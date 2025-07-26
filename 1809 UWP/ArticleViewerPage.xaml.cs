@@ -182,35 +182,50 @@ namespace _1809_UWP
             var isDarkTheme = Application.Current.RequestedTheme == ApplicationTheme.Dark;
             var textColor = isDarkTheme ? "#E8E8E8" : "#202020";
             var linkColor = isDarkTheme ? "#78B2F3" : "#0066CC";
+            var tableBackgroundColor = isDarkTheme ? "rgba(40, 40, 40, 0.7)" : "rgba(255, 255, 255, 0.5)";
 
             var style = $@"
-                <style>
-                    html, body {{ 
-                        background-color: transparent !important; 
-                        color: {textColor}; 
-                        font-family: 'Segoe UI', sans-serif;
-                        margin: 0; padding: 0;
-                    }}
-                    a {{ color: {linkColor}; text-decoration: none; }}
-                    a:hover {{ text-decoration: underline; }}
-                    .mw-editsection, .reflist, .gallery, .thumb, .infobox, table.infobox, table.infobox > tbody > tr > th, table.infobox > tbody > tr > td {{ 
-                        background-color: transparent !important; 
-                    }}
-                    table.infobox {{ border-color: gray; }}
-                </style>";
+        <style>
+            html, body {{ 
+                background-color: transparent !important; 
+                color: {textColor}; 
+                font-family: 'Segoe UI', sans-serif;
+                margin: 0; padding: 0;
+            }}
+            a {{ color: {linkColor}; text-decoration: none; }}
+            a:hover {{ text-decoration: underline; }}
+            .mw-editsection, .reflist {{ display: none; }}
+            .infobox, table.wikitable {{
+                background-color: {tableBackgroundColor} !important;
+                border-radius: 8px;
+                border-collapse: separate;
+                border-spacing: 0;
+                border-color: transparent !important;
+            }}
+            
+            .infobox > tbody > tr > th, .infobox > tbody > tr > td,
+            .wikitable > tbody > tr > th, .wikitable > tbody > tr > td {{
+                padding: 8px;
+            }}
+
+            .gallery, .thumb,
+            .infobox > tbody > tr > th, .infobox > tbody > tr > td {{ 
+                background-color: transparent !important; 
+            }}
+        </style>";
 
             return $@"
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <meta charset='UTF-8'>
-                    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-                    {style}
-                </head>
-                <body>
-                    {doc.DocumentNode.OuterHtml}
-                </body>
-                </html>";
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset='UTF-8'>
+            <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+            {style}
+        </head>
+        <body>
+            {doc.DocumentNode.OuterHtml}
+        </body>
+        </html>";
         }
     }
 }
