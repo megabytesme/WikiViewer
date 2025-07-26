@@ -27,6 +27,8 @@
                        Margin="12,0,12,12"/>
 
         <xaml:WebView2 x:Name="SilentFetchView" Width="1" Height="1" Opacity="0" Grid.RowSpan="2" />
+        
+        <Grid x:Name="WorkerWebViewHost" Visibility="Collapsed"/>
 
         <Grid x:Name="LoadingOverlay" Background="Transparent" Visibility="Collapsed" Grid.RowSpan="2">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
