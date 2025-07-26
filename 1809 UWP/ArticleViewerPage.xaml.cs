@@ -55,13 +55,10 @@ namespace _1809_UWP
             try
             {
                 Environment.SetEnvironmentVariable("WEBVIEW2_DEFAULT_BACKGROUND_COLOR", "00FFFFFF");
-
                 await SilentFetchView.EnsureCoreWebView2Async();
                 await ArticleDisplayWebView.EnsureCoreWebView2Async();
-
                 var tempFolder = ApplicationData.Current.LocalFolder.Path;
                 ArticleDisplayWebView.CoreWebView2.SetVirtualHostNameToFolderMapping(VirtualHostName, tempFolder, CoreWebView2HostResourceAccessKind.Allow);
-
                 SilentFetchView.CoreWebView2.NavigationCompleted += CoreWebView2_NavigationCompleted;
                 _isInitialized = true;
                 if (!string.IsNullOrEmpty(_pageTitleToFetch))
@@ -106,7 +103,6 @@ namespace _1809_UWP
                 {
                     string script = "document.body.innerText;";
                     string scriptResult = await sender.ExecuteScriptAsync(script);
-
                     string resultJson;
                     try
                     {
@@ -119,16 +115,13 @@ namespace _1809_UWP
                     }
 
                     if (string.IsNullOrEmpty(resultJson))
-                    {
                         throw new Exception("WebView returned empty content after JSON deserialization.");
-                    }
 
                     if (_currentFetchStep == FetchStep.GetRandomTitle)
                     {
                         var randomResponse = JsonSerializer.Deserialize<RandomQueryResponse>(resultJson);
                         string randomTitle = randomResponse?.query?.random?.FirstOrDefault()?.title;
                         if (string.IsNullOrEmpty(randomTitle)) throw new Exception("Failed to get a random title from the API.");
-
                         _pageTitleToFetch = randomTitle;
                         _currentFetchStep = FetchStep.ParseArticleContent;
                         LoadingText.Text = $"Parsing: '{_pageTitleToFetch}'...";
@@ -141,16 +134,12 @@ namespace _1809_UWP
                         string htmlContent = apiResponse?.parse?.text?.Content;
                         string articleTitle = apiResponse?.parse?.title;
                         if (string.IsNullOrEmpty(htmlContent) || string.IsNullOrEmpty(articleTitle)) throw new Exception("API response did not contain valid title or content.");
-
                         ArticleTitle.Text = articleTitle;
                         string processedHtml = await ProcessHtmlAsync(htmlContent);
-
                         StorageFolder localFolder = ApplicationData.Current.LocalFolder;
                         StorageFile articleFile = await localFolder.CreateFileAsync("article.html", CreationCollisionOption.ReplaceExisting);
                         await FileIO.WriteTextAsync(articleFile, processedHtml);
-
                         ArticleDisplayWebView.CoreWebView2.Navigate($"https://{VirtualHostName}/article.html");
-
                         LoadingOverlay.Visibility = Visibility.Collapsed;
                         _currentFetchStep = FetchStep.Idle;
                     }
@@ -178,9 +167,7 @@ namespace _1809_UWP
         private async Task<string> NavigateAndFetchImageAsBase64Async(string imageUrl)
         {
             if (string.IsNullOrEmpty(imageUrl)) return null;
-
             var tcs = new TaskCompletionSource<string>();
-
             TypedEventHandler<CoreWebView2, CoreWebView2NavigationCompletedEventArgs> navigationHandler = null;
             navigationHandler = async (sender, args) =>
             {
@@ -216,7 +203,6 @@ namespace _1809_UWP
                     tcs.TrySetResult(null);
                 }
             };
-
             try
             {
                 SilentFetchView.CoreWebView2.NavigationCompleted += navigationHandler;
@@ -239,16 +225,26 @@ namespace _1809_UWP
             string baseUrl = "https://betawiki.net";
             var baseUri = new Uri(baseUrl);
 
-            var imageLinks = doc.DocumentNode.SelectNodes("//a[starts-with(@href, '/wiki/File:')]");
-            if (imageLinks != null && imageLinks.Any())
+            var nodesToRemove = doc.DocumentNode.SelectNodes("//link[contains(@href, 'mw-data:TemplateStyles')] | //style[contains(@data-mw-deduplicate, 'TemplateStyles')]");
+            if (nodesToRemove != null)
             {
-                var imageFileNames = imageLinks.Select(link => link.GetAttributeValue("href", "").Substring(6)).Distinct().ToList();
-                var titles = string.Join("|", imageFileNames.Select(Uri.EscapeDataString));
-                var imageUrlApi = $"{ApiBaseUrl}?action=query&prop=imageinfo&iiprop=url&format=json&titles={titles}";
+                foreach (var node in nodesToRemove) { node.Remove(); }
+            }
+            var legendCells = doc.DocumentNode.SelectNodes("//td[contains(@class, 'table-version')]");
+            if (legendCells != null)
+            {
+                foreach (var cell in legendCells) { cell.Attributes.Remove("style"); }
+            }
 
-                SilentFetchView.CoreWebView2.NavigationCompleted -= CoreWebView2_NavigationCompleted;
-                try
+            SilentFetchView.CoreWebView2.NavigationCompleted -= CoreWebView2_NavigationCompleted;
+            try
+            {
+                var imageLinks = doc.DocumentNode.SelectNodes("//a[starts-with(@href, '/wiki/File:')]");
+                if (imageLinks != null && imageLinks.Any())
                 {
+                    var imageFileNames = imageLinks.Select(link => link.GetAttributeValue("href", "").Substring(6)).Distinct().ToList();
+                    var titles = string.Join("|", imageFileNames.Select(Uri.EscapeDataString));
+                    var imageUrlApi = $"{ApiBaseUrl}?action=query&prop=imageinfo&iiprop=url&format=json&titles={titles}";
                     var tcs = new TaskCompletionSource<string>();
                     TypedEventHandler<CoreWebView2, CoreWebView2NavigationCompletedEventArgs> handler = null;
                     handler = async (sender, args) =>
@@ -260,23 +256,18 @@ namespace _1809_UWP
                             string scriptResult = await sender.ExecuteScriptAsync(script);
                             string resultJson;
                             try { resultJson = JsonSerializer.Deserialize<string>(scriptResult); }
-                            catch (JsonException) { Debug.WriteLine("[LOG] Image API content is not JSON, assuming Cloudflare interstitial. Waiting..."); return; }
+                            catch (JsonException) { Debug.WriteLine("[LOG] Image API content is not JSON, assuming Cloudflare. Waiting..."); return; }
                             tcs.TrySetResult(resultJson);
                         }
                         catch (Exception ex) { tcs.TrySetException(ex); }
                     };
                     SilentFetchView.CoreWebView2.NavigationCompleted += handler;
                     SilentFetchView.CoreWebView2.Navigate(imageUrlApi);
-
                     var imageJsonResponse = await tcs.Task;
                     var imageInfoResponse = JsonSerializer.Deserialize<ImageQueryResponse>(imageJsonResponse);
-
                     if (imageInfoResponse?.query?.pages != null)
                     {
-                        var imageUrlMap = imageInfoResponse.query.pages.Values
-                            .Where(p => p.imageinfo?.FirstOrDefault()?.url != null)
-                            .ToDictionary(p => p.title, p => p.imageinfo.First().url);
-
+                        var imageUrlMap = imageInfoResponse.query.pages.Values.Where(p => p.imageinfo?.FirstOrDefault()?.url != null).ToDictionary(p => p.title, p => p.imageinfo.First().url);
                         if (imageUrlMap.Any())
                         {
                             foreach (var link in imageLinks)
@@ -291,30 +282,15 @@ namespace _1809_UWP
                         }
                     }
                 }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[LOG] Failed to get image URLs: {ex.Message}");
-                }
-                finally
-                {
-                    SilentFetchView.CoreWebView2.NavigationCompleted += CoreWebView2_NavigationCompleted;
-                }
-            }
 
-            SilentFetchView.CoreWebView2.NavigationCompleted -= CoreWebView2_NavigationCompleted;
-            try
-            {
                 var allImages = doc.DocumentNode.SelectNodes("//img");
                 if (allImages != null)
                 {
                     foreach (var img in allImages)
                     {
-                        string originalSrc = img.GetAttributeValue("srcset", null)?.Split(',').FirstOrDefault()?.Trim().Split(' ')[0]
-                                            ?? img.GetAttributeValue("src", null);
-
+                        string originalSrc = img.GetAttributeValue("srcset", null)?.Split(',').FirstOrDefault()?.Trim().Split(' ')[0] ?? img.GetAttributeValue("src", null);
                         if (string.IsNullOrEmpty(originalSrc) || originalSrc.StartsWith("data:image")) continue;
                         if (!Uri.TryCreate(baseUri, originalSrc, out Uri resultUri)) continue;
-
                         string base64Data = await NavigateAndFetchImageAsBase64Async(resultUri.AbsoluteUri);
                         if (!string.IsNullOrEmpty(base64Data))
                         {
@@ -340,33 +316,107 @@ namespace _1809_UWP
             }
 
             var isDarkTheme = Application.Current.RequestedTheme == ApplicationTheme.Dark;
-            var textColor = isDarkTheme ? "#E8E8E8" : "#202020";
-            var linkColor = isDarkTheme ? "#78B2F3" : "#0066CC";
-            var tableBackgroundColor = isDarkTheme ? "rgba(40, 40, 40, 0.7)" : "rgba(255, 255, 255, 0.5)";
+            string cssVariables;
+            if (isDarkTheme)
+            {
+                cssVariables = @":root {
+            --text-primary: #FFFFFF;
+            --text-secondary: #C3C3C3;
+            --link-color: #85B9F3;
+            --card-shadow: rgba(0, 0, 0, 0.4);
+            --card-background: rgba(44, 44, 44, 0.7);
+            --card-border: rgba(255, 255, 255, 0.1);
+            --card-header-background: rgba(255, 255, 255, 0.08);
+            --item-hover-background: rgba(255, 255, 255, 0.07);
+            --table-row-divider: rgba(255, 255, 255, 0.08);
+            --legend-unsupported-tint: linear-gradient(rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.15));
+            --legend-supported-tint: linear-gradient(rgba(234, 179, 8, 0.15), rgba(234, 179, 8, 0.15));
+            --legend-latest-tint: linear-gradient(rgba(34, 197, 94, 0.15), rgba(34, 197, 94, 0.15));
+            --legend-preview-tint: linear-gradient(rgba(249, 115, 22, 0.15), rgba(249, 115, 22, 0.15));
+            --legend-future-tint: linear-gradient(rgba(59, 130, 246, 0.15), rgba(59, 130, 246, 0.15));
+            --legend-na-tint: linear-gradient(rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.04));
+        }";
+            }
+            else
+            {
+                cssVariables = @":root {
+            --text-primary: #000000;
+            --text-secondary: #505050;
+            --link-color: #0066CC;
+            --card-shadow: rgba(0, 0, 0, 0.13);
+            --card-background: rgba(249, 249, 249, 0.7);
+            --card-border: rgba(0, 0, 0, 0.1);
+            --card-header-background: rgba(0, 0, 0, 0.05);
+            --item-hover-background: rgba(0, 0, 0, 0.05);
+            --table-row-divider: rgba(0, 0, 0, 0.08);
+            --legend-unsupported-tint: linear-gradient(rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.1));
+            --legend-supported-tint: linear-gradient(rgba(234, 179, 8, 0.1), rgba(234, 179, 8, 0.1));
+            --legend-latest-tint: linear-gradient(rgba(34, 197, 94, 0.1), rgba(34, 197, 94, 0.1));
+            --legend-preview-tint: linear-gradient(rgba(249, 115, 22, 0.1), rgba(249, 115, 22, 0.1));
+            --legend-future-tint: linear-gradient(rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.1));
+            --legend-na-tint: linear-gradient(rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.04));
+        }";
+            }
 
             var style = $@"<style>
-                    html, body {{ background-color: transparent !important; color: {textColor}; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; }}
-                    a {{ color: {linkColor}; text-decoration: none; }}
-                    a:hover {{ text-decoration: underline; }}
-                    .mw-editsection, .reflist {{ display: none; }}
-                    img {{ max-width: 100%; height: auto; }}
-                    .infobox, table.wikitable {{ background-color: {tableBackgroundColor} !important; border-radius: 8px; border-collapse: separate; border-spacing: 0; border-color: transparent !important; }}
-                    .infobox > tbody > tr > th, .infobox > tbody > tr > td, .wikitable > tbody > tr > th, .wikitable > tbody > tr > td {{ padding: 8px; }}
-                    .gallery, .thumb, .infobox > tbody > tr > th, .infobox > tbody > tr > td {{ background-color: transparent !important; }}
-                </style>";
+        {cssVariables}
+        html, body {{ background-color: transparent !important; color: var(--text-primary); font-family: 'Segoe UI Variable', 'Segoe UI', sans-serif; margin: 0; padding: 12px; font-size: 15px; -webkit-font-smoothing: antialiased; }}
+        a {{ color: var(--link-color); text-decoration: none; }}
+        a:hover {{ text-decoration: underline; }}
+        a.selflink, a.new {{ color: var(--text-secondary); pointer-events: none; text-decoration: none; }}
+        img {{ max-width: 100%; height: auto; border-radius: 4px; }}
+        .mw-editsection, .reflist {{ display: none; }}
+
+        .infobox {{ float: right; margin: 0 0 1em 1.5em; width: 22em; }}
+        .hlist ul {{ padding: 0; margin: 0; list-style: none; }}
+        .hlist li {{ display: inline; white-space: nowrap; }}
+        .hlist li:not(:first-child)::before {{ content: ' \00B7 '; font-weight: bold; }}
+        .hlist dl, .hlist ol, .hlist ul {{ display: inline; }}
+
+        .infobox, table.wikitable, .navbox {{ background-color: var(--card-background) !important; border: 1px solid var(--card-border); border-radius: 8px; box-shadow: 0 4px 12px var(--card-shadow); border-collapse: separate; border-spacing: 0; margin-bottom: 16px; overflow: hidden; }}
+        
+        .infobox > tbody > tr > *, .wikitable > tbody > tr > * {{ vertical-align: middle; }}
+        .infobox > tbody > tr > th, .infobox > tbody > tr > td, .wikitable > tbody > tr > th, .wikitable > tbody > tr > td {{ padding: 12px 16px; text-align: left; border: none; }}
+        .infobox > tbody > tr:not(:last-child) > *, .wikitable > tbody > tr:not(:last-child) > * {{ border-bottom: 1px solid var(--table-row-divider); }}
+        .infobox > tbody > tr > th, .wikitable > tbody > tr > th {{ font-weight: 600; color: var(--text-secondary); }}
+
+        .wikitable .table-version-unsupported {{ background-image: var(--legend-unsupported-tint); }}
+        .wikitable .table-version-supported {{ background-image: var(--legend-supported-tint); }}
+        .wikitable .table-version-latest {{ background-image: var(--legend-latest-tint); }}
+        .wikitable .table-version-preview {{ background-image: var(--legend-preview-tint); }}
+        .wikitable .table-version-future {{ background-image: var(--legend-future-tint); }}
+        .wikitable .table-na {{ background-image: var(--legend-na-tint); color: var(--text-secondary) !important; }}
+        .version-legend-horizontal {{ padding: 8px 16px; font-size: 13px; color: var(--text-secondary); text-align: center; }}
+        .version-legend-square {{ display: inline-block; width: 1em; height: 1em; margin-right: 0.5em; border: 1px solid var(--card-border); vertical-align: -0.1em; }}
+        .version-legend-horizontal .version-unsupported.version-legend-square {{ background-image: var(--legend-unsupported-tint); }}
+        .version-legend-horizontal .version-supported.version-legend-square {{ background-image: var(--legend-supported-tint); }}
+        .version-legend-horizontal .version-latest.version-legend-square {{ background-image: var(--legend-latest-tint); }}
+        .version-legend-horizontal .version-preview.version-legend-square {{ background-image: var(--legend-preview-tint); }}
+        .version-legend-horizontal .version-future.version-legend-square {{ background-image: var(--legend-future-tint); }}
+        
+        .navbox-title, .navbox-group {{ background: var(--card-header-background); padding: 12px 16px; font-weight: 600; }}
+        .navbox-title {{ border-bottom: 1px solid var(--card-border); font-size: 16px; }}
+        .navbox-group {{ border-top: 1px solid var(--card-border); font-size: 12px; text-transform: uppercase; }}
+        .navbox-title a, .navbox-title a:link, .navbox-title a:visited {{ color: var(--text-primary); text-decoration: none; }}
+        .navbox-group a, .navbox-group a:link, .navbox-group a:visited {{ color: var(--text-secondary); text-decoration: none; }}
+        .navbox-inner {{ padding: 8px; }}
+        .navbox-list li a {{ padding: 4px 6px; border-radius: 4px; transition: background-color 0.15s ease-in-out; }}
+        .navbox-list li a:hover {{ background: var(--item-hover-background); text-decoration: none; }}
+        .navbox-image {{ float: right; margin: 16px; }}
+    </style>";
 
             return $@"
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <meta charset='UTF-8'>
-                    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-                    {style}
-                </head>
-                <body>
-                    {doc.DocumentNode.OuterHtml}
-                </body>
-                </html>";
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset='UTF-8'>
+            <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+            {style}
+        </head>
+        <body>
+            {doc.DocumentNode.OuterHtml}
+        </body>
+        </html>";
         }
     }
 }
