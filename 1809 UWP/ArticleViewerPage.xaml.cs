@@ -40,17 +40,11 @@ namespace _1809_UWP
         private const string VirtualHostName = "local.betawiki-app.net";
         private bool _isInitialized = false;
         private readonly int _maxWorkerCount;
-        private List<WebView2> _webViewWorkers;
-        private ConcurrentQueue<WebView2> _availableWorkers;
-        private SemaphoreSlim _workerSemaphore;
 
         public ArticleViewerPage()
         {
             this.InitializeComponent();
             _maxWorkerCount = Environment.ProcessorCount;
-            _webViewWorkers = new List<WebView2>();
-            _availableWorkers = new ConcurrentQueue<WebView2>();
-            _workerSemaphore = new SemaphoreSlim(_maxWorkerCount, _maxWorkerCount);
         }
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -69,22 +63,8 @@ namespace _1809_UWP
             {
                 Environment.SetEnvironmentVariable("WEBVIEW2_DEFAULT_BACKGROUND_COLOR", "00FFFFFF");
 
-                var coreInitTasks = new List<Task>
-        {
-            SilentFetchView.EnsureCoreWebView2Async().AsTask(),
-            ArticleDisplayWebView.EnsureCoreWebView2Async().AsTask()
-        };
-
-                for (int i = 0; i < _maxWorkerCount; i++)
-                {
-                    var worker = new WebView2();
-                    _webViewWorkers.Add(worker);
-                    WorkerWebViewHost.Children.Add(worker);
-                    coreInitTasks.Add(worker.EnsureCoreWebView2Async().AsTask());
-                }
-
-                await Task.WhenAll(coreInitTasks);
-                foreach (var worker in _webViewWorkers) _availableWorkers.Enqueue(worker);
+                await SilentFetchView.EnsureCoreWebView2Async();
+                await ArticleDisplayWebView.EnsureCoreWebView2Async();
 
                 var tempFolder = ApplicationData.Current.LocalFolder.Path;
                 ArticleDisplayWebView.CoreWebView2.SetVirtualHostNameToFolderMapping(VirtualHostName, tempFolder, CoreWebView2HostResourceAccessKind.Allow);
@@ -108,9 +88,6 @@ namespace _1809_UWP
         {
             ArticleDisplayWebView?.Close();
             SilentFetchView?.Close();
-            foreach (var worker in _webViewWorkers) worker?.Close();
-            _webViewWorkers.Clear();
-            _workerSemaphore?.Dispose();
 
             ArticleDisplayWebView = null;
             SilentFetchView = null;
@@ -264,6 +241,10 @@ namespace _1809_UWP
             if (legendCells != null) { foreach (var cell in legendCells) { cell.Attributes.Remove("style"); } }
 
             SilentFetchView.CoreWebView2.NavigationCompleted -= CoreWebView2_NavigationCompleted;
+
+            List<WebView2> webViewWorkers = new List<WebView2>();
+            SemaphoreSlim workerSemaphore = null;
+
             try
             {
                 var imageLinks = doc.DocumentNode.SelectNodes("//a[starts-with(@href, '/wiki/File:')]");
@@ -311,8 +292,23 @@ namespace _1809_UWP
                 }
 
                 var allImages = doc.DocumentNode.SelectNodes("//img");
-                if (allImages != null)
+                if (allImages != null && allImages.Count > 0)
                 {
+                    int workersToCreate = Math.Min(allImages.Count, _maxWorkerCount);
+                    workerSemaphore = new SemaphoreSlim(workersToCreate, workersToCreate);
+                    var availableWorkers = new ConcurrentQueue<WebView2>();
+
+                    var coreInitTasks = new List<Task>();
+                    for (int i = 0; i < workersToCreate; i++)
+                    {
+                        var worker = new WebView2();
+                        webViewWorkers.Add(worker);
+                        WorkerWebViewHost.Children.Add(worker);
+                        coreInitTasks.Add(worker.EnsureCoreWebView2Async().AsTask());
+                    }
+                    await Task.WhenAll(coreInitTasks);
+                    foreach (var worker in webViewWorkers) availableWorkers.Enqueue(worker);
+
                     var imageDownloadTasks = allImages.Select(async img =>
                     {
                         string originalSrc = img.GetAttributeValue("srcset", null)?.Split(',').FirstOrDefault()?.Trim().Split(' ')[0] ?? img.GetAttributeValue("src", null);
@@ -321,8 +317,8 @@ namespace _1809_UWP
                             return;
                         }
 
-                        await _workerSemaphore.WaitAsync();
-                        _availableWorkers.TryDequeue(out WebView2 worker);
+                        await workerSemaphore.WaitAsync();
+                        availableWorkers.TryDequeue(out WebView2 worker);
                         try
                         {
                             string localImagePath = await DownloadAndCacheImageAsync(resultUri, imageCacheFolder, worker);
@@ -337,8 +333,8 @@ namespace _1809_UWP
                         }
                         finally
                         {
-                            _availableWorkers.Enqueue(worker);
-                            _workerSemaphore.Release();
+                            availableWorkers.Enqueue(worker);
+                            workerSemaphore.Release();
                         }
                     }).ToList();
 
@@ -348,6 +344,10 @@ namespace _1809_UWP
             finally
             {
                 SilentFetchView.CoreWebView2.NavigationCompleted += CoreWebView2_NavigationCompleted;
+
+                foreach (var worker in webViewWorkers) worker?.Close();
+                WorkerWebViewHost.Children.Clear();
+                workerSemaphore?.Dispose();
             }
 
             foreach (var link in doc.DocumentNode.SelectNodes("//a[@href]") ?? Enumerable.Empty<HtmlNode>())
@@ -365,81 +365,81 @@ namespace _1809_UWP
             if (isDarkTheme)
             {
                 cssVariables = @":root {
-                    --text-primary: #FFFFFF; --text-secondary: #C3C3C3; --link-color: #85B9F3; --card-shadow: rgba(0, 0, 0, 0.4);
-                    --card-background: rgba(44, 44, 44, 0.7); --card-border: rgba(255, 255, 255, 0.1); --card-header-background: rgba(255, 255, 255, 0.08);
-                    --item-hover-background: rgba(255, 255, 255, 0.07); --table-row-divider: rgba(255, 255, 255, 0.08);
-                    --legend-unsupported-tint: linear-gradient(rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.15));
-                    --legend-supported-tint: linear-gradient(rgba(234, 179, 8, 0.15), rgba(234, 179, 8, 0.15));
-                    --legend-latest-tint: linear-gradient(rgba(34, 197, 94, 0.15), rgba(34, 197, 94, 0.15));
-                    --legend-preview-tint: linear-gradient(rgba(249, 115, 22, 0.15), rgba(249, 115, 22, 0.15));
-                    --legend-future-tint: linear-gradient(rgba(59, 130, 246, 0.15), rgba(59, 130, 246, 0.15));
-                    --legend-na-tint: linear-gradient(rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.04));
-                }";
+            --text-primary: #FFFFFF; --text-secondary: #C3C3C3; --link-color: #85B9F3; --card-shadow: rgba(0, 0, 0, 0.4);
+            --card-background: rgba(44, 44, 44, 0.7); --card-border: rgba(255, 255, 255, 0.1); --card-header-background: rgba(255, 255, 255, 0.08);
+            --item-hover-background: rgba(255, 255, 255, 0.07); --table-row-divider: rgba(255, 255, 255, 0.08);
+            --legend-unsupported-tint: linear-gradient(rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.15));
+            --legend-supported-tint: linear-gradient(rgba(234, 179, 8, 0.15), rgba(234, 179, 8, 0.15));
+            --legend-latest-tint: linear-gradient(rgba(34, 197, 94, 0.15), rgba(34, 197, 94, 0.15));
+            --legend-preview-tint: linear-gradient(rgba(249, 115, 22, 0.15), rgba(249, 115, 22, 0.15));
+            --legend-future-tint: linear-gradient(rgba(59, 130, 246, 0.15), rgba(59, 130, 246, 0.15));
+            --legend-na-tint: linear-gradient(rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.04));
+        }";
             }
             else
             {
                 cssVariables = @":root {
-                    --text-primary: #000000; --text-secondary: #505050; --link-color: #0066CC; --card-shadow: rgba(0, 0, 0, 0.13);
-                    --card-background: rgba(249, 249, 249, 0.7); --card-border: rgba(0, 0, 0, 0.1); --card-header-background: rgba(0, 0, 0, 0.05);
-                    --item-hover-background: rgba(0, 0, 0, 0.05); --table-row-divider: rgba(0, 0, 0, 0.08);
-                    --legend-unsupported-tint: linear-gradient(rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.1));
-                    --legend-supported-tint: linear-gradient(rgba(234, 179, 8, 0.1), rgba(234, 179, 8, 0.1));
-                    --legend-latest-tint: linear-gradient(rgba(34, 197, 94, 0.1), rgba(34, 197, 94, 0.1));
-                    --legend-preview-tint: linear-gradient(rgba(249, 115, 22, 0.1), rgba(249, 115, 22, 0.1));
-                    --legend-future-tint: linear-gradient(rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.1));
-                    --legend-na-tint: linear-gradient(rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.04));
-                }";
+            --text-primary: #000000; --text-secondary: #505050; --link-color: #0066CC; --card-shadow: rgba(0, 0, 0, 0.13);
+            --card-background: rgba(249, 249, 249, 0.7); --card-border: rgba(0, 0, 0, 0.1); --card-header-background: rgba(0, 0, 0, 0.05);
+            --item-hover-background: rgba(0, 0, 0, 0.05); --table-row-divider: rgba(0, 0, 0, 0.08);
+            --legend-unsupported-tint: linear-gradient(rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.1));
+            --legend-supported-tint: linear-gradient(rgba(234, 179, 8, 0.1), rgba(234, 179, 8, 0.1));
+            --legend-latest-tint: linear-gradient(rgba(34, 197, 94, 0.1), rgba(34, 197, 94, 0.1));
+            --legend-preview-tint: linear-gradient(rgba(249, 115, 22, 0.1), rgba(249, 115, 22, 0.1));
+            --legend-future-tint: linear-gradient(rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.1));
+            --legend-na-tint: linear-gradient(rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.04));
+        }";
             }
 
             var style = $@"<style>
-                {cssVariables}
-                html, body {{ background-color: transparent !important; color: var(--text-primary); font-family: 'Segoe UI Variable', 'Segoe UI', sans-serif; margin: 0; padding: 12px; font-size: 15px; -webkit-font-smoothing: antialiased; }}
-                a {{ color: var(--link-color); text-decoration: none; }} a:hover {{ text-decoration: underline; }}
-                a.selflink, a.new {{ color: var(--text-secondary); pointer-events: none; text-decoration: none; }}
-                img {{ max-width: 100%; height: auto; border-radius: 4px; }} .mw-editsection, .reflist {{ display: none; }}
-                .infobox {{ float: right; margin: 0 0 1em 1.5em; width: 22em; }}
-                .hlist ul {{ padding: 0; margin: 0; list-style: none; }} .hlist li {{ display: inline; white-space: nowrap; }}
-                .hlist li:not(:first-child)::before {{ content: ' \00B7 '; font-weight: bold; }} .hlist dl, .hlist ol, .hlist ul {{ display: inline; }}
-                .infobox, table.wikitable, .navbox {{ background-color: var(--card-background) !important; border: 1px solid var(--card-border); border-radius: 8px; box-shadow: 0 4px 12px var(--card-shadow); border-collapse: separate; border-spacing: 0; margin-bottom: 16px; overflow: hidden; }}
-                .infobox > tbody > tr > *, .wikitable > tbody > tr > * {{ vertical-align: middle; }}
-                .infobox > tbody > tr > th, .infobox > tbody > tr > td, .wikitable > tbody > tr > th, .wikitable > tbody > tr > td {{ padding: 12px 16px; text-align: left; border: none; }}
-                .infobox > tbody > tr:not(:last-child) > *, .wikitable > tbody > tr:not(:last-child) > * {{ border-bottom: 1px solid var(--table-row-divider); }}
-                .infobox > tbody > tr > th, .wikitable > tbody > tr > th {{ font-weight: 600; color: var(--text-secondary); }}
-                .wikitable .table-version-unsupported {{ background-image: var(--legend-unsupported-tint); }}
-                .wikitable .table-version-supported {{ background-image: var(--legend-supported-tint); }}
-                .wikitable .table-version-latest {{ background-image: var(--legend-latest-tint); }}
-                .wikitable .table-version-preview {{ background-image: var(--legend-preview-tint); }}
-                .wikitable .table-version-future {{ background-image: var(--legend-future-tint); }}
-                .wikitable .table-na {{ background-image: var(--legend-na-tint); color: var(--text-secondary) !important; }}
-                .version-legend-horizontal {{ padding: 8px 16px; font-size: 13px; color: var(--text-secondary); text-align: center; }}
-                .version-legend-square {{ display: inline-block; width: 1em; height: 1em; margin-right: 0.5em; border: 1px solid var(--card-border); vertical-align: -0.1em; }}
-                .version-legend-horizontal .version-unsupported.version-legend-square {{ background-image: var(--legend-unsupported-tint); }}
-                .version-legend-horizontal .version-supported.version-legend-square {{ background-image: var(--legend-supported-tint); }}
-                .version-legend-horizontal .version-latest.version-legend-square {{ background-image: var(--legend-latest-tint); }}
-                .version-legend-horizontal .version-preview.version-legend-square {{ background-image: var(--legend-preview-tint); }}
-                .version-legend-horizontal .version-future.version-legend-square {{ background-image: var(--legend-future-tint); }}
-                .navbox-title, .navbox-group {{ background: var(--card-header-background); padding: 12px 16px; font-weight: 600; }}
-                .navbox-title {{ border-bottom: 1px solid var(--card-border); font-size: 16px; }}
-                .navbox-group {{ border-top: 1px solid var(--card-border); font-size: 12px; text-transform: uppercase; }}
-                .navbox-title a, .navbox-title a:link, .navbox-title a:visited {{ color: var(--text-primary); text-decoration: none; }}
-                .navbox-group a, .navbox-group a:link, .navbox-group a:visited {{ color: var(--text-secondary); text-decoration: none; }}
-                .navbox-inner {{ padding: 8px; }} .navbox-list li a {{ padding: 4px 6px; border-radius: 4px; transition: background-color 0.15s ease-in-out; }}
-                .navbox-list li a:hover {{ background: var(--item-hover-background); text-decoration: none; }}
-                .navbox-image {{ float: right; margin: 16px; }}
-            </style>";
+        {cssVariables}
+        html, body {{ background-color: transparent !important; color: var(--text-primary); font-family: 'Segoe UI Variable', 'Segoe UI', sans-serif; margin: 0; padding: 12px; font-size: 15px; -webkit-font-smoothing: antialiased; }}
+        a {{ color: var(--link-color); text-decoration: none; }} a:hover {{ text-decoration: underline; }}
+        a.selflink, a.new {{ color: var(--text-secondary); pointer-events: none; text-decoration: none; }}
+        img {{ max-width: 100%; height: auto; border-radius: 4px; }} .mw-editsection, .reflist {{ display: none; }}
+        .infobox {{ float: right; margin: 0 0 1em 1.5em; width: 22em; }}
+        .hlist ul {{ padding: 0; margin: 0; list-style: none; }} .hlist li {{ display: inline; white-space: nowrap; }}
+        .hlist li:not(:first-child)::before {{ content: ' \00B7 '; font-weight: bold; }} .hlist dl, .hlist ol, .hlist ul {{ display: inline; }}
+        .infobox, table.wikitable, .navbox {{ background-color: var(--card-background) !important; border: 1px solid var(--card-border); border-radius: 8px; box-shadow: 0 4px 12px var(--card-shadow); border-collapse: separate; border-spacing: 0; margin-bottom: 16px; overflow: hidden; }}
+        .infobox > tbody > tr > *, .wikitable > tbody > tr > * {{ vertical-align: middle; }}
+        .infobox > tbody > tr > th, .infobox > tbody > tr > td, .wikitable > tbody > tr > th, .wikitable > tbody > tr > td {{ padding: 12px 16px; text-align: left; border: none; }}
+        .infobox > tbody > tr:not(:last-child) > *, .wikitable > tbody > tr:not(:last-child) > * {{ border-bottom: 1px solid var(--table-row-divider); }}
+        .infobox > tbody > tr > th, .wikitable > tbody > tr > th {{ font-weight: 600; color: var(--text-secondary); }}
+        .wikitable .table-version-unsupported {{ background-image: var(--legend-unsupported-tint); }}
+        .wikitable .table-version-supported {{ background-image: var(--legend-supported-tint); }}
+        .wikitable .table-version-latest {{ background-image: var(--legend-latest-tint); }}
+        .wikitable .table-version-preview {{ background-image: var(--legend-preview-tint); }}
+        .wikitable .table-version-future {{ background-image: var(--legend-future-tint); }}
+        .wikitable .table-na {{ background-image: var(--legend-na-tint); color: var(--text-secondary) !important; }}
+        .version-legend-horizontal {{ padding: 8px 16px; font-size: 13px; color: var(--text-secondary); text-align: center; }}
+        .version-legend-square {{ display: inline-block; width: 1em; height: 1em; margin-right: 0.5em; border: 1px solid var(--card-border); vertical-align: -0.1em; }}
+        .version-legend-horizontal .version-unsupported.version-legend-square {{ background-image: var(--legend-unsupported-tint); }}
+        .version-legend-horizontal .version-supported.version-legend-square {{ background-image: var(--legend-supported-tint); }}
+        .version-legend-horizontal .version-latest.version-legend-square {{ background-image: var(--legend-latest-tint); }}
+        .version-legend-horizontal .version-preview.version-legend-square {{ background-image: var(--legend-preview-tint); }}
+        .version-legend-horizontal .version-future.version-legend-square {{ background-image: var(--legend-future-tint); }}
+        .navbox-title, .navbox-group {{ background: var(--card-header-background); padding: 12px 16px; font-weight: 600; }}
+        .navbox-title {{ border-bottom: 1px solid var(--card-border); font-size: 16px; }}
+        .navbox-group {{ border-top: 1px solid var(--card-border); font-size: 12px; text-transform: uppercase; }}
+        .navbox-title a, .navbox-title a:link, .navbox-title a:visited {{ color: var(--text-primary); text-decoration: none; }}
+        .navbox-group a, .navbox-group a:link, .navbox-group a:visited {{ color: var(--text-secondary); text-decoration: none; }}
+        .navbox-inner {{ padding: 8px; }} .navbox-list li a {{ padding: 4px 6px; border-radius: 4px; transition: background-color 0.15s ease-in-out; }}
+        .navbox-list li a:hover {{ background: var(--item-hover-background); text-decoration: none; }}
+        .navbox-image {{ float: right; margin: 16px; }}
+    </style>";
 
             return $@"
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <meta charset='UTF-8'>
-                    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-                    {style}
-                </head>
-                <body>
-                    {doc.DocumentNode.OuterHtml}
-                </body>
-                </html>";
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset='UTF-8'>
+            <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+            {style}
+        </head>
+        <body>
+            {doc.DocumentNode.OuterHtml}
+        </body>
+        </html>";
         }
     }
 }
