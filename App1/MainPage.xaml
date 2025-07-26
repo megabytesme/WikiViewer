@@ -5,10 +5,34 @@
     xmlns:local="using:App1"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:xaml="using:Microsoft.UI.Xaml.Controls"
     mc:Ignorable="d"
-    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
+    Loaded="Page_Loaded">
 
     <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
 
+        <StackPanel Grid.Row="0" Margin="20" Spacing="20">
+            <TextBlock Text="BetaWiki API Test (WebView2)" FontSize="24" HorizontalAlignment="Center"/>
+            <Button x:Name="FetchButton" 
+                Content="Fetch Random Page Title" 
+                Click="FetchButton_Click" 
+                HorizontalAlignment="Center"
+                IsEnabled="False"/>
+            <TextBlock x:Name="ResultTextBlock" 
+                   Text="Result will be shown here..."
+                   TextWrapping="Wrap"
+                   MaxWidth="400"/>
+        </StackPanel>
+
+        <Border x:Name="WebViewContainer" 
+            Grid.Row="1" 
+            BorderBrush="Green" 
+            BorderThickness="2" 
+            Margin="20"/>
     </Grid>
 </Page>
