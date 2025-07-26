@@ -1,6 +1,6 @@
 {
   "profiles": {
-    "_1809_UWP": {
+    "App1": {
       "commandName": "MsixPackage"
     }
   }

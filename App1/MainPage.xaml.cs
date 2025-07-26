@@ -1,6 +1,6 @@
 ﻿using Windows.UI.Xaml.Controls;
 
-namespace _1809_UWP
+namespace App1
 {
     /// <summary>
     /// An empty page that can be used on its own or navigated to within a <see cref="Frame">.

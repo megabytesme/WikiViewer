@@ -5,7 +5,7 @@ using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Navigation;
 
-namespace _1809_UWP
+namespace App1
 {
     /// <summary>
     /// Provides application-specific behavior to supplement the default <see cref="Application"/> class.
