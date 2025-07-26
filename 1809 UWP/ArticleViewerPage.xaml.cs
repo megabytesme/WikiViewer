@@ -2,41 +2,29 @@
 using System.Diagnostics;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using HtmlAgilityPack;
 using Microsoft.Web.WebView2.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
-using Windows.UI.Xaml.Documents;
 using Windows.UI.Xaml.Navigation;
-using System.Text.Json.Serialization;
 
 namespace _1809_UWP
 {
-    public class ApiParseResponse { public ParseResult parse { get; set; } }
-
-    public class ParseResult
-    {
-        public string title { get; set; }
-        public TextContent text { get; set; }
-    }
-
-    public class TextContent
-    {
-        [JsonPropertyName("*")]
-        public string Content { get; set; }
-    }
-
     public class RandomQueryResponse { public QueryResult query { get; set; } }
     public class QueryResult { public RandomPage[] random { get; set; } }
     public class RandomPage { public string title { get; set; } }
+    public class ApiParseResponse { public ParseResult parse { get; set; } }
+    public class ParseResult { public string title { get; set; } public TextContent text { get; set; } }
+    public class TextContent { [JsonPropertyName("*")] public string Content { get; set; } }
 
     public sealed partial class ArticleViewerPage : Page
     {
         private enum FetchStep { Idle, GetRandomTitle, ParseArticleContent }
         private FetchStep _currentFetchStep = FetchStep.Idle;
-
         private string _pageTitleToFetch = "";
         private const string ApiBaseUrl = "https://betawiki.net/api.php";
+        private bool _isInitialized = false;
 
         public ArticleViewerPage()
         {
@@ -49,47 +37,61 @@ namespace _1809_UWP
             if (e.Parameter is string pageTitle && !string.IsNullOrEmpty(pageTitle))
             {
                 _pageTitleToFetch = pageTitle;
-                StartArticleFetch();
             }
         }
 
-        private async void StartArticleFetch()
+        private async void Page_Loaded(object sender, RoutedEventArgs e)
         {
+            if (_isInitialized) return;
+
+            try
+            {
+                Environment.SetEnvironmentVariable("WEBVIEW2_DEFAULT_BACKGROUND_COLOR", "00FFFFFF");
+
+                await SilentFetchView.EnsureCoreWebView2Async();
+                await ArticleDisplayWebView.EnsureCoreWebView2Async();
+
+                SilentFetchView.CoreWebView2.NavigationCompleted += CoreWebView2_NavigationCompleted;
+                _isInitialized = true;
+
+                if (!string.IsNullOrEmpty(_pageTitleToFetch))
+                {
+                    StartArticleFetch();
+                }
+            }
+            catch (Exception ex)
+            {
+                ArticleTitle.Text = "Error initializing WebView2: " + ex.Message;
+                LoadingOverlay.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private void StartArticleFetch()
+        {
+            if (!_isInitialized) return;
+
             LoadingOverlay.Visibility = Visibility.Visible;
             LoadingText.Text = $"Fetching: '{_pageTitleToFetch}'...";
             Debug.WriteLine($"[LOG] Starting fetch for: '{_pageTitleToFetch}'");
 
-            try
+            string apiUrl;
+            if (_pageTitleToFetch.Equals("random", StringComparison.OrdinalIgnoreCase))
             {
-                await FetchAndVerifyWebView.EnsureCoreWebView2Async();
-                FetchAndVerifyWebView.CoreWebView2.NavigationCompleted -= CoreWebView2_NavigationCompleted;
-                FetchAndVerifyWebView.CoreWebView2.NavigationCompleted += CoreWebView2_NavigationCompleted;
-
-                string apiUrl;
-                if (_pageTitleToFetch.Equals("random", StringComparison.OrdinalIgnoreCase))
-                {
-                    _currentFetchStep = FetchStep.GetRandomTitle;
-                    Debug.WriteLine("[LOG] Step 1: Getting a random title.");
-                    apiUrl = $"{ApiBaseUrl}?action=query&list=random&rnnamespace=0&rnlimit=1&format=json";
-                }
-                else
-                {
-                    _currentFetchStep = FetchStep.ParseArticleContent;
-                    Debug.WriteLine($"[LOG] Step 1 (and only): Parsing page '{_pageTitleToFetch}'.");
-                    apiUrl = $"{ApiBaseUrl}?action=parse&page={Uri.EscapeDataString(_pageTitleToFetch)}&format=json";
-                }
-
-                Debug.WriteLine($"[LOG] Navigating WebView to: {apiUrl}");
-                FetchAndVerifyWebView.CoreWebView2.Navigate(apiUrl);
+                _currentFetchStep = FetchStep.GetRandomTitle;
+                apiUrl = $"{ApiBaseUrl}?action=query&list=random&rnnamespace=0&rnlimit=1&format=json";
             }
-            catch (Exception ex)
+            else
             {
+                _currentFetchStep = FetchStep.ParseArticleContent;
+                apiUrl = $"{ApiBaseUrl}?action=parse&page={Uri.EscapeDataString(_pageTitleToFetch)}&format=json";
             }
+
+            Debug.WriteLine($"[LOG] Navigating WebView to: {apiUrl}");
+            SilentFetchView.CoreWebView2.Navigate(apiUrl);
         }
 
         private async void CoreWebView2_NavigationCompleted(CoreWebView2 sender, CoreWebView2NavigationCompletedEventArgs args)
         {
-            Debug.WriteLine($"[LOG] NavigationCompleted fired for step: {_currentFetchStep}");
             if (_currentFetchStep == FetchStep.Idle) return;
 
             await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, async () =>
@@ -97,15 +99,13 @@ namespace _1809_UWP
                 if (!args.IsSuccess)
                 {
                     LoadingOverlay.Visibility = Visibility.Collapsed;
-                    Debug.WriteLine($"[LOG] Navigation FAILED. Status: {args.WebErrorStatus}");
                     return;
                 }
 
                 try
                 {
                     string script = "document.body.innerText;";
-                    string scriptResult = await FetchAndVerifyWebView.CoreWebView2.ExecuteScriptAsync(script);
-
+                    string scriptResult = await SilentFetchView.CoreWebView2.ExecuteScriptAsync(script);
                     string resultJson = JsonSerializer.Deserialize<string>(scriptResult);
 
                     if (string.IsNullOrEmpty(resultJson))
@@ -116,51 +116,34 @@ namespace _1809_UWP
                     if (_currentFetchStep == FetchStep.GetRandomTitle)
                     {
                         var randomResponse = JsonSerializer.Deserialize<RandomQueryResponse>(resultJson);
-                        string randomTitle = null;
-                        if (randomResponse != null && randomResponse.query != null && randomResponse.query.random != null && randomResponse.query.random.Length > 0)
-                        {
-                            randomTitle = randomResponse.query.random.FirstOrDefault()?.title;
-                        }
+                        string randomTitle = randomResponse?.query?.random?.FirstOrDefault()?.title;
 
                         if (string.IsNullOrEmpty(randomTitle))
                         {
                             throw new Exception("Failed to get a random title from the API.");
                         }
 
-                        Debug.WriteLine($"[LOG] Got random title: '{randomTitle}'.");
                         _pageTitleToFetch = randomTitle;
-
                         _currentFetchStep = FetchStep.ParseArticleContent;
                         LoadingText.Text = $"Parsing: '{_pageTitleToFetch}'...";
-                        Debug.WriteLine($"[LOG] Step 2: Parsing page '{_pageTitleToFetch}'.");
                         string parseUrl = $"{ApiBaseUrl}?action=parse&page={Uri.EscapeDataString(_pageTitleToFetch)}&format=json";
-                        FetchAndVerifyWebView.CoreWebView2.Navigate(parseUrl);
+                        SilentFetchView.CoreWebView2.Navigate(parseUrl);
                     }
                     else if (_currentFetchStep == FetchStep.ParseArticleContent)
                     {
                         var apiResponse = JsonSerializer.Deserialize<ApiParseResponse>(resultJson);
-                        string htmlContent = null;
-                        string articleTitle = null;
-                        if (apiResponse != null && apiResponse.parse != null)
-                        {
-                            articleTitle = apiResponse.parse.title;
-                            if (apiResponse.parse.text != null)
-                            {
-                                htmlContent = apiResponse.parse.text.Content;
-                            }
-                        }
+                        string htmlContent = apiResponse?.parse?.text?.Content;
+                        string articleTitle = apiResponse?.parse?.title;
 
                         if (string.IsNullOrEmpty(htmlContent) || string.IsNullOrEmpty(articleTitle))
                         {
                             throw new Exception("API response did not contain valid title or content.");
                         }
 
-                        Debug.WriteLine($"[LOG] SUCCESS! Parsed article '{articleTitle}'.");
                         ArticleTitle.Text = articleTitle;
-                        HtmlToRichTextBlock(htmlContent);
+                        string processedHtml = ProcessHtmlForWebView(htmlContent);
+                        ArticleDisplayWebView.NavigateToString(processedHtml);
 
-                        FetchAndVerifyWebView.Visibility = Visibility.Collapsed;
-                        ContentScrollViewer.Visibility = Visibility.Visible;
                         LoadingOverlay.Visibility = Visibility.Collapsed;
                         _currentFetchStep = FetchStep.Idle;
                     }
@@ -173,35 +156,61 @@ namespace _1809_UWP
             });
         }
 
-        private void HtmlToRichTextBlock(string html)
+        private string ProcessHtmlForWebView(string rawHtml)
         {
-            ArticleContent.Blocks.Clear();
             var doc = new HtmlDocument();
-            doc.LoadHtml(html);
+            doc.LoadHtml(rawHtml);
 
-            var paragraph = new Paragraph();
+            string baseUrl = "https://betawiki.net";
 
-            foreach (var node in doc.DocumentNode.Descendants())
+            foreach (var img in doc.DocumentNode.SelectNodes("//img[@src]") ?? Enumerable.Empty<HtmlNode>())
             {
-                if (node.NodeType == HtmlNodeType.Text && node.ParentNode.Name != "a")
+                string src = img.GetAttributeValue("src", "");
+                if (src.StartsWith("/")) img.SetAttributeValue("src", baseUrl + src);
+            }
+
+            foreach (var link in doc.DocumentNode.SelectNodes("//a[@href]") ?? Enumerable.Empty<HtmlNode>())
+            {
+                string href = link.GetAttributeValue("href", "");
+                if (href.StartsWith("/wiki/"))
                 {
-                    paragraph.Inlines.Add(new Run { Text = HtmlEntity.DeEntitize(node.InnerText) });
-                }
-                else if (node.Name == "p")
-                {
-                    if (paragraph.Inlines.Count > 0) ArticleContent.Blocks.Add(paragraph);
-                    paragraph = new Paragraph();
-                }
-                else if (node.Name == "b" || node.Name == "strong")
-                {
-                    paragraph.Inlines.Add(new Bold { Inlines = { new Run { Text = HtmlEntity.DeEntitize(node.InnerText) } } });
+                    link.SetAttributeValue("href", baseUrl + href);
+                    link.SetAttributeValue("target", "_blank");
                 }
             }
 
-            if (paragraph.Inlines.Count > 0)
-            {
-                ArticleContent.Blocks.Add(paragraph);
-            }
+            var isDarkTheme = Application.Current.RequestedTheme == ApplicationTheme.Dark;
+            var textColor = isDarkTheme ? "#E8E8E8" : "#202020";
+            var linkColor = isDarkTheme ? "#78B2F3" : "#0066CC";
+
+            var style = $@"
+                <style>
+                    html, body {{ 
+                        background-color: transparent !important; 
+                        color: {textColor}; 
+                        font-family: 'Segoe UI', sans-serif;
+                        margin: 0; padding: 0;
+                    }}
+                    a {{ color: {linkColor}; text-decoration: none; }}
+                    a:hover {{ text-decoration: underline; }}
+                    .mw-editsection, .reflist, .gallery, .thumb, .infobox, table.infobox, table.infobox > tbody > tr > th, table.infobox > tbody > tr > td {{ 
+                        background-color: transparent !important; 
+                    }}
+                    table.infobox {{ border-color: gray; }}
+                </style>";
+
+            return $@"
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset='UTF-8'>
+                    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+                    {style}
+                </head>
+                <body>
+                    {doc.DocumentNode.OuterHtml}
+                </body>
+                </html>";
         }
     }
 }
