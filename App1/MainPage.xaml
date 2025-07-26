@@ -5,34 +5,27 @@
     xmlns:local="using:App1"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    xmlns:xaml="using:Microsoft.UI.Xaml.Controls"
     mc:Ignorable="d"
-    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
-    Loaded="Page_Loaded">
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
 
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
+    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="20">
+        <TextBlock Text="BetaWiki API" FontSize="36" FontWeight="Bold" HorizontalAlignment="Center"/>
 
-        <StackPanel Grid.Row="0" Margin="20" Spacing="20">
-            <TextBlock Text="BetaWiki API Test (WebView2)" FontSize="24" HorizontalAlignment="Center"/>
-            <Button x:Name="FetchButton" 
-                Content="Fetch Random Page Title" 
-                Click="FetchButton_Click" 
+        <Button x:Name="FetchButton"
+                Content="Get a Random Page Title"
                 HorizontalAlignment="Center"
-                IsEnabled="False"/>
-            <TextBlock x:Name="ResultTextBlock" 
-                   Text="Result will be shown here..."
-                   TextWrapping="Wrap"
-                   MaxWidth="400"/>
-        </StackPanel>
+                Click="FetchButton_Click"
+                Style="{ThemeResource AccentButtonStyle}"/>
 
-        <Border x:Name="WebViewContainer" 
-            Grid.Row="1" 
-            BorderBrush="Green" 
-            BorderThickness="2" 
-            Margin="20"/>
-    </Grid>
+        <TextBlock Text="Result:" FontWeight="SemiBold" FontSize="18"/>
+
+        <Border BorderBrush="Gray" BorderThickness="1" Padding="10" MinHeight="100" MaxWidth="500">
+            <ScrollViewer>
+                <TextBlock x:Name="ResultTextBlock" 
+                           Text="Click the button to fetch data..."
+                           TextWrapping="Wrap"
+                           FontSize="14"/>
+            </ScrollViewer>
+        </Border>
+    </StackPanel>
 </Page>
