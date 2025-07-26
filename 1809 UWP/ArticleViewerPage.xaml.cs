@@ -39,7 +39,7 @@ namespace _1809_UWP
         private const string ApiBaseUrl = "https://betawiki.net/api.php";
         private const string VirtualHostName = "local.betawiki-app.net";
         private bool _isInitialized = false;
-        private const int WorkerCount = 4;
+        private readonly int _maxWorkerCount;
         private List<WebView2> _webViewWorkers;
         private ConcurrentQueue<WebView2> _availableWorkers;
         private SemaphoreSlim _workerSemaphore;
@@ -47,9 +47,10 @@ namespace _1809_UWP
         public ArticleViewerPage()
         {
             this.InitializeComponent();
+            _maxWorkerCount = Environment.ProcessorCount;
             _webViewWorkers = new List<WebView2>();
             _availableWorkers = new ConcurrentQueue<WebView2>();
-            _workerSemaphore = new SemaphoreSlim(WorkerCount, WorkerCount);
+            _workerSemaphore = new SemaphoreSlim(_maxWorkerCount, _maxWorkerCount);
         }
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -74,7 +75,7 @@ namespace _1809_UWP
             ArticleDisplayWebView.EnsureCoreWebView2Async().AsTask()
         };
 
-                for (int i = 0; i < WorkerCount; i++)
+                for (int i = 0; i < _maxWorkerCount; i++)
                 {
                     var worker = new WebView2();
                     _webViewWorkers.Add(worker);
