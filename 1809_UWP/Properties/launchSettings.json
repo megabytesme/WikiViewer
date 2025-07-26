@@ -1,0 +1,7 @@
+{
+  "profiles": {
+    "_1809_UWP": {
+      "commandName": "MsixPackage"
+    }
+  }
+}
