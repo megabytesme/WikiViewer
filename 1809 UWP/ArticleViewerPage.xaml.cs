@@ -48,11 +48,73 @@ namespace _1809_UWP
     public static class ArticleCacheManager
     {
         private static StorageFolder _cacheFolder;
+        private static StorageFolder _imageCacheFolder;
 
         public static async Task InitializeAsync()
         {
-            if (_cacheFolder != null) return;
-            _cacheFolder = await ApplicationData.Current.LocalFolder.CreateFolderAsync("ArticleCache", CreationCollisionOption.OpenIfExists);
+            if (_cacheFolder == null)
+            {
+                _cacheFolder = await ApplicationData.Current.LocalFolder.CreateFolderAsync("ArticleCache", CreationCollisionOption.OpenIfExists);
+            }
+            if (_imageCacheFolder == null)
+            {
+                _imageCacheFolder = await ApplicationData.Current.LocalFolder.CreateFolderAsync("cache", CreationCollisionOption.OpenIfExists);
+            }
+        }
+
+        public static async Task<ulong> GetCacheSizeAsync()
+        {
+            await InitializeAsync();
+            ulong totalSize = 0;
+
+            try
+            {
+                var articleFiles = await _cacheFolder.GetFilesAsync();
+                foreach (var file in articleFiles)
+                {
+                    var properties = await file.GetBasicPropertiesAsync();
+                    totalSize += properties.Size;
+                }
+
+                var imageFiles = await _imageCacheFolder.GetFilesAsync();
+                foreach (var file in imageFiles)
+                {
+                    var properties = await file.GetBasicPropertiesAsync();
+                    totalSize += properties.Size;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[CACHE] Error calculating cache size: {ex.Message}");
+            }
+
+            return totalSize;
+        }
+
+        public static async Task ClearCacheAsync()
+        {
+            await InitializeAsync();
+
+            try
+            {
+                var articleFiles = await _cacheFolder.GetFilesAsync();
+                foreach (var file in articleFiles)
+                {
+                    await file.DeleteAsync(StorageDeleteOption.PermanentDelete);
+                }
+
+                var imageFiles = await _imageCacheFolder.GetFilesAsync();
+                foreach (var file in imageFiles)
+                {
+                    await file.DeleteAsync(StorageDeleteOption.PermanentDelete);
+                }
+
+                Debug.WriteLine("[CACHE] All cache folders cleared.");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[CACHE] Error clearing cache: {ex.Message}");
+            }
         }
 
         private static string GetHashedFileName(string pageTitle)

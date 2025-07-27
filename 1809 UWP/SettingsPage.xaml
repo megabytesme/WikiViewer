@@ -13,9 +13,9 @@
             <TextBlock Text="Settings" Style="{ThemeResource HeaderTextBlockStyle}" Margin="0,0,0,12"/>
 
             <ToggleSwitch x:Name="CachingToggle"
-                          Header="Enable Article Caching"
-                          IsOn="True"
-                          Toggled="CachingToggle_Toggled">
+              Header="Enable Article Caching"
+              IsOn="True"
+              Toggled="CachingToggle_Toggled">
                 <ToggleSwitch.OffContent>
                     <TextBlock Text="Articles will not be saved for offline use."/>
                 </ToggleSwitch.OffContent>
@@ -23,6 +23,37 @@
                     <TextBlock Text="Articles will be cached to improve speed and allow offline reading."/>
                 </ToggleSwitch.OnContent>
             </ToggleSwitch>
+            
+            <StackPanel BorderBrush="{ThemeResource SystemControlForegroundBaseLowBrush}" 
+                        BorderThickness="0,1,0,0" 
+                        Padding="0,12,0,0"
+                        Spacing="8">
+
+                <TextBlock Text="Cache Management" Style="{ThemeResource SubtitleTextBlockStyle}"/>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="Storage Used by Cache"/>
+                        <TextBlock x:Name="CacheSizeText" 
+                                   Text="Calculating..." 
+                                   Style="{ThemeResource BodyTextBlockStyle}"
+                                   Opacity="0.7"/>
+                    </StackPanel>
+
+                    <Button x:Name="ClearCacheButton" 
+                            Grid.Column="1"
+                            Content="Clear Cache" 
+                            Style="{ThemeResource AccentButtonStyle}"
+                            Click="ClearCacheButton_Click"
+                            VerticalAlignment="Center"/>
+                </Grid>
+
+            </StackPanel>
         </StackPanel>
     </Grid>
 </Page>
