@@ -43,12 +43,12 @@
             <muxc:NavigationView.MenuItems>
                 <muxc:NavigationViewItem Content="Home" Tag="home">
                     <muxc:NavigationViewItem.Icon>
-                        <FontIcon Glyph=""/>
+                        <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE10F;"/>
                     </muxc:NavigationViewItem.Icon>
                 </muxc:NavigationViewItem>
                 <muxc:NavigationViewItem Content="Random Article" Tag="random">
                     <muxc:NavigationViewItem.Icon>
-                        <FontIcon Glyph=""/>
+                        <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE12B;"/>
                     </muxc:NavigationViewItem.Icon>
                 </muxc:NavigationViewItem>
             </muxc:NavigationView.MenuItems>
