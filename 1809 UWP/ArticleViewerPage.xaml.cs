@@ -528,7 +528,7 @@ namespace _1809_UWP
                 html, body {{ background-color: transparent !important; color: var(--text-primary); font-family: 'Segoe UI Variable', 'Segoe UI', sans-serif; margin: 0; padding: 0 12px 12px 12px; font-size: 15px; -webkit-font-smoothing: antialiased; padding-top: 60px; }}
                 a {{ color: var(--link-color); text-decoration: none; }} a:hover {{ text-decoration: underline; }}
                 a.selflink, a.new {{ color: var(--text-secondary); pointer-events: none; text-decoration: none; }}
-                img {{ max-width: 100%; height: auto; border-radius: 4px; }} .mw-editsection, .reflist {{ display: none; }}
+                img {{ max-width: 100%; height: auto; border-radius: 4px; }} .mw-editsection {{ display: none; }}
                 .infobox {{ float: right; margin: 0 0 1em 1.5em; width: 22em; }}
                 .hlist ul {{ padding: 0; margin: 0; list-style: none; }} .hlist li {{ display: inline; white-space: nowrap; }}
                 .hlist li:not(:first-child)::before {{ content: ' \00B7 '; font-weight: bold; }} .hlist dl, .hlist ol, .hlist ul {{ display: inline; }}
@@ -558,6 +558,10 @@ namespace _1809_UWP
                 .navbox-inner {{ padding: 8px; }} .navbox-list li a {{ padding: 4px 6px; border-radius: 4px; transition: background-color 0.15s ease-in-out; }}
                 .navbox-list li a:hover {{ background: var(--item-hover-background); text-decoration: none; }}
                 .navbox-image {{ float: right; margin: 16px; }}
+                h2 {{ border-bottom: 1px solid var(--card-border); padding-bottom: 8px; margin-top: 24px; }}
+                .reflist {{ font-size: 90%; column-width: 30em; column-gap: 2em; margin-top: 1em; }}
+                .reflist ol.references {{ margin: 0; padding-left: 1.6em; }}
+                .reflist li {{ margin-bottom: 0.5em; page-break-inside: avoid; break-inside: avoid-column; }}
             </style>";
 
             return $@"
