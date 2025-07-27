@@ -70,6 +70,7 @@ namespace _1809_UWP
                 var tempFolder = ApplicationData.Current.LocalFolder.Path;
                 ArticleDisplayWebView.CoreWebView2.SetVirtualHostNameToFolderMapping(VirtualHostName, tempFolder, CoreWebView2HostResourceAccessKind.Allow);
 
+                ArticleDisplayWebView.CoreWebView2.NavigationStarting += ArticleDisplayWebView_NavigationStarting;
                 SilentFetchView.CoreWebView2.NavigationCompleted += CoreWebView2_NavigationCompleted;
                 this.Unloaded += ArticleViewerPage_Unloaded;
 
@@ -89,9 +90,31 @@ namespace _1809_UWP
         {
             ArticleDisplayWebView?.Close();
             SilentFetchView?.Close();
-
             ArticleDisplayWebView = null;
             SilentFetchView = null;
+        }
+
+        private async void ArticleDisplayWebView_NavigationStarting(CoreWebView2 sender, CoreWebView2NavigationStartingEventArgs args)
+        {
+            Uri uri = new Uri(args.Uri);
+
+            if (uri.Host.Equals(VirtualHostName, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            args.Cancel = true;
+
+            if (uri.Host.Equals("betawiki.net", StringComparison.OrdinalIgnoreCase) && uri.AbsolutePath.StartsWith("/wiki/"))
+            {
+                string newTitle = uri.AbsolutePath.Substring("/wiki/".Length);
+                _pageTitleToFetch = Uri.UnescapeDataString(newTitle).Replace('_', ' ');
+                StartArticleFetch();
+            }
+            else
+            {
+                await Windows.System.Launcher.LaunchUriAsync(uri);
+            }
         }
 
         private void StartArticleFetch()
@@ -137,7 +160,7 @@ namespace _1809_UWP
                         string randomTitle = randomResponse?.query?.random?.FirstOrDefault()?.title;
                         if (string.IsNullOrEmpty(randomTitle)) throw new Exception("Failed to get a random title from the API.");
 
-                        _pageTitleToFetch = randomTitle;
+                        _pageTitleToFetch = randomTitle.Replace('_', ' ');
                         _currentFetchStep = FetchStep.ParseArticleContent;
                         LoadingText.Text = $"Parsing: '{_pageTitleToFetch}'...";
 
@@ -159,9 +182,7 @@ namespace _1809_UWP
                         if (contentNode == null) throw new Exception("Could not find main content element in the downloaded page.");
 
                         string htmlContent = contentNode.InnerHtml;
-                        string articleTitle = _pageTitleToFetch.Equals("random", StringComparison.OrdinalIgnoreCase)
-                            ? doc.DocumentNode.SelectSingleNode("//h1[@id='firstHeading']")?.InnerText ?? ""
-                            : _pageTitleToFetch;
+                        string articleTitle = _pageTitleToFetch;
 
                         if (string.IsNullOrEmpty(htmlContent) || string.IsNullOrEmpty(articleTitle)) throw new Exception("Extracted content or title was empty.");
 
@@ -223,7 +244,6 @@ namespace _1809_UWP
                 const string script = @"(function() {
                     let base64Data = null;
                     const img = document.querySelector('img');
-
                     if (img && img.naturalWidth > 0) {
                         const canvas = document.createElement('canvas');
                         canvas.width = img.naturalWidth;
@@ -235,7 +255,6 @@ namespace _1809_UWP
                         const svgText = new XMLSerializer().serializeToString(document.documentElement);
                         base64Data = window.btoa(svgText);
                     }
-                    
                     return base64Data;
                 })();";
 
@@ -399,7 +418,6 @@ namespace _1809_UWP
                 if (href.StartsWith("/wiki/"))
                 {
                     link.SetAttributeValue("href", baseUrl + href);
-                    link.SetAttributeValue("target", "_blank");
                 }
             }
 
