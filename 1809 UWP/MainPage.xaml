@@ -10,6 +10,19 @@
     mc:Ignorable="d">
 
     <Grid>
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup x:Name="WindowStates">
+                <VisualState x:Name="WideState">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="1008" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="NavView.PaneDisplayMode" Value="Left"/>
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
+
         <Grid.RowDefinitions>
             <RowDefinition Height="32"/>
             <RowDefinition Height="*"/>
@@ -31,7 +44,7 @@
 
         <muxc:NavigationView Grid.Row="1"
                              x:Name="NavView"
-                             PaneDisplayMode="Left"
+                             PaneDisplayMode="LeftCompact" 
                              IsSettingsVisible="True"
                              IsBackButtonVisible="Collapsed"
                              IsBackEnabled="False"
