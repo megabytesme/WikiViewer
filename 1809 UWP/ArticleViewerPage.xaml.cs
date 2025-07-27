@@ -20,6 +20,7 @@ using Windows.UI;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Media;
+using Windows.UI.Xaml.Media.Animation;
 using Windows.UI.Xaml.Navigation;
 using muxc = Microsoft.UI.Xaml.Controls;
 
@@ -192,6 +193,24 @@ namespace _1809_UWP
             this.ActualThemeChanged += (s, e) => ApplyAcrylicToTitleBar();
         }
 
+        private void ShowLoadingOverlay()
+        {
+            LoadingOverlay.IsHitTestVisible = true;
+            FadeInAnimation.Begin();
+        }
+
+        private void HideLoadingOverlay()
+        {
+            void onAnimationCompleted(object s, object e)
+            {
+                LoadingOverlay.IsHitTestVisible = false;
+                FadeOutAnimation.Completed -= onAnimationCompleted;
+            }
+
+            FadeOutAnimation.Completed += onAnimationCompleted;
+            FadeOutAnimation.Begin();
+        }
+
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
@@ -337,7 +356,8 @@ namespace _1809_UWP
             if (!_isInitialized) return;
 
             _fetchStopwatch = Stopwatch.StartNew();
-            LoadingOverlay.Visibility = Visibility.Visible;
+            ShowLoadingOverlay();
+
             LastUpdatedText.Visibility = Visibility.Collapsed;
             ArticleTitle.Text = _pageTitleToFetch.Replace('_', ' ');
             LoadingText.Text = $"Checking for '{ArticleTitle.Text}'...";
@@ -372,7 +392,7 @@ namespace _1809_UWP
                         await DisplayProcessedHtml(cachedHtml);
                         LastUpdatedText.Text = $"Last updated: {cachedMetadata.LastUpdated.ToLocalTime():g} (Cached)";
                         LastUpdatedText.Visibility = Visibility.Visible;
-                        LoadingOverlay.Visibility = Visibility.Collapsed;
+                        HideLoadingOverlay();
                         _fetchStopwatch.Stop();
                         Debug.WriteLine($"[PERF] ===== Total operation time (from cache): {_fetchStopwatch.ElapsedMilliseconds} ms =====");
                         return;
@@ -384,7 +404,7 @@ namespace _1809_UWP
             {
                 ArticleTitle.Text = "No Connection";
                 LoadingText.Text = $"Cannot fetch '{ArticleTitle.Text}'. Please check your internet connection.";
-                LoadingOverlay.Visibility = Visibility.Collapsed;
+                HideLoadingOverlay();
                 return;
             }
 
@@ -450,7 +470,7 @@ namespace _1809_UWP
             {
                 if (!args.IsSuccess)
                 {
-                    LoadingOverlay.Visibility = Visibility.Collapsed;
+                    HideLoadingOverlay();
                     ArticleTitle.Text = "Failed to load page";
                     _currentFetchStep = FetchStep.Idle;
                     return;
@@ -521,7 +541,7 @@ namespace _1809_UWP
 
                         await DisplayProcessedHtml(processedHtml);
 
-                        LoadingOverlay.Visibility = Visibility.Collapsed;
+                        HideLoadingOverlay();
                         _currentFetchStep = FetchStep.Idle;
                         _fetchStopwatch.Stop();
                         Debug.WriteLine($"[PERF] ===== Total operation time (from network): {_fetchStopwatch.ElapsedMilliseconds} ms =====");
@@ -530,7 +550,7 @@ namespace _1809_UWP
                 catch (Exception ex)
                 {
                     Debug.WriteLine($"[ERROR] NavigationCompleted failed: {ex.Message}");
-                    LoadingOverlay.Visibility = Visibility.Collapsed;
+                    HideLoadingOverlay();
                     ArticleTitle.Text = "An error occurred";
                     _currentFetchStep = FetchStep.Idle;
                 }
