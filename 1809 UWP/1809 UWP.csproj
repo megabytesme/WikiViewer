@@ -122,9 +122,6 @@
     <Compile Include="ArticleViewerPage.xaml.cs">
       <DependentUpon>ArticleViewerPage.xaml</DependentUpon>
     </Compile>
-    <Compile Include="HomePage.xaml.cs">
-      <DependentUpon>HomePage.xaml</DependentUpon>
-    </Compile>
     <Compile Include="MainPage.xaml.cs">
       <DependentUpon>MainPage.xaml</DependentUpon>
     </Compile>
@@ -216,9 +213,6 @@
   </ItemGroup>
   <ItemGroup>
     <Page Include="ArticleViewerPage.xaml">
-      <SubType>Designer</SubType>
-    </Page>
-    <Page Include="HomePage.xaml">
       <SubType>Designer</SubType>
     </Page>
     <Page Include="MainPage.xaml">
