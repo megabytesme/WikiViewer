@@ -1,0 +1,28 @@
+﻿<Page
+    x:Class="_1809_UWP.EditPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
+    mc:Ignorable="d"
+    Background="Transparent">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <CommandBar Grid.Row="0" DefaultLabelPosition="Right">
+            <AppBarButton x:Name="CancelButton" Icon="Cancel" Label="Cancel" Click="Cancel_Click"/>
+            <CommandBar.Content>
+                <TextBlock x:Name="PageTitle" Style="{ThemeResource TitleTextBlockStyle}" Margin="12,0"/>
+            </CommandBar.Content>
+        </CommandBar>
+
+        <muxc:WebView2 x:Name="EditWebView" Grid.Row="1" />
+
+        <ProgressRing x:Name="LoadingRing" Grid.RowSpan="2" Width="60" Height="60" IsActive="True"/>
+    </Grid>
+</Page>

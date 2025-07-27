@@ -191,6 +191,23 @@ namespace _1809_UWP
             this.InitializeComponent();
             _maxWorkerCount = Environment.ProcessorCount;
             this.ActualThemeChanged += (s, e) => ApplyAcrylicToTitleBar();
+            AuthService.AuthenticationStateChanged += OnAuthenticationStateChanged;
+        }
+
+        private void EditButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (!string.IsNullOrEmpty(_pageTitleToFetch))
+            {
+                Frame.Navigate(typeof(EditPage), _pageTitleToFetch);
+            }
+        }
+
+        private void OnAuthenticationStateChanged(object sender, EventArgs e)
+        {
+            _ = Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
+            {
+                EditButton.Visibility = AuthService.IsLoggedIn ? Visibility.Visible : Visibility.Collapsed;
+            });
         }
 
         private void ShowLoadingOverlay()
@@ -220,6 +237,8 @@ namespace _1809_UWP
                 _articleHistory.Clear();
                 _articleHistory.Push(_pageTitleToFetch);
             }
+
+            EditButton.Visibility = AuthService.IsLoggedIn ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private async void Page_Loaded(object sender, RoutedEventArgs e)
@@ -269,6 +288,7 @@ namespace _1809_UWP
 
         private void ArticleViewerPage_Unloaded(object sender, RoutedEventArgs e)
         {
+            AuthService.AuthenticationStateChanged -= OnAuthenticationStateChanged;
             this.ActualThemeChanged -= (s, ev) => ApplyAcrylicToTitleBar();
 
             if (ArticleDisplayWebView?.CoreWebView2 != null)

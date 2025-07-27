@@ -49,6 +49,16 @@
                        Margin="12,12,12,12"/>
         </Grid>
 
+        <CommandBar VerticalAlignment="Bottom" 
+                    Grid.RowSpan="2" 
+                    Background="{ThemeResource SystemControlAcrylicElementBrush}">
+            <AppBarButton x:Name="EditButton" 
+                          Icon="Edit" 
+                          Label="Edit" 
+                          Click="EditButton_Click" 
+                          Visibility="Collapsed"/>
+        </CommandBar>
+
         <xaml:WebView2 x:Name="SilentFetchView" Width="1" Height="1" Opacity="0" Grid.RowSpan="2" />
         <Grid x:Name="WorkerWebViewHost" Visibility="Collapsed"/>
 

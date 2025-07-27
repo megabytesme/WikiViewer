@@ -126,6 +126,9 @@
     </Compile>
     <Compile Include="AuthService.cs" />
     <Compile Include="CredentialService.cs" />
+    <Compile Include="EditPage.xaml.cs">
+      <DependentUpon>EditPage.xaml</DependentUpon>
+    </Compile>
     <Compile Include="LoginPage.xaml.cs">
       <DependentUpon>LoginPage.xaml</DependentUpon>
     </Compile>
@@ -223,6 +226,9 @@
   </ItemGroup>
   <ItemGroup>
     <Page Include="ArticleViewerPage.xaml">
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="EditPage.xaml">
       <SubType>Designer</SubType>
     </Page>
     <Page Include="LoginPage.xaml">
