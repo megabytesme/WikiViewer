@@ -38,6 +38,11 @@
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
                 <ProgressRing IsActive="True" Width="60" Height="60"/>
                 <TextBlock x:Name="LoadingText" Text="Loading..." HorizontalAlignment="Center"/>
+                <TextBlock x:Name="LastUpdatedText"
+                   Style="{ThemeResource BodyTextBlockStyle}"
+                   Opacity="0.7"
+                   Visibility="Collapsed"
+                   Margin="0,4,0,0"/>
             </StackPanel>
         </Grid>
     </Grid>

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.NetworkInformation;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -11,15 +12,16 @@ using System.Threading;
 using System.Threading.Tasks;
 using Windows.Foundation;
 using Windows.Storage;
+using Windows.UI;
+using Windows.UI.Xaml;
+using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Media;
+using Windows.UI.Xaml.Navigation;
 using HtmlAgilityPack;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Web.WebView2.Core;
-using Windows.UI.Xaml;
-using Windows.UI.Xaml.Controls;
-using Windows.UI.Xaml.Navigation;
-using Windows.UI.Xaml.Media;
 using muxc = Microsoft.UI.Xaml.Controls;
-using Windows.UI;
+
 
 namespace _1809_UWP
 {
@@ -33,6 +35,79 @@ namespace _1809_UWP
     public class ImageQueryPages { public Dictionary<string, ImagePage> pages { get; set; } }
     public class ImagePage { public string title { get; set; } public ImageInfo[] imageinfo { get; set; } }
     public class ImageInfo { public string url { get; set; } }
+    public class TimestampQueryResponse { public TimestampQueryPages query { get; set; } }
+    public class TimestampQueryPages { public Dictionary<string, TimestampPage> pages { get; set; } }
+    public class TimestampPage { [JsonPropertyName("revisions")] public List<RevisionInfo> Revisions { get; set; } }
+    public class RevisionInfo { [JsonPropertyName("timestamp")] public DateTime Timestamp { get; set; } }
+
+    public class ArticleCacheItem
+    {
+        public string Title { get; set; }
+        public DateTime LastUpdated { get; set; }
+    }
+
+    public static class ArticleCacheManager
+    {
+        private static StorageFolder _cacheFolder;
+
+        public static async Task InitializeAsync()
+        {
+            if (_cacheFolder != null) return;
+            _cacheFolder = await ApplicationData.Current.LocalFolder.CreateFolderAsync("ArticleCache", CreationCollisionOption.OpenIfExists);
+        }
+
+        private static string GetHashedFileName(string pageTitle)
+        {
+            var hash = System.Security.Cryptography.SHA1.Create()
+                .ComputeHash(Encoding.UTF8.GetBytes(pageTitle.ToLowerInvariant()));
+            return hash.Aggregate("", (s, b) => s + b.ToString("x2"));
+        }
+
+        public static async Task<ArticleCacheItem> GetCacheMetadataAsync(string pageTitle)
+        {
+            await InitializeAsync();
+            string fileName = GetHashedFileName(pageTitle) + ".json";
+            var item = await _cacheFolder.TryGetItemAsync(fileName);
+            if (item is StorageFile file)
+            {
+                try
+                {
+                    string json = await FileIO.ReadTextAsync(file);
+                    return JsonSerializer.Deserialize<ArticleCacheItem>(json);
+                }
+                catch { return null; }
+            }
+            return null;
+        }
+
+        public static async Task<string> GetCachedArticleHtmlAsync(string pageTitle)
+        {
+            await InitializeAsync();
+            string fileName = GetHashedFileName(pageTitle) + ".html";
+            var item = await _cacheFolder.TryGetItemAsync(fileName);
+            if (item is StorageFile file)
+            {
+                return await FileIO.ReadTextAsync(file);
+            }
+            return null;
+        }
+
+        public static async Task SaveArticleToCacheAsync(string pageTitle, string htmlContent, DateTime lastUpdated)
+        {
+            await InitializeAsync();
+            string baseFileName = GetHashedFileName(pageTitle);
+
+            var metadata = new ArticleCacheItem { Title = pageTitle, LastUpdated = lastUpdated };
+            string json = JsonSerializer.Serialize(metadata);
+            StorageFile metadataFile = await _cacheFolder.CreateFileAsync(baseFileName + ".json", CreationCollisionOption.ReplaceExisting);
+            await FileIO.WriteTextAsync(metadataFile, json);
+
+            StorageFile htmlFile = await _cacheFolder.CreateFileAsync(baseFileName + ".html", CreationCollisionOption.ReplaceExisting);
+            await FileIO.WriteTextAsync(htmlFile, htmlContent);
+
+            Debug.WriteLine($"[CACHE] Saved '{pageTitle}' to cache.");
+        }
+    }
 
     public sealed partial class ArticleViewerPage : Page
     {
@@ -52,6 +127,7 @@ namespace _1809_UWP
         {
             this.InitializeComponent();
             _maxWorkerCount = Environment.ProcessorCount;
+            this.ActualThemeChanged += (s, e) => ApplyAcrylicToTitleBar();
         }
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -72,22 +148,17 @@ namespace _1809_UWP
             try
             {
                 Environment.SetEnvironmentVariable("WEBVIEW2_DEFAULT_BACKGROUND_COLOR", "00FFFFFF");
-
                 await SilentFetchView.EnsureCoreWebView2Async();
                 await ArticleDisplayWebView.EnsureCoreWebView2Async();
-
                 var tempFolder = ApplicationData.Current.LocalFolder.Path;
                 ArticleDisplayWebView.CoreWebView2.SetVirtualHostNameToFolderMapping(VirtualHostName, tempFolder, CoreWebView2HostResourceAccessKind.Allow);
-
                 ArticleDisplayWebView.CoreWebView2.NavigationCompleted += ArticleDisplayWebView_ContentNavigationCompleted;
                 ArticleDisplayWebView.CoreWebView2.NavigationStarting += ArticleDisplayWebView_NavigationStarting;
                 SilentFetchView.CoreWebView2.NavigationCompleted += CoreWebView2_NavigationCompleted;
                 this.Unloaded += ArticleViewerPage_Unloaded;
-
                 _isInitialized = true;
                 if (!string.IsNullOrEmpty(_pageTitleToFetch))
                 {
-                    _articleHistory.Push(_pageTitleToFetch);
                     StartArticleFetch();
                 }
             }
@@ -104,16 +175,14 @@ namespace _1809_UWP
                 BackgroundSource = AcrylicBackgroundSource.Backdrop,
                 TintOpacity = 0.4
             };
-
             if (this.ActualTheme == ElementTheme.Dark)
             {
-                acrylicBrush.TintColor = Windows.UI.Colors.Black;
+                acrylicBrush.TintColor = Colors.Black;
             }
             else
             {
-                acrylicBrush.TintColor = Windows.UI.Colors.White;
+                acrylicBrush.TintColor = Colors.White;
             }
-
             TitleBarBackground.Background = acrylicBrush;
         }
 
@@ -124,15 +193,256 @@ namespace _1809_UWP
                 ArticleDisplayWebView.CoreWebView2.NavigationCompleted -= ArticleDisplayWebView_ContentNavigationCompleted;
                 ArticleDisplayWebView.CoreWebView2.NavigationStarting -= ArticleDisplayWebView_NavigationStarting;
             }
-            if (SilentFetchView?.CoreWebView2 != null)
+        }
+
+        private async Task<string> DownloadAndCacheImageAsync(Uri imageUrl, StorageFolder cacheFolder, WebView2 worker)
+        {
+            if (imageUrl == null || worker == null || worker.CoreWebView2 == null) return null;
+
+            var fileName = System.Security.Cryptography.SHA1.Create()
+                .ComputeHash(Encoding.UTF8.GetBytes(imageUrl.AbsoluteUri))
+                .Aggregate("", (s, b) => s + b.ToString("x2")) + Path.GetExtension(imageUrl.LocalPath);
+
+            var cachedFile = await cacheFolder.TryGetItemAsync(fileName) as StorageFile;
+            if (cachedFile != null)
             {
-                SilentFetchView.CoreWebView2.NavigationCompleted -= CoreWebView2_NavigationCompleted;
+                return $"/cache/{fileName}";
             }
 
-            ArticleDisplayWebView?.Close();
-            SilentFetchView?.Close();
-            ArticleDisplayWebView = null;
-            SilentFetchView = null;
+            var tcs = new TaskCompletionSource<string>();
+            TypedEventHandler<CoreWebView2, CoreWebView2NavigationCompletedEventArgs> navigationHandler = null;
+            navigationHandler = async (sender, args) =>
+            {
+                sender.NavigationCompleted -= navigationHandler;
+                if (!args.IsSuccess) { tcs.TrySetResult(null); return; }
+
+                const string script = @"(function() {
+            let base64Data = null;
+            const img = document.querySelector('img');
+            if (img && img.naturalWidth > 0) {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.naturalWidth;
+                canvas.height = img.naturalHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                base64Data = canvas.toDataURL('image/png').split(',')[1];
+            } else if (document.documentElement && document.documentElement.tagName.toLowerCase() === 'svg') {
+                const svgText = new XMLSerializer().serializeToString(document.documentElement);
+                base64Data = window.btoa(unescape(encodeURIComponent(svgText)));
+            }
+            return base64Data;
+        })();";
+
+                try
+                {
+                    string scriptResult = await sender.ExecuteScriptAsync(script);
+                    tcs.TrySetResult(string.IsNullOrEmpty(scriptResult) || scriptResult == "null" ? null : JsonSerializer.Deserialize<string>(scriptResult));
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[ImageCache] Script execution failed for {imageUrl.AbsoluteUri}: {ex.Message}");
+                    tcs.TrySetResult(null);
+                }
+            };
+
+            worker.CoreWebView2.NavigationCompleted += navigationHandler;
+            worker.CoreWebView2.Navigate(imageUrl.AbsoluteUri);
+
+            string base64Data = await tcs.Task;
+            if (string.IsNullOrEmpty(base64Data)) return null;
+
+            var newFile = await cacheFolder.CreateFileAsync(fileName, CreationCollisionOption.ReplaceExisting);
+            var bytes = Convert.FromBase64String(base64Data);
+            await FileIO.WriteBytesAsync(newFile, bytes);
+
+            return $"/cache/{fileName}";
+        }
+
+        private async void StartArticleFetch()
+        {
+            if (!_isInitialized) return;
+
+            _pageTitleToFetch = _pageTitleToFetch.Replace(' ', '_');
+
+            _fetchStopwatch = Stopwatch.StartNew();
+            LoadingOverlay.Visibility = Visibility.Visible;
+            LastUpdatedText.Visibility = Visibility.Collapsed;
+            ArticleTitle.Text = _pageTitleToFetch.Replace('_', ' ');
+            LoadingText.Text = $"Checking for '{ArticleTitle.Text}'...";
+
+            ArticleCacheItem cachedMetadata = await ArticleCacheManager.GetCacheMetadataAsync(_pageTitleToFetch);
+            bool isConnected = NetworkInterface.GetIsNetworkAvailable();
+            DateTime? remoteTimestamp = null;
+
+            if (isConnected && !_pageTitleToFetch.Equals("random", StringComparison.OrdinalIgnoreCase))
+            {
+                remoteTimestamp = await FetchLastUpdatedTimestampAsync(_pageTitleToFetch);
+            }
+
+            if (cachedMetadata != null && (!isConnected || remoteTimestamp == null || remoteTimestamp.Value.ToUniversalTime() <= cachedMetadata.LastUpdated.ToUniversalTime()))
+            {
+                Debug.WriteLine($"[CACHE] Loading '{_pageTitleToFetch}' from cache. Freshness: {(!isConnected ? "OFFLINE" : "UP-TO-DATE")}");
+                LoadingText.Text = $"Loading '{ArticleTitle.Text}' from cache...";
+                string cachedHtml = await ArticleCacheManager.GetCachedArticleHtmlAsync(_pageTitleToFetch);
+                if (!string.IsNullOrEmpty(cachedHtml))
+                {
+                    await DisplayProcessedHtml(cachedHtml);
+                    LastUpdatedText.Text = $"Last updated: {cachedMetadata.LastUpdated.ToLocalTime():g} (Cached)";
+                    LastUpdatedText.Visibility = Visibility.Visible;
+                    LoadingOverlay.Visibility = Visibility.Collapsed;
+                    _fetchStopwatch.Stop();
+                    Debug.WriteLine($"[PERF] ===== Total operation time (from cache): {_fetchStopwatch.ElapsedMilliseconds} ms =====");
+                    return;
+                }
+            }
+
+            if (!isConnected)
+            {
+                ArticleTitle.Text = "No Connection";
+                LoadingText.Text = $"Cannot fetch '{_pageTitleToFetch}'. Please check your internet connection.";
+                return;
+            }
+
+            Debug.WriteLine($"[NETWORK] Fetching fresh version of '{_pageTitleToFetch}'.");
+            LoadingText.Text = $"Fetching: '{ArticleTitle.Text}'...";
+
+            string urlToFetch;
+            if (_pageTitleToFetch.Equals("random", StringComparison.OrdinalIgnoreCase))
+            {
+                _currentFetchStep = FetchStep.GetRandomTitle;
+                urlToFetch = $"{ApiBaseUrl}?action=query&list=random&rnnamespace=0&rnlimit=1&format=json";
+            }
+            else
+            {
+                _currentFetchStep = FetchStep.ParseArticleContent;
+                urlToFetch = $"https://betawiki.net/wiki/{Uri.EscapeDataString(_pageTitleToFetch)}";
+            }
+            SilentFetchView.CoreWebView2.Navigate(urlToFetch);
+        }
+
+        private async Task<DateTime?> FetchLastUpdatedTimestampAsync(string pageTitle)
+        {
+            if (string.IsNullOrEmpty(pageTitle) || pageTitle.Equals("random", StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            try
+            {
+                string url = $"{ApiBaseUrl}?action=query&prop=revisions&titles={Uri.EscapeDataString(pageTitle)}&rvprop=timestamp&rvlimit=1&format=json";
+                var tcs = new TaskCompletionSource<string>();
+                TypedEventHandler<CoreWebView2, CoreWebView2NavigationCompletedEventArgs> handler = null;
+                handler = async (sender, args) =>
+                {
+                    sender.NavigationCompleted -= handler;
+                    if (!args.IsSuccess)
+                    {
+                        tcs.TrySetResult(null);
+                        return;
+                    }
+                    try
+                    {
+                        string scriptResult = await sender.ExecuteScriptAsync("document.body.innerText");
+                        tcs.TrySetResult(JsonSerializer.Deserialize<string>(scriptResult));
+                    }
+                    catch { tcs.TrySetResult(null); }
+                };
+                SilentFetchView.CoreWebView2.NavigationCompleted += handler;
+                SilentFetchView.CoreWebView2.Navigate(url);
+                string json = await tcs.Task;
+                if (string.IsNullOrEmpty(json)) return null;
+                var response = JsonSerializer.Deserialize<TimestampQueryResponse>(json);
+                var page = response?.query?.pages?.Values.FirstOrDefault();
+                var revision = page?.Revisions?.FirstOrDefault();
+                return revision?.Timestamp;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to fetch timestamp: {ex.Message}");
+                return null;
+            }
+        }
+
+        private async Task DisplayProcessedHtml(string html)
+        {
+            StorageFolder localFolder = ApplicationData.Current.LocalFolder;
+            StorageFile articleFile = await localFolder.CreateFileAsync("article.html", CreationCollisionOption.ReplaceExisting);
+            await FileIO.WriteTextAsync(articleFile, html);
+            Debug.WriteLine($"[PERF] Wrote article.html to disk at: {_fetchStopwatch.ElapsedMilliseconds} ms");
+            ArticleDisplayWebView.CoreWebView2.Navigate($"https://{VirtualHostName}/article.html");
+        }
+
+        private async void CoreWebView2_NavigationCompleted(CoreWebView2 sender, CoreWebView2NavigationCompletedEventArgs args)
+        {
+            if (_currentFetchStep == FetchStep.Idle) return;
+
+            await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, async () =>
+            {
+                if (!args.IsSuccess)
+                {
+                    LoadingOverlay.Visibility = Visibility.Collapsed;
+                    ArticleTitle.Text = "Failed to load page";
+                    return;
+                }
+
+                try
+                {
+                    if (_currentFetchStep == FetchStep.GetRandomTitle)
+                    {
+                        string script = "document.body.innerText;";
+                        string scriptResult = await sender.ExecuteScriptAsync(script);
+                        string resultJson = JsonSerializer.Deserialize<string>(scriptResult);
+                        var randomResponse = JsonSerializer.Deserialize<RandomQueryResponse>(resultJson);
+                        string randomTitle = randomResponse?.query?.random?.FirstOrDefault()?.title;
+                        if (string.IsNullOrEmpty(randomTitle)) throw new Exception("Failed to get a random title from the API.");
+
+                        if (_articleHistory.Count > 0 && _articleHistory.Peek().Equals("random", StringComparison.OrdinalIgnoreCase))
+                        {
+                            _articleHistory.Pop();
+                            _articleHistory.Push(randomTitle);
+                        }
+
+                        _pageTitleToFetch = randomTitle;
+                        _currentFetchStep = FetchStep.ParseArticleContent;
+                        ArticleTitle.Text = _pageTitleToFetch.Replace('_', ' ');
+                        LoadingText.Text = $"Parsing: '{ArticleTitle.Text}'...";
+                        string pageUrl = $"https://betawiki.net/wiki/{Uri.EscapeDataString(randomTitle)}";
+                        SilentFetchView.CoreWebView2.Navigate(pageUrl);
+                    }
+                    else if (_currentFetchStep == FetchStep.ParseArticleContent)
+                    {
+                        string fullHtml = await sender.ExecuteScriptAsync("document.documentElement.outerHTML");
+                        fullHtml = JsonSerializer.Deserialize<string>(fullHtml);
+                        var doc = new HtmlDocument();
+                        doc.LoadHtml(fullHtml);
+                        var contentNode = doc.DocumentNode.SelectSingleNode("//div[@id='mw-content-text']");
+                        if (contentNode == null) throw new Exception("Could not find main content element.");
+
+                        string processedHtml = await ProcessHtmlAsync(contentNode.InnerHtml, _fetchStopwatch);
+
+                        DateTime? lastUpdated = await FetchLastUpdatedTimestampAsync(_pageTitleToFetch);
+                        if (lastUpdated.HasValue)
+                        {
+                            await ArticleCacheManager.SaveArticleToCacheAsync(_pageTitleToFetch, processedHtml, lastUpdated.Value);
+                            LastUpdatedText.Text = $"Last updated: {lastUpdated.Value.ToLocalTime():g}";
+                        }
+
+                        await DisplayProcessedHtml(processedHtml);
+                        if (!string.IsNullOrEmpty(LastUpdatedText.Text))
+                        {
+                            LastUpdatedText.Visibility = Visibility.Visible;
+                        }
+
+                        LoadingOverlay.Visibility = Visibility.Collapsed;
+                        _currentFetchStep = FetchStep.Idle;
+                        _fetchStopwatch.Stop();
+                        Debug.WriteLine($"[PERF] ===== Total operation time (from network): {_fetchStopwatch.ElapsedMilliseconds} ms =====");
+                    }
+                }
+                catch (Exception ex)
+                {
+                }
+            });
         }
 
         private void TitleBar_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -153,7 +463,7 @@ namespace _1809_UWP
         {
             if (ArticleDisplayWebView?.CoreWebView2 != null && _titleBarHeight > 0)
             {
-                string script = $"document.body.style.paddingTop = '{_titleBarHeight - 50}px';";
+                string script = $"document.querySelector('.mw-parser-output').style.paddingTop = '{_titleBarHeight}px';";
                 await ArticleDisplayWebView.CoreWebView2.ExecuteScriptAsync(script);
             }
         }
@@ -161,18 +471,12 @@ namespace _1809_UWP
         private async void ArticleDisplayWebView_NavigationStarting(CoreWebView2 sender, CoreWebView2NavigationStartingEventArgs args)
         {
             Uri uri = new Uri(args.Uri);
-
-            if (uri.Host.Equals(VirtualHostName, StringComparison.OrdinalIgnoreCase))
-            {
-                return;
-            }
-
+            if (uri.Host.Equals(VirtualHostName, StringComparison.OrdinalIgnoreCase)) return;
             args.Cancel = true;
-
             if (uri.Host.Equals("betawiki.net", StringComparison.OrdinalIgnoreCase) && uri.AbsolutePath.StartsWith("/wiki/"))
             {
                 string newTitle = uri.AbsolutePath.Substring("/wiki/".Length);
-                _pageTitleToFetch = Uri.UnescapeDataString(newTitle).Replace('_', ' ');
+                _pageTitleToFetch = Uri.UnescapeDataString(newTitle);
                 _articleHistory.Push(_pageTitleToFetch);
                 StartArticleFetch();
             }
@@ -180,174 +484,6 @@ namespace _1809_UWP
             {
                 await Windows.System.Launcher.LaunchUriAsync(uri);
             }
-        }
-
-        private void StartArticleFetch()
-        {
-            if (!_isInitialized) return;
-
-            _fetchStopwatch = Stopwatch.StartNew();
-            Debug.WriteLine($"[PERF] Starting article fetch for '{_pageTitleToFetch}'...");
-
-            LoadingOverlay.Visibility = Visibility.Visible;
-            LoadingText.Text = $"Fetching: '{_pageTitleToFetch}'...";
-            string urlToFetch;
-            if (_pageTitleToFetch.Equals("random", StringComparison.OrdinalIgnoreCase))
-            {
-                _currentFetchStep = FetchStep.GetRandomTitle;
-                urlToFetch = $"{ApiBaseUrl}?action=query&list=random&rnnamespace=0&rnlimit=1&format=json";
-            }
-            else
-            {
-                _currentFetchStep = FetchStep.ParseArticleContent;
-                urlToFetch = $"https://betawiki.net/wiki/{Uri.EscapeDataString(_pageTitleToFetch)}";
-            }
-            SilentFetchView.CoreWebView2.Navigate(urlToFetch);
-        }
-
-        private async void CoreWebView2_NavigationCompleted(CoreWebView2 sender, CoreWebView2NavigationCompletedEventArgs args)
-        {
-            if (_currentFetchStep == FetchStep.Idle) return;
-
-            await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, async () =>
-            {
-                if (!args.IsSuccess) return;
-                try
-                {
-                    if (_currentFetchStep == FetchStep.GetRandomTitle)
-                    {
-                        string script = "document.body.innerText;";
-                        string scriptResult = await sender.ExecuteScriptAsync(script);
-                        string resultJson = JsonSerializer.Deserialize<string>(scriptResult);
-
-                        Debug.WriteLine($"[PERF] GetRandomTitle API call completed in: {_fetchStopwatch.ElapsedMilliseconds} ms");
-                        var randomResponse = JsonSerializer.Deserialize<RandomQueryResponse>(resultJson);
-                        string randomTitle = randomResponse?.query?.random?.FirstOrDefault()?.title;
-                        if (string.IsNullOrEmpty(randomTitle)) throw new Exception("Failed to get a random title from the API.");
-
-                        if (_articleHistory.Count > 0 && _articleHistory.Peek().Equals("random", StringComparison.OrdinalIgnoreCase))
-                        {
-                            _articleHistory.Pop();
-                            _articleHistory.Push(randomTitle);
-                        }
-
-                        _pageTitleToFetch = randomTitle.Replace('_', ' ');
-                        _currentFetchStep = FetchStep.ParseArticleContent;
-                        LoadingText.Text = $"Parsing: '{_pageTitleToFetch}'...";
-
-                        string pageUrl = $"https://betawiki.net/wiki/{Uri.EscapeDataString(randomTitle)}";
-                        SilentFetchView.CoreWebView2.Navigate(pageUrl);
-                    }
-                    else if (_currentFetchStep == FetchStep.ParseArticleContent)
-                    {
-                        string fullHtml = await sender.ExecuteScriptAsync("document.documentElement.outerHTML");
-                        if (string.IsNullOrEmpty(fullHtml)) throw new Exception("Failed to get page HTML.");
-                        fullHtml = JsonSerializer.Deserialize<string>(fullHtml);
-
-                        Debug.WriteLine($"[PERF] Full page download completed in: {_fetchStopwatch.ElapsedMilliseconds} ms. Payload size: {fullHtml.Length} bytes.");
-
-                        var doc = new HtmlDocument();
-                        doc.LoadHtml(fullHtml);
-
-                        var contentNode = doc.DocumentNode.SelectSingleNode("//div[@id='mw-content-text']");
-                        if (contentNode == null) throw new Exception("Could not find main content element in the downloaded page.");
-
-                        string htmlContent = contentNode.InnerHtml;
-                        string articleTitle = _pageTitleToFetch;
-
-                        if (string.IsNullOrEmpty(htmlContent) || string.IsNullOrEmpty(articleTitle)) throw new Exception("Extracted content or title was empty.");
-
-                        ArticleTitle.Text = articleTitle;
-                        string processedHtml = await ProcessHtmlAsync(htmlContent, _fetchStopwatch);
-
-                        StorageFolder localFolder = ApplicationData.Current.LocalFolder;
-                        StorageFile articleFile = await localFolder.CreateFileAsync("article.html", CreationCollisionOption.ReplaceExisting);
-                        await FileIO.WriteTextAsync(articleFile, processedHtml);
-                        Debug.WriteLine($"[PERF] Wrote article.html to disk at: {_fetchStopwatch.ElapsedMilliseconds} ms");
-
-                        ArticleDisplayWebView.CoreWebView2.Navigate($"https://{VirtualHostName}/article.html");
-                        LoadingOverlay.Visibility = Visibility.Collapsed;
-                        _currentFetchStep = FetchStep.Idle;
-
-                        _fetchStopwatch.Stop();
-                        Debug.WriteLine($"[PERF] ===== Total operation time: {_fetchStopwatch.ElapsedMilliseconds} ms =====");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _fetchStopwatch?.Stop();
-                    Debug.WriteLine($"[LOG] Process FAILED at step {_currentFetchStep}: {ex.Message}. Assuming manual CAPTCHA.");
-                    LoadingOverlay.Visibility = Visibility.Collapsed;
-                    SilentFetchView.Visibility = Visibility.Visible;
-                    SilentFetchView.CoreWebView2.NavigationCompleted -= CoreWebView2_NavigationCompleted;
-                    SilentFetchView.CoreWebView2.NavigationCompleted += CoreWebView2_CaptchaSolved_NavigationCompleted;
-                    SilentFetchView.CoreWebView2.Navigate(ApiBaseUrl);
-                }
-            });
-        }
-
-        private void CoreWebView2_CaptchaSolved_NavigationCompleted(CoreWebView2 sender, CoreWebView2NavigationCompletedEventArgs args)
-        {
-            SilentFetchView.CoreWebView2.NavigationCompleted -= CoreWebView2_CaptchaSolved_NavigationCompleted;
-            SilentFetchView.Visibility = Visibility.Collapsed;
-            SilentFetchView.CoreWebView2.NavigationCompleted += CoreWebView2_NavigationCompleted;
-            StartArticleFetch();
-        }
-
-        private async Task<string> DownloadAndCacheImageAsync(Uri imageUrl, StorageFolder cacheFolder, WebView2 worker)
-        {
-            if (imageUrl == null || worker == null) return null;
-
-            var fileName = System.Security.Cryptography.SHA1.Create()
-                .ComputeHash(Encoding.UTF8.GetBytes(imageUrl.AbsoluteUri))
-                .Aggregate("", (s, b) => s + b.ToString("x2")) + Path.GetExtension(imageUrl.LocalPath);
-
-            var cachedFile = await cacheFolder.TryGetItemAsync(fileName) as StorageFile;
-            if (cachedFile != null) return $"/cache/{fileName}";
-
-            var tcs = new TaskCompletionSource<string>();
-            TypedEventHandler<CoreWebView2, CoreWebView2NavigationCompletedEventArgs> navigationHandler = null;
-            navigationHandler = async (sender, args) =>
-            {
-                sender.NavigationCompleted -= navigationHandler;
-                if (!args.IsSuccess) { tcs.TrySetResult(null); return; }
-
-                const string script = @"(function() {
-                    let base64Data = null;
-                    const img = document.querySelector('img');
-                    if (img && img.naturalWidth > 0) {
-                        const canvas = document.createElement('canvas');
-                        canvas.width = img.naturalWidth;
-                        canvas.height = img.naturalHeight;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0);
-                        base64Data = canvas.toDataURL('image/png').split(',')[1];
-                    } else if (document.documentElement && document.documentElement.tagName.toLowerCase() === 'svg') {
-                        const svgText = new XMLSerializer().serializeToString(document.documentElement);
-                        base64Data = window.btoa(svgText);
-                    }
-                    return base64Data;
-                })();";
-
-                try
-                {
-                    string scriptResult = await sender.ExecuteScriptAsync(script);
-                    tcs.TrySetResult(string.IsNullOrEmpty(scriptResult) || scriptResult == "null" ? null : JsonSerializer.Deserialize<string>(scriptResult));
-                }
-                catch (Exception) { tcs.TrySetResult(null); }
-            };
-
-            worker.CoreWebView2.NavigationCompleted += navigationHandler;
-            worker.CoreWebView2.Navigate(imageUrl.AbsoluteUri);
-
-            string base64Data = await tcs.Task;
-            if (string.IsNullOrEmpty(base64Data)) return null;
-
-            var newFile = await cacheFolder.CreateFileAsync(fileName, CreationCollisionOption.ReplaceExisting);
-            var bytes = Convert.FromBase64String(base64Data);
-            await FileIO.WriteBytesAsync(newFile, bytes);
-
-            return $"/cache/{fileName}";
         }
 
         private async Task<string> ProcessHtmlAsync(string rawHtml, Stopwatch stopwatch)
@@ -525,7 +661,7 @@ namespace _1809_UWP
 
             var style = $@"<style>
                 {cssVariables}
-                html, body {{ background-color: transparent !important; color: var(--text-primary); font-family: 'Segoe UI Variable', 'Segoe UI', sans-serif; margin: 0; padding: 0 12px 12px 12px; font-size: 15px; -webkit-font-smoothing: antialiased; padding-top: 60px; }}
+                html, body {{ background-color: transparent !important; color: var(--text-primary); font-family: 'Segoe UI Variable', 'Segoe UI', sans-serif; margin: 0; padding: 0 12px 12px 12px; font-size: 15px; -webkit-font-smoothing: antialiased; padding-top: 10px; }}
                 a {{ color: var(--link-color); text-decoration: none; }} a:hover {{ text-decoration: underline; }}
                 a.selflink, a.new {{ color: var(--text-secondary); pointer-events: none; text-decoration: none; }}
                 img {{ max-width: 100%; height: auto; border-radius: 4px; }} .mw-editsection {{ display: none; }}
