@@ -17,6 +17,9 @@ using Microsoft.Web.WebView2.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Navigation;
+using Windows.UI.Xaml.Media;
+using muxc = Microsoft.UI.Xaml.Controls;
+using Windows.UI;
 
 namespace _1809_UWP
 {
@@ -42,6 +45,7 @@ namespace _1809_UWP
         private readonly int _maxWorkerCount;
         private Stopwatch _fetchStopwatch;
         private readonly Stack<string> _articleHistory = new Stack<string>();
+        private double _titleBarHeight = 0;
         public bool CanGoBackInPage => _articleHistory.Count > 1;
 
         public ArticleViewerPage()
@@ -63,6 +67,7 @@ namespace _1809_UWP
 
         private async void Page_Loaded(object sender, RoutedEventArgs e)
         {
+            ApplyAcrylicToTitleBar();
             if (_isInitialized) return;
             try
             {
@@ -74,6 +79,7 @@ namespace _1809_UWP
                 var tempFolder = ApplicationData.Current.LocalFolder.Path;
                 ArticleDisplayWebView.CoreWebView2.SetVirtualHostNameToFolderMapping(VirtualHostName, tempFolder, CoreWebView2HostResourceAccessKind.Allow);
 
+                ArticleDisplayWebView.CoreWebView2.NavigationCompleted += ArticleDisplayWebView_ContentNavigationCompleted;
                 ArticleDisplayWebView.CoreWebView2.NavigationStarting += ArticleDisplayWebView_NavigationStarting;
                 SilentFetchView.CoreWebView2.NavigationCompleted += CoreWebView2_NavigationCompleted;
                 this.Unloaded += ArticleViewerPage_Unloaded;
@@ -81,6 +87,7 @@ namespace _1809_UWP
                 _isInitialized = true;
                 if (!string.IsNullOrEmpty(_pageTitleToFetch))
                 {
+                    _articleHistory.Push(_pageTitleToFetch);
                     StartArticleFetch();
                 }
             }
@@ -90,15 +97,68 @@ namespace _1809_UWP
             }
         }
 
+        private void ApplyAcrylicToTitleBar()
+        {
+            var acrylicBrush = new AcrylicBrush
+            {
+                BackgroundSource = AcrylicBackgroundSource.Backdrop,
+                TintOpacity = 0.4
+            };
+
+            if (this.ActualTheme == ElementTheme.Dark)
+            {
+                acrylicBrush.TintColor = Windows.UI.Colors.Black;
+            }
+            else
+            {
+                acrylicBrush.TintColor = Windows.UI.Colors.White;
+            }
+
+            TitleBarBackground.Background = acrylicBrush;
+        }
+
         private void ArticleViewerPage_Unloaded(object sender, RoutedEventArgs e)
         {
+            if (ArticleDisplayWebView?.CoreWebView2 != null)
+            {
+                ArticleDisplayWebView.CoreWebView2.NavigationCompleted -= ArticleDisplayWebView_ContentNavigationCompleted;
+                ArticleDisplayWebView.CoreWebView2.NavigationStarting -= ArticleDisplayWebView_NavigationStarting;
+            }
+            if (SilentFetchView?.CoreWebView2 != null)
+            {
+                SilentFetchView.CoreWebView2.NavigationCompleted -= CoreWebView2_NavigationCompleted;
+            }
+
             ArticleDisplayWebView?.Close();
             SilentFetchView?.Close();
             ArticleDisplayWebView = null;
             SilentFetchView = null;
         }
 
-        private void ArticleDisplayWebView_NavigationStarting(CoreWebView2 sender, CoreWebView2NavigationStartingEventArgs args)
+        private void TitleBar_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            _titleBarHeight = e.NewSize.Height;
+            UpdateWebViewPadding();
+        }
+
+        private void ArticleDisplayWebView_ContentNavigationCompleted(CoreWebView2 sender, CoreWebView2NavigationCompletedEventArgs args)
+        {
+            if (args.IsSuccess)
+            {
+                UpdateWebViewPadding();
+            }
+        }
+
+        private async void UpdateWebViewPadding()
+        {
+            if (ArticleDisplayWebView?.CoreWebView2 != null && _titleBarHeight > 0)
+            {
+                string script = $"document.body.style.paddingTop = '{_titleBarHeight - 50}px';";
+                await ArticleDisplayWebView.CoreWebView2.ExecuteScriptAsync(script);
+            }
+        }
+
+        private async void ArticleDisplayWebView_NavigationStarting(CoreWebView2 sender, CoreWebView2NavigationStartingEventArgs args)
         {
             Uri uri = new Uri(args.Uri);
 
@@ -114,12 +174,11 @@ namespace _1809_UWP
                 string newTitle = uri.AbsolutePath.Substring("/wiki/".Length);
                 _pageTitleToFetch = Uri.UnescapeDataString(newTitle).Replace('_', ' ');
                 _articleHistory.Push(_pageTitleToFetch);
-
                 StartArticleFetch();
             }
             else
             {
-                _ = Windows.System.Launcher.LaunchUriAsync(uri);
+                await Windows.System.Launcher.LaunchUriAsync(uri);
             }
         }
 
@@ -169,16 +228,16 @@ namespace _1809_UWP
                         if (_articleHistory.Count > 0 && _articleHistory.Peek().Equals("random", StringComparison.OrdinalIgnoreCase))
                         {
                             _articleHistory.Pop();
+                            _articleHistory.Push(randomTitle);
                         }
-                        _articleHistory.Push(randomTitle);
+
                         _pageTitleToFetch = randomTitle.Replace('_', ' ');
                         _currentFetchStep = FetchStep.ParseArticleContent;
                         LoadingText.Text = $"Parsing: '{_pageTitleToFetch}'...";
 
-                        string pageUrl = $"https://betawiki.net/wiki/{Uri.EscapeDataString(_pageTitleToFetch)}";
+                        string pageUrl = $"https://betawiki.net/wiki/{Uri.EscapeDataString(randomTitle)}";
                         SilentFetchView.CoreWebView2.Navigate(pageUrl);
                     }
-
                     else if (_currentFetchStep == FetchStep.ParseArticleContent)
                     {
                         string fullHtml = await sender.ExecuteScriptAsync("document.documentElement.outerHTML");
@@ -466,7 +525,7 @@ namespace _1809_UWP
 
             var style = $@"<style>
                 {cssVariables}
-                html, body {{ background-color: transparent !important; color: var(--text-primary); font-family: 'Segoe UI Variable', 'Segoe UI', sans-serif; margin: 0; padding: 12px; font-size: 15px; -webkit-font-smoothing: antialiased; }}
+                html, body {{ background-color: transparent !important; color: var(--text-primary); font-family: 'Segoe UI Variable', 'Segoe UI', sans-serif; margin: 0; padding: 0 12px 12px 12px; font-size: 15px; -webkit-font-smoothing: antialiased; padding-top: 60px; }}
                 a {{ color: var(--link-color); text-decoration: none; }} a:hover {{ text-decoration: underline; }}
                 a.selflink, a.new {{ color: var(--text-secondary); pointer-events: none; text-decoration: none; }}
                 img {{ max-width: 100%; height: auto; border-radius: 4px; }} .mw-editsection, .reflist {{ display: none; }}
@@ -521,7 +580,7 @@ namespace _1809_UWP
             {
                 _articleHistory.Pop();
                 string previousPageTitle = _articleHistory.Peek();
-                _pageTitleToFetch = previousPageTitle;
+                _pageTitleToFetch = previousPageTitle.Replace('_', ' ');
                 StartArticleFetch();
                 return true;
             }

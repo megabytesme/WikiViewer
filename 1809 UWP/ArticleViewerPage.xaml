@@ -16,20 +16,24 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <TextBlock x:Name="ArticleTitle" 
-                   Grid.Row="0"
-                   Style="{ThemeResource HeaderTextBlockStyle}" 
-                   TextWrapping="Wrap"
-                   Margin="12,0,12,12"/>
-
         <xaml:WebView2 x:Name="ArticleDisplayWebView"
-                       Grid.Row="1"
-                       Margin="12,0,12,12"/>
+                       Grid.Row="0"
+                       Grid.RowSpan="2"/>
+
+        <Grid x:Name="TitleBarBackground"
+              Grid.Row="0"
+              VerticalAlignment="Top"
+              SizeChanged="TitleBar_SizeChanged"
+              Margin="0,0,15,0">
+
+            <TextBlock x:Name="ArticleTitle" 
+                       Style="{ThemeResource HeaderTextBlockStyle}" 
+                       TextWrapping="Wrap"
+                       Margin="12,12,12,12"/>
+        </Grid>
 
         <xaml:WebView2 x:Name="SilentFetchView" Width="1" Height="1" Opacity="0" Grid.RowSpan="2" />
-        
         <Grid x:Name="WorkerWebViewHost" Visibility="Collapsed"/>
-
         <Grid x:Name="LoadingOverlay" Background="Transparent" Visibility="Collapsed" Grid.RowSpan="2">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
                 <ProgressRing IsActive="True" Width="60" Height="60"/>
