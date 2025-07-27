@@ -40,6 +40,7 @@ namespace _1809_UWP
         private const string VirtualHostName = "local.betawiki-app.net";
         private bool _isInitialized = false;
         private readonly int _maxWorkerCount;
+        private Stopwatch _fetchStopwatch;
 
         public ArticleViewerPage()
         {
@@ -96,20 +97,24 @@ namespace _1809_UWP
         private void StartArticleFetch()
         {
             if (!_isInitialized) return;
+
+            _fetchStopwatch = Stopwatch.StartNew();
+            Debug.WriteLine($"[PERF] Starting article fetch for '{_pageTitleToFetch}'...");
+
             LoadingOverlay.Visibility = Visibility.Visible;
             LoadingText.Text = $"Fetching: '{_pageTitleToFetch}'...";
-            string apiUrl;
+            string urlToFetch;
             if (_pageTitleToFetch.Equals("random", StringComparison.OrdinalIgnoreCase))
             {
                 _currentFetchStep = FetchStep.GetRandomTitle;
-                apiUrl = $"{ApiBaseUrl}?action=query&list=random&rnnamespace=0&rnlimit=1&format=json";
+                urlToFetch = $"{ApiBaseUrl}?action=query&list=random&rnnamespace=0&rnlimit=1&format=json";
             }
             else
             {
                 _currentFetchStep = FetchStep.ParseArticleContent;
-                apiUrl = $"{ApiBaseUrl}?action=parse&page={Uri.EscapeDataString(_pageTitleToFetch)}&format=json";
+                urlToFetch = $"https://betawiki.net/wiki/{Uri.EscapeDataString(_pageTitleToFetch)}";
             }
-            SilentFetchView.CoreWebView2.Navigate(apiUrl);
+            SilentFetchView.CoreWebView2.Navigate(urlToFetch);
         }
 
         private async void CoreWebView2_NavigationCompleted(CoreWebView2 sender, CoreWebView2NavigationCompletedEventArgs args)
@@ -121,43 +126,64 @@ namespace _1809_UWP
                 if (!args.IsSuccess) return;
                 try
                 {
-                    string script = "document.body.innerText;";
-                    string scriptResult = await sender.ExecuteScriptAsync(script);
-                    string resultJson;
-                    try { resultJson = JsonSerializer.Deserialize<string>(scriptResult); }
-                    catch (JsonException) { Debug.WriteLine("[LOG] Content is not JSON, assuming Cloudflare interstitial. Waiting for redirect..."); return; }
-
-                    if (string.IsNullOrEmpty(resultJson)) throw new Exception("WebView returned empty content after JSON deserialization.");
-
                     if (_currentFetchStep == FetchStep.GetRandomTitle)
                     {
+                        string script = "document.body.innerText;";
+                        string scriptResult = await sender.ExecuteScriptAsync(script);
+                        string resultJson = JsonSerializer.Deserialize<string>(scriptResult);
+
+                        Debug.WriteLine($"[PERF] GetRandomTitle API call completed in: {_fetchStopwatch.ElapsedMilliseconds} ms");
                         var randomResponse = JsonSerializer.Deserialize<RandomQueryResponse>(resultJson);
                         string randomTitle = randomResponse?.query?.random?.FirstOrDefault()?.title;
                         if (string.IsNullOrEmpty(randomTitle)) throw new Exception("Failed to get a random title from the API.");
+
                         _pageTitleToFetch = randomTitle;
                         _currentFetchStep = FetchStep.ParseArticleContent;
                         LoadingText.Text = $"Parsing: '{_pageTitleToFetch}'...";
-                        string parseUrl = $"{ApiBaseUrl}?action=parse&page={Uri.EscapeDataString(_pageTitleToFetch)}&format=json";
-                        SilentFetchView.CoreWebView2.Navigate(parseUrl);
+
+                        string pageUrl = $"https://betawiki.net/wiki/{Uri.EscapeDataString(_pageTitleToFetch)}";
+                        SilentFetchView.CoreWebView2.Navigate(pageUrl);
                     }
                     else if (_currentFetchStep == FetchStep.ParseArticleContent)
                     {
-                        var apiResponse = JsonSerializer.Deserialize<ApiParseResponse>(resultJson);
-                        string htmlContent = apiResponse?.parse?.text?.Content;
-                        string articleTitle = apiResponse?.parse?.title;
-                        if (string.IsNullOrEmpty(htmlContent) || string.IsNullOrEmpty(articleTitle)) throw new Exception("API response did not contain valid title or content.");
+                        string fullHtml = await sender.ExecuteScriptAsync("document.documentElement.outerHTML");
+                        if (string.IsNullOrEmpty(fullHtml)) throw new Exception("Failed to get page HTML.");
+                        fullHtml = JsonSerializer.Deserialize<string>(fullHtml);
+
+                        Debug.WriteLine($"[PERF] Full page download completed in: {_fetchStopwatch.ElapsedMilliseconds} ms. Payload size: {fullHtml.Length} bytes.");
+
+                        var doc = new HtmlDocument();
+                        doc.LoadHtml(fullHtml);
+
+                        var contentNode = doc.DocumentNode.SelectSingleNode("//div[@id='mw-content-text']");
+                        if (contentNode == null) throw new Exception("Could not find main content element in the downloaded page.");
+
+                        string htmlContent = contentNode.InnerHtml;
+                        string articleTitle = _pageTitleToFetch.Equals("random", StringComparison.OrdinalIgnoreCase)
+                            ? doc.DocumentNode.SelectSingleNode("//h1[@id='firstHeading']")?.InnerText ?? ""
+                            : _pageTitleToFetch;
+
+                        if (string.IsNullOrEmpty(htmlContent) || string.IsNullOrEmpty(articleTitle)) throw new Exception("Extracted content or title was empty.");
+
                         ArticleTitle.Text = articleTitle;
-                        string processedHtml = await ProcessHtmlAsync(htmlContent);
+                        string processedHtml = await ProcessHtmlAsync(htmlContent, _fetchStopwatch);
+
                         StorageFolder localFolder = ApplicationData.Current.LocalFolder;
                         StorageFile articleFile = await localFolder.CreateFileAsync("article.html", CreationCollisionOption.ReplaceExisting);
                         await FileIO.WriteTextAsync(articleFile, processedHtml);
+                        Debug.WriteLine($"[PERF] Wrote article.html to disk at: {_fetchStopwatch.ElapsedMilliseconds} ms");
+
                         ArticleDisplayWebView.CoreWebView2.Navigate($"https://{VirtualHostName}/article.html");
                         LoadingOverlay.Visibility = Visibility.Collapsed;
                         _currentFetchStep = FetchStep.Idle;
+
+                        _fetchStopwatch.Stop();
+                        Debug.WriteLine($"[PERF] ===== Total operation time: {_fetchStopwatch.ElapsedMilliseconds} ms =====");
                     }
                 }
                 catch (Exception ex)
                 {
+                    _fetchStopwatch?.Stop();
                     Debug.WriteLine($"[LOG] Process FAILED at step {_currentFetchStep}: {ex.Message}. Assuming manual CAPTCHA.");
                     LoadingOverlay.Visibility = Visibility.Collapsed;
                     SilentFetchView.Visibility = Visibility.Visible;
@@ -234,8 +260,9 @@ namespace _1809_UWP
             return $"/cache/{fileName}";
         }
 
-        private async Task<string> ProcessHtmlAsync(string rawHtml)
+        private async Task<string> ProcessHtmlAsync(string rawHtml, Stopwatch stopwatch)
         {
+            Debug.WriteLine($"[PERF] Entering ProcessHtmlAsync at: {stopwatch.ElapsedMilliseconds} ms");
             var doc = new HtmlDocument();
             doc.LoadHtml(rawHtml);
             string baseUrl = "https://betawiki.net";
@@ -259,6 +286,7 @@ namespace _1809_UWP
                 var imageLinks = doc.DocumentNode.SelectNodes("//a[starts-with(@href, '/wiki/File:')]");
                 if (imageLinks != null && imageLinks.Any())
                 {
+                    long startTime = stopwatch.ElapsedMilliseconds;
                     var imageFileNames = imageLinks.Select(link => link.GetAttributeValue("href", "").Substring(6)).Distinct().ToList();
                     var titles = string.Join("|", imageFileNames.Select(Uri.EscapeDataString));
                     var imageUrlApi = $"{ApiBaseUrl}?action=query&prop=imageinfo&iiprop=url&format=json&titles={titles}";
@@ -281,6 +309,8 @@ namespace _1809_UWP
                     SilentFetchView.CoreWebView2.NavigationCompleted += handler;
                     SilentFetchView.CoreWebView2.Navigate(imageUrlApi);
                     var imageJsonResponse = await tcs.Task;
+                    Debug.WriteLine($"[PERF] Image URL lookup API call took: {stopwatch.ElapsedMilliseconds - startTime} ms");
+
                     var imageInfoResponse = JsonSerializer.Deserialize<ImageQueryResponse>(imageJsonResponse);
                     if (imageInfoResponse?.query?.pages != null)
                     {
@@ -303,13 +333,14 @@ namespace _1809_UWP
                 var allImages = doc.DocumentNode.SelectNodes("//img");
                 if (allImages != null && allImages.Count > 0)
                 {
+                    long startTime = stopwatch.ElapsedMilliseconds;
                     int workersToCreate = Math.Min(allImages.Count, _maxWorkerCount);
                     workerSemaphore = new SemaphoreSlim(workersToCreate, workersToCreate);
                     var availableWorkers = new ConcurrentQueue<WebView2>();
 
                     var coreInitTasks = new List<Task>();
                     for (int i = 0; i < workersToCreate; i++)
-                {
+                    {
                         var worker = new WebView2();
                         webViewWorkers.Add(worker);
                         WorkerWebViewHost.Children.Add(worker);
@@ -317,7 +348,9 @@ namespace _1809_UWP
                     }
                     await Task.WhenAll(coreInitTasks);
                     foreach (var worker in webViewWorkers) availableWorkers.Enqueue(worker);
+                    Debug.WriteLine($"[PERF] Initializing {workersToCreate} workers took: {stopwatch.ElapsedMilliseconds - startTime} ms");
 
+                    startTime = stopwatch.ElapsedMilliseconds;
                     var imageDownloadTasks = allImages.Select(async img =>
                     {
                         string originalSrc = img.GetAttributeValue("srcset", null)?.Split(',').FirstOrDefault()?.Trim().Split(' ')[0] ?? img.GetAttributeValue("src", null);
@@ -348,6 +381,7 @@ namespace _1809_UWP
                     }).ToList();
 
                     await Task.WhenAll(imageDownloadTasks);
+                    Debug.WriteLine($"[PERF] Downloading & Caching {allImages.Count} images took: {stopwatch.ElapsedMilliseconds - startTime} ms");
                 }
             }
             finally
