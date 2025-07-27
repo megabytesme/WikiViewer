@@ -1,5 +1,11 @@
-﻿using System;
+﻿using Microsoft.Web.WebView2.Core;
+using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 using Windows.ApplicationModel.Core;
 using Windows.UI;
 using Windows.UI.Core;
@@ -14,11 +20,56 @@ namespace _1809_UWP
 {
     public sealed partial class MainPage : Page
     {
+        private CancellationTokenSource _suggestionCts;
+        private TaskCompletionSource<string> _apiResultTcs;
+
         public MainPage()
         {
             this.InitializeComponent();
             ApplyBackdropOrAcrylic();
             SetupTitleBar();
+
+            _ = InitializeApiWebViewAsync();
+        }
+
+        private async Task InitializeApiWebViewAsync()
+        {
+            try
+            {
+                await ApiFetchWebView.EnsureCoreWebView2Async();
+                ApiFetchWebView.CoreWebView2.NavigationCompleted += ApiFetchWebView_NavigationCompleted;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to initialize API WebView: {ex.Message}");
+            }
+        }
+
+        private async void ApiFetchWebView_NavigationCompleted(CoreWebView2 sender, CoreWebView2NavigationCompletedEventArgs args)
+        {
+            if (_apiResultTcs == null || _apiResultTcs.Task.IsCompleted)
+            {
+                return;
+            }
+
+            if (!args.IsSuccess)
+            {
+                _apiResultTcs.TrySetException(new HttpRequestException($"API navigation failed with status: {args.WebErrorStatus}"));
+                return;
+            }
+
+            try
+            {
+                string script = "document.body.innerText;";
+                string scriptResult = await sender.ExecuteScriptAsync(script);
+                string resultJson = JsonSerializer.Deserialize<string>(scriptResult);
+
+                _apiResultTcs.TrySetResult(resultJson);
+            }
+            catch (Exception ex)
+            {
+                _apiResultTcs.TrySetException(ex);
+            }
         }
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -109,6 +160,53 @@ namespace _1809_UWP
             if (!string.IsNullOrEmpty(args.QueryText))
             {
                 ContentFrame.Navigate(typeof(ArticleViewerPage), args.QueryText);
+            }
+        }
+
+        private async void SearchBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
+        {
+            if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput) return;
+
+            string query = sender.Text;
+            if (string.IsNullOrWhiteSpace(query) || query.Length < 2)
+            {
+                sender.ItemsSource = null;
+                return;
+            }
+
+            _suggestionCts?.Cancel();
+            _suggestionCts = new CancellationTokenSource();
+            var token = _suggestionCts.Token;
+
+            try
+            {
+                await Task.Delay(300, token);
+                string url = $"https://betawiki.net/api.php?action=opensearch&format=json&limit=10&search={Uri.EscapeDataString(query)}";
+
+                _apiResultTcs = new TaskCompletionSource<string>();
+                ApiFetchWebView.CoreWebView2.Navigate(url);
+                string json = await _apiResultTcs.Task;
+                using (JsonDocument doc = JsonDocument.Parse(json))
+                {
+                    JsonElement root = doc.RootElement;
+                    if (root.GetArrayLength() > 1)
+                    {
+                        var suggestions = new List<string>();
+                        foreach (JsonElement suggestionElement in root[1].EnumerateArray())
+                        {
+                            suggestions.Add(suggestionElement.GetString());
+                        }
+                        sender.ItemsSource = suggestions;
+                    }
+                }
+            }
+            catch (TaskCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Suggestion fetch via WebView failed: {ex.Message}");
+                sender.ItemsSource = null;
             }
         }
 
