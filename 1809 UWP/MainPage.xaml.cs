@@ -77,18 +77,21 @@ namespace _1809_UWP
 
         private void AuthService_AuthenticationStateChanged(object sender, EventArgs e)
         {
-            if (AuthService.IsLoggedIn)
+            _ = Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
             {
-                LoginNavItem.Content = AuthService.Username;
-                LoginNavItem.Icon = new FontIcon { FontFamily = new FontFamily("Segoe MDL2 Assets"), Glyph = "" };
-                LoginNavItem.Tag = "logout";
-            }
-            else
-            {
-                LoginNavItem.Content = "Login";
-                LoginNavItem.Icon = new FontIcon { FontFamily = new FontFamily("Segoe MDL2 Assets"), Glyph = "" };
-                LoginNavItem.Tag = "login";
-            }
+                if (AuthService.IsLoggedIn)
+                {
+                    LoginNavItem.Content = AuthService.Username;
+                    LoginNavItem.Icon = new FontIcon { FontFamily = new FontFamily("Segoe MDL2 Assets"), Glyph = "" };
+                    LoginNavItem.Tag = "userpage";
+                }
+                else
+                {
+                    LoginNavItem.Content = "Login";
+                    LoginNavItem.Icon = new FontIcon { FontFamily = new FontFamily("Segoe MDL2 Assets"), Glyph = "" };
+                    LoginNavItem.Tag = "login";
+                }
+            });
         }
 
         private async Task InitializeApiWebViewAsync()
@@ -201,6 +204,7 @@ namespace _1809_UWP
         private void NavView_ItemInvoked(muxc.NavigationView sender, muxc.NavigationViewItemInvokedEventArgs args)
         {
             Type targetPage = null;
+            string pageParameter = null;
 
             if (args.IsSettingsInvoked)
             {
@@ -211,23 +215,35 @@ namespace _1809_UWP
                 switch (tag)
                 {
                     case "home":
-                        ContentFrame.Navigate(typeof(ArticleViewerPage), "Main Page", args.RecommendedNavigationTransitionInfo);
-                        return;
+                        targetPage = typeof(ArticleViewerPage);
+                        pageParameter = "Main Page";
+                        break;
+
                     case "random":
-                        ContentFrame.Navigate(typeof(ArticleViewerPage), "random", args.RecommendedNavigationTransitionInfo);
-                        return;
+                        targetPage = typeof(ArticleViewerPage);
+                        pageParameter = "random";
+                        break;
+
                     case "login":
                         targetPage = typeof(LoginPage);
                         break;
-                    case "logout":
-                        AuthService.Logout();
-                        return;
+
+                    case "userpage":
+                        if (AuthService.IsLoggedIn)
+                        {
+                            targetPage = typeof(ArticleViewerPage);
+                            pageParameter = $"User:{AuthService.Username}";
+                        }
+                        break;
                 }
             }
 
-            if (targetPage != null && ContentFrame.SourcePageType != targetPage)
+            if (targetPage != null)
             {
-                ContentFrame.Navigate(targetPage, null, args.RecommendedNavigationTransitionInfo);
+                if (ContentFrame.SourcePageType != targetPage || (ContentFrame.GetNavigationState() as string) != pageParameter)
+                {
+                    ContentFrame.Navigate(targetPage, pageParameter, args.RecommendedNavigationTransitionInfo);
+                }
             }
         }
 
