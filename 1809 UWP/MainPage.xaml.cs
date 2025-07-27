@@ -240,6 +240,12 @@ namespace _1809_UWP
                         .OfType<muxc.NavigationViewItem>()
                         .FirstOrDefault(item => "home".Equals(item.Tag as string));
                 }
+                else if (pageParameter.Equals("random", StringComparison.OrdinalIgnoreCase))
+                {
+                    NavView.SelectedItem = NavView.MenuItems
+                        .OfType<muxc.NavigationViewItem>()
+                        .FirstOrDefault(item => "random".Equals(item.Tag as string));
+                }
                 else
                 {
                     NavView.SelectedItem = null;

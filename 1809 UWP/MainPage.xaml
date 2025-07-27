@@ -37,7 +37,8 @@
                              IsBackEnabled="False"
                              ItemInvoked="NavView_ItemInvoked"
                              Loaded="NavView_Loaded"
-                             BackRequested="NavView_BackRequested">
+                             BackRequested="NavView_BackRequested"
+                             IsTitleBarAutoPaddingEnabled="True">
 
             <muxc:NavigationView.MenuItems>
                 <muxc:NavigationViewItem Content="Home" Tag="home">
