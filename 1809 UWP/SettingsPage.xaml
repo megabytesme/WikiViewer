@@ -53,6 +53,8 @@
                             VerticalAlignment="Center"/>
                 </Grid>
 
+                <Button Content="About" Click="AboutButton_Click" Width="160"/>
+
             </StackPanel>
         </StackPanel>
     </Grid>

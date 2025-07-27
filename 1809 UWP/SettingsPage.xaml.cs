@@ -2,6 +2,7 @@
 using System.Threading.Tasks;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Documents;
 using Windows.UI.Xaml.Navigation;
 
 namespace _1809_UWP
@@ -67,6 +68,80 @@ namespace _1809_UWP
 
                 await UpdateCacheSizeDisplayAsync();
             }
+        }
+
+        private async void AboutButton_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new ContentDialog
+            {
+                Title = "About WikiBeta",
+                Content = new ScrollViewer()
+                {
+                    Content = new TextBlock()
+                    {
+                        Inlines =
+                        {
+                            new Run() { Text = "WikiBeta" },
+                            new LineBreak(),
+                            new Run() { Text = "Version 2.0.0.0 (1809_UWP)" },
+                            new LineBreak(),
+                            new Run() { Text = "Copyright © 2025 MegaBytesMe" },
+                            new LineBreak(),
+                            new LineBreak(),
+                            new Run() { Text = "Source code available on " },
+                            new Hyperlink()
+                            {
+                                NavigateUri = new Uri("https://github.com/megabytesme/WikiBeta"),
+                                Inlines = { new Run() { Text = "GitHub" } },
+                            },
+                            new LineBreak(),
+                            new Run() { Text = "Anything wrong? Let us know: " },
+                            new Hyperlink()
+                            {
+                                NavigateUri = new Uri(
+                                    "https://github.com/megabytesme/WikiBeta/issues"
+                                ),
+                                Inlines = { new Run() { Text = "Support" } },
+                            },
+                            new LineBreak(),
+                            new Run() { Text = "Privacy Policy: " },
+                            new Hyperlink()
+                            {
+                                NavigateUri = new Uri(
+                                    "https://github.com/megabytesme/WikiBeta/blob/master/PRIVACYPOLICY.md"
+                                ),
+                                Inlines = { new Run() { Text = "Privacy Policy" } },
+                            },
+                            new LineBreak(),
+                            new LineBreak(),
+                            new Run() { Text = "Like what you see? View my " },
+                            new Hyperlink()
+                            {
+                                NavigateUri = new Uri("https://github.com/megabytesme"),
+                                Inlines = { new Run() { Text = "GitHub" } },
+                            },
+                            new Run() { Text = " and maybe my " },
+                            new Hyperlink()
+                            {
+                                NavigateUri = new Uri(
+                                    "https://apps.microsoft.com/search?query=megabytesme"
+                                ),
+                                Inlines = { new Run() { Text = "Other Apps" } },
+                            },
+                            new LineBreak(),
+                            new LineBreak(),
+                            new Run()
+                            {
+                                Text =
+                                    "WikiBeta is an app which allows you to view the Beta Wiki without your web browser, online and offline (after caching).",
+                            },
+                        },
+                        TextWrapping = TextWrapping.Wrap,
+                    },
+                },
+                CloseButtonText = "OK",
+            };
+            await dialog.ShowAsync();
         }
     }
 }
