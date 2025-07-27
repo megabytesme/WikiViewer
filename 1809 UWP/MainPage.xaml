@@ -32,7 +32,7 @@
         <muxc:NavigationView Grid.Row="1"
                              x:Name="NavView"
                              PaneDisplayMode="Left"
-                             IsSettingsVisible="False"
+                             IsSettingsVisible="True"
                              IsBackButtonVisible="Collapsed"
                              IsBackEnabled="False"
                              ItemInvoked="NavView_ItemInvoked"

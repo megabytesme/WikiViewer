@@ -140,18 +140,29 @@ namespace _1809_UWP
 
         private void NavView_ItemInvoked(muxc.NavigationView sender, muxc.NavigationViewItemInvokedEventArgs args)
         {
-            if (args.IsSettingsInvoked) return;
+            Type targetPage = null;
 
-            if (args.InvokedItemContainer?.Tag is string tag)
+            if (args.IsSettingsInvoked)
+            {
+                targetPage = typeof(SettingsPage);
+            }
+            else if (args.InvokedItemContainer?.Tag is string tag)
             {
                 if (tag == "home")
                 {
                     ContentFrame.Navigate(typeof(ArticleViewerPage), "Main Page", args.RecommendedNavigationTransitionInfo);
+                    return;
                 }
                 else if (tag == "random")
                 {
                     ContentFrame.Navigate(typeof(ArticleViewerPage), "random", args.RecommendedNavigationTransitionInfo);
+                    return;
                 }
+            }
+
+            if (targetPage != null && ContentFrame.SourcePageType != targetPage)
+            {
+                ContentFrame.Navigate(targetPage, null, args.RecommendedNavigationTransitionInfo);
             }
         }
 
@@ -217,24 +228,27 @@ namespace _1809_UWP
             SystemNavigationManager.GetForCurrentView().AppViewBackButtonVisibility =
                 NavView.IsBackEnabled ? AppViewBackButtonVisibility.Visible : AppViewBackButtonVisibility.Collapsed;
 
-            if (e.SourcePageType == typeof(ArticleViewerPage) && e.Parameter is string pageParameter)
+            if (e.SourcePageType == typeof(SettingsPage))
+            {
+                NavView.SelectedItem = NavView.SettingsItem;
+            }
+            else if (e.SourcePageType == typeof(ArticleViewerPage) && e.Parameter is string pageParameter)
             {
                 if (pageParameter.Equals("Main Page", StringComparison.OrdinalIgnoreCase))
                 {
                     NavView.SelectedItem = NavView.MenuItems
                         .OfType<muxc.NavigationViewItem>()
                         .FirstOrDefault(item => "home".Equals(item.Tag as string));
-                    return;
-                } else
+                }
+                else
                 {
-                    NavView.SelectedItem = NavView.MenuItems
-                        .OfType<muxc.NavigationViewItem>()
-                        .FirstOrDefault(item => "random".Equals(item.Tag as string));
-                    return;
+                    NavView.SelectedItem = null;
                 }
             }
-
-            NavView.SelectedItem = null;
+            else
+            {
+                NavView.SelectedItem = null;
+            }
         }
 
         private void NavView_BackRequested(muxc.NavigationView sender, muxc.NavigationViewBackRequestedEventArgs args)

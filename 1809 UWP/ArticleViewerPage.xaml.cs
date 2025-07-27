@@ -22,7 +22,6 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.Web.WebView2.Core;
 using muxc = Microsoft.UI.Xaml.Controls;
 
-
 namespace _1809_UWP
 {
     public class RandomQueryResponse { public QueryResult query { get; set; } }
@@ -270,29 +269,32 @@ namespace _1809_UWP
             ArticleTitle.Text = _pageTitleToFetch.Replace('_', ' ');
             LoadingText.Text = $"Checking for '{ArticleTitle.Text}'...";
 
-            ArticleCacheItem cachedMetadata = await ArticleCacheManager.GetCacheMetadataAsync(_pageTitleToFetch);
             bool isConnected = NetworkInterface.GetIsNetworkAvailable();
-            DateTime? remoteTimestamp = null;
 
-            if (isConnected && !_pageTitleToFetch.Equals("random", StringComparison.OrdinalIgnoreCase))
+            if (AppSettings.IsCachingEnabled)
             {
-                remoteTimestamp = await FetchLastUpdatedTimestampAsync(_pageTitleToFetch);
-            }
-
-            if (cachedMetadata != null && (!isConnected || remoteTimestamp == null || remoteTimestamp.Value.ToUniversalTime() <= cachedMetadata.LastUpdated.ToUniversalTime()))
-            {
-                Debug.WriteLine($"[CACHE] Loading '{_pageTitleToFetch}' from cache. Freshness: {(!isConnected ? "OFFLINE" : "UP-TO-DATE")}");
-                LoadingText.Text = $"Loading '{ArticleTitle.Text}' from cache...";
-                string cachedHtml = await ArticleCacheManager.GetCachedArticleHtmlAsync(_pageTitleToFetch);
-                if (!string.IsNullOrEmpty(cachedHtml))
+                ArticleCacheItem cachedMetadata = await ArticleCacheManager.GetCacheMetadataAsync(_pageTitleToFetch);
+                DateTime? remoteTimestamp = null;
+                if (isConnected && !_pageTitleToFetch.Equals("random", StringComparison.OrdinalIgnoreCase))
                 {
-                    await DisplayProcessedHtml(cachedHtml);
-                    LastUpdatedText.Text = $"Last updated: {cachedMetadata.LastUpdated.ToLocalTime():g} (Cached)";
-                    LastUpdatedText.Visibility = Visibility.Visible;
-                    LoadingOverlay.Visibility = Visibility.Collapsed;
-                    _fetchStopwatch.Stop();
-                    Debug.WriteLine($"[PERF] ===== Total operation time (from cache): {_fetchStopwatch.ElapsedMilliseconds} ms =====");
-                    return;
+                    remoteTimestamp = await FetchLastUpdatedTimestampAsync(_pageTitleToFetch);
+                }
+
+                if (cachedMetadata != null && (!isConnected || remoteTimestamp == null || remoteTimestamp.Value.ToUniversalTime() <= cachedMetadata.LastUpdated.ToUniversalTime()))
+                {
+                    Debug.WriteLine($"[CACHE] Loading '{_pageTitleToFetch}' from cache. Freshness: {(!isConnected ? "OFFLINE" : "UP-TO-DATE")}");
+                    LoadingText.Text = $"Loading '{ArticleTitle.Text}' from cache...";
+                    string cachedHtml = await ArticleCacheManager.GetCachedArticleHtmlAsync(_pageTitleToFetch);
+                    if (!string.IsNullOrEmpty(cachedHtml))
+                    {
+                        await DisplayProcessedHtml(cachedHtml);
+                        LastUpdatedText.Text = $"Last updated: {cachedMetadata.LastUpdated.ToLocalTime():g} (Cached)";
+                        LastUpdatedText.Visibility = Visibility.Visible;
+                        LoadingOverlay.Visibility = Visibility.Collapsed;
+                        _fetchStopwatch.Stop();
+                        Debug.WriteLine($"[PERF] ===== Total operation time (from cache): {_fetchStopwatch.ElapsedMilliseconds} ms =====");
+                        return;
+                    }
                 }
             }
 
@@ -419,15 +421,20 @@ namespace _1809_UWP
                         if (contentNode == null) throw new Exception("Could not find main content element.");
 
                         string processedHtml = await ProcessHtmlAsync(contentNode.InnerHtml, _fetchStopwatch);
-
                         DateTime? lastUpdated = await FetchLastUpdatedTimestampAsync(_pageTitleToFetch);
-                        if (lastUpdated.HasValue)
+
+                        if (AppSettings.IsCachingEnabled && lastUpdated.HasValue)
                         {
                             await ArticleCacheManager.SaveArticleToCacheAsync(_pageTitleToFetch, processedHtml, lastUpdated.Value);
+                        }
+
+                        if (lastUpdated.HasValue)
+                        {
                             LastUpdatedText.Text = $"Last updated: {lastUpdated.Value.ToLocalTime():g}";
                         }
 
                         await DisplayProcessedHtml(processedHtml);
+
                         if (!string.IsNullOrEmpty(LastUpdatedText.Text))
                         {
                             LastUpdatedText.Visibility = Visibility.Visible;
@@ -441,6 +448,9 @@ namespace _1809_UWP
                 }
                 catch (Exception ex)
                 {
+                    Debug.WriteLine($"[ERROR] NavigationCompleted failed: {ex.Message}");
+                    LoadingOverlay.Visibility = Visibility.Collapsed;
+                    ArticleTitle.Text = "An error occurred";
                 }
             });
         }
