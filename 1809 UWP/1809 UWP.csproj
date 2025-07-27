@@ -116,12 +116,18 @@
     <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="APIHelper.cs" />
     <Compile Include="App.xaml.cs">
       <DependentUpon>App.xaml</DependentUpon>
     </Compile>
     <Compile Include="AppSettings.cs" />
     <Compile Include="ArticleViewerPage.xaml.cs">
       <DependentUpon>ArticleViewerPage.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="AuthService.cs" />
+    <Compile Include="CredentialService.cs" />
+    <Compile Include="LoginPage.xaml.cs">
+      <DependentUpon>LoginPage.xaml</DependentUpon>
     </Compile>
     <Compile Include="SettingsPage.xaml.cs">
       <DependentUpon>SettingsPage.xaml</DependentUpon>
@@ -217,6 +223,9 @@
   </ItemGroup>
   <ItemGroup>
     <Page Include="ArticleViewerPage.xaml">
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="LoginPage.xaml">
       <SubType>Designer</SubType>
     </Page>
     <Page Include="SettingsPage.xaml">

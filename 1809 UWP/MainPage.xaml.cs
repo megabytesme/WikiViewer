@@ -1,6 +1,8 @@
-﻿using Microsoft.Web.WebView2.Core;
+﻿using Microsoft.UI.Xaml.Controls;
+using Microsoft.Web.WebView2.Core;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Net.Http;
 using System.Text.Json;
@@ -22,14 +24,71 @@ namespace _1809_UWP
     {
         private CancellationTokenSource _suggestionCts;
         private TaskCompletionSource<string> _apiResultTcs;
+        public WebView2 PublicApiWebView => ApiFetchWebView;
+        private ApiHelper _apiHelper;
 
         public MainPage()
         {
             this.InitializeComponent();
             ApplyBackdropOrAcrylic();
             SetupTitleBar();
-
             _ = InitializeApiWebViewAsync();
+            AuthService.AuthenticationStateChanged += AuthService_AuthenticationStateChanged;
+            this.Unloaded += (s, e) => { AuthService.AuthenticationStateChanged -= AuthService_AuthenticationStateChanged; };
+            this.Loaded += MainPage_Loaded;
+        }
+
+        private async void MainPage_Loaded(object sender, RoutedEventArgs e)
+        {
+            while (_apiHelper == null)
+            {
+                await Task.Delay(100);
+            }
+            await TryAutoLoginAsync();
+        }
+
+        private async Task TryAutoLoginAsync()
+        {
+            Debug.WriteLine("[MainPage] Attempting to auto-login...");
+            var savedCreds = CredentialService.LoadCredentials();
+
+            if (savedCreds != null)
+            {
+                Debug.WriteLine($"[MainPage] Found saved credentials for user: {savedCreds.Username}.");
+                LoginNavItem.Content = "Signing in...";
+
+                try
+                {
+                    await AuthService.PerformLoginAsync(savedCreds.Username, savedCreds.Password, _apiHelper);
+                    Debug.WriteLine("[MainPage] Auto-login successful.");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[MainPage] Auto-login failed: {ex.Message}");
+                    CredentialService.ClearCredentials();
+                    AuthService_AuthenticationStateChanged(null, null);
+                }
+            }
+            else
+            {
+                Debug.WriteLine("[MainPage] No saved credentials found.");
+            }
+        }
+
+        private void AuthService_AuthenticationStateChanged(object sender, EventArgs e)
+        {
+            if (AuthService.IsLoggedIn)
+            {
+                LoginNavItem.Content = AuthService.Username;
+                LoginNavItem.Icon = new FontIcon { FontFamily = new FontFamily("Segoe MDL2 Assets"), Glyph = "" };
+                LoginNavItem.Tag = "logout";
+            }
+            else
+            {
+                LoginNavItem.Content = "Login";
+                LoginNavItem.Icon = new FontIcon { FontFamily = new FontFamily("Segoe MDL2 Assets"), Glyph = "" };
+                LoginNavItem.Tag = "login";
+            }
         }
 
         private async Task InitializeApiWebViewAsync()
@@ -38,6 +97,7 @@ namespace _1809_UWP
             {
                 await ApiFetchWebView.EnsureCoreWebView2Async();
                 ApiFetchWebView.CoreWebView2.NavigationCompleted += ApiFetchWebView_NavigationCompleted;
+                _apiHelper = new ApiHelper(this.PublicApiWebView.CoreWebView2);
             }
             catch (Exception ex)
             {
@@ -148,15 +208,20 @@ namespace _1809_UWP
             }
             else if (args.InvokedItemContainer?.Tag is string tag)
             {
-                if (tag == "home")
+                switch (tag)
                 {
-                    ContentFrame.Navigate(typeof(ArticleViewerPage), "Main Page", args.RecommendedNavigationTransitionInfo);
-                    return;
-                }
-                else if (tag == "random")
-                {
-                    ContentFrame.Navigate(typeof(ArticleViewerPage), "random", args.RecommendedNavigationTransitionInfo);
-                    return;
+                    case "home":
+                        ContentFrame.Navigate(typeof(ArticleViewerPage), "Main Page", args.RecommendedNavigationTransitionInfo);
+                        return;
+                    case "random":
+                        ContentFrame.Navigate(typeof(ArticleViewerPage), "random", args.RecommendedNavigationTransitionInfo);
+                        return;
+                    case "login":
+                        targetPage = typeof(LoginPage);
+                        break;
+                    case "logout":
+                        AuthService.Logout();
+                        return;
                 }
             }
 
