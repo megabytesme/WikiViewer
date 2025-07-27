@@ -2,6 +2,7 @@
 using System.Linq;
 using Windows.ApplicationModel.Core;
 using Windows.UI;
+using Windows.UI.Core;
 using Windows.UI.ViewManagement;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
@@ -18,6 +19,18 @@ namespace _1809_UWP
             this.InitializeComponent();
             ApplyBackdropOrAcrylic();
             SetupTitleBar();
+        }
+
+        protected override void OnNavigatedTo(NavigationEventArgs e)
+        {
+            base.OnNavigatedTo(e);
+            SystemNavigationManager.GetForCurrentView().BackRequested += System_BackRequested;
+        }
+
+        protected override void OnNavigatedFrom(NavigationEventArgs e)
+        {
+            base.OnNavigatedFrom(e);
+            SystemNavigationManager.GetForCurrentView().BackRequested -= System_BackRequested;
         }
 
         private void ApplyBackdropOrAcrylic()
@@ -72,7 +85,6 @@ namespace _1809_UWP
                 NavView.SelectedItem = NavView.MenuItems.OfType<muxc.NavigationViewItem>().FirstOrDefault();
                 ContentFrame.Navigate(typeof(HomePage));
             }
-            ContentFrame.Navigated += ContentFrame_Navigated;
         }
 
         private void NavView_ItemInvoked(muxc.NavigationView sender, muxc.NavigationViewItemInvokedEventArgs args)
@@ -105,7 +117,12 @@ namespace _1809_UWP
 
         private void ContentFrame_Navigated(object sender, NavigationEventArgs e)
         {
-            NavView.IsBackEnabled = ContentFrame.CanGoBack;
+            bool canGoBackInArticlePage = (ContentFrame.Content as ArticleViewerPage)?.CanGoBackInPage ?? false;
+
+            NavView.IsBackEnabled = ContentFrame.CanGoBack || canGoBackInArticlePage;
+
+            SystemNavigationManager.GetForCurrentView().AppViewBackButtonVisibility =
+                NavView.IsBackEnabled ? AppViewBackButtonVisibility.Visible : AppViewBackButtonVisibility.Collapsed;
 
             if (ContentFrame.SourcePageType == typeof(HomePage))
             {
@@ -118,13 +135,29 @@ namespace _1809_UWP
             TryGoBack();
         }
 
+        private void System_BackRequested(object sender, BackRequestedEventArgs e)
+        {
+            if (!e.Handled)
+            {
+                e.Handled = TryGoBack();
+            }
+        }
+
         private bool TryGoBack()
         {
+            if (ContentFrame.Content is ArticleViewerPage articlePage && articlePage.GoBackInPage())
+            {
+                NavView.IsBackEnabled = ContentFrame.CanGoBack || articlePage.CanGoBackInPage;
+
+                return true;
+            }
+
             if (ContentFrame.CanGoBack)
             {
                 ContentFrame.GoBack();
                 return true;
             }
+
             return false;
         }
     }

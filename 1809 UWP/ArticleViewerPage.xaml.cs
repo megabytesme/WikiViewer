@@ -41,6 +41,8 @@ namespace _1809_UWP
         private bool _isInitialized = false;
         private readonly int _maxWorkerCount;
         private Stopwatch _fetchStopwatch;
+        private readonly Stack<string> _articleHistory = new Stack<string>();
+        public bool CanGoBackInPage => _articleHistory.Count > 1;
 
         public ArticleViewerPage()
         {
@@ -54,6 +56,8 @@ namespace _1809_UWP
             if (e.Parameter is string pageTitle && !string.IsNullOrEmpty(pageTitle))
             {
                 _pageTitleToFetch = pageTitle;
+                _articleHistory.Clear();
+                _articleHistory.Push(_pageTitleToFetch);
             }
         }
 
@@ -94,7 +98,7 @@ namespace _1809_UWP
             SilentFetchView = null;
         }
 
-        private async void ArticleDisplayWebView_NavigationStarting(CoreWebView2 sender, CoreWebView2NavigationStartingEventArgs args)
+        private void ArticleDisplayWebView_NavigationStarting(CoreWebView2 sender, CoreWebView2NavigationStartingEventArgs args)
         {
             Uri uri = new Uri(args.Uri);
 
@@ -109,11 +113,13 @@ namespace _1809_UWP
             {
                 string newTitle = uri.AbsolutePath.Substring("/wiki/".Length);
                 _pageTitleToFetch = Uri.UnescapeDataString(newTitle).Replace('_', ' ');
+                _articleHistory.Push(_pageTitleToFetch);
+
                 StartArticleFetch();
             }
             else
             {
-                await Windows.System.Launcher.LaunchUriAsync(uri);
+                _ = Windows.System.Launcher.LaunchUriAsync(uri);
             }
         }
 
@@ -160,6 +166,11 @@ namespace _1809_UWP
                         string randomTitle = randomResponse?.query?.random?.FirstOrDefault()?.title;
                         if (string.IsNullOrEmpty(randomTitle)) throw new Exception("Failed to get a random title from the API.");
 
+                        if (_articleHistory.Count > 0 && _articleHistory.Peek().Equals("random", StringComparison.OrdinalIgnoreCase))
+                        {
+                            _articleHistory.Pop();
+                        }
+                        _articleHistory.Push(randomTitle);
                         _pageTitleToFetch = randomTitle.Replace('_', ' ');
                         _currentFetchStep = FetchStep.ParseArticleContent;
                         LoadingText.Text = $"Parsing: '{_pageTitleToFetch}'...";
@@ -167,6 +178,7 @@ namespace _1809_UWP
                         string pageUrl = $"https://betawiki.net/wiki/{Uri.EscapeDataString(_pageTitleToFetch)}";
                         SilentFetchView.CoreWebView2.Navigate(pageUrl);
                     }
+
                     else if (_currentFetchStep == FetchStep.ParseArticleContent)
                     {
                         string fullHtml = await sender.ExecuteScriptAsync("document.documentElement.outerHTML");
@@ -501,6 +513,19 @@ namespace _1809_UWP
                     {doc.DocumentNode.OuterHtml}
                 </body>
                 </html>";
+        }
+
+        public bool GoBackInPage()
+        {
+            if (this.CanGoBackInPage)
+            {
+                _articleHistory.Pop();
+                string previousPageTitle = _articleHistory.Peek();
+                _pageTitleToFetch = previousPageTitle;
+                StartArticleFetch();
+                return true;
+            }
+            return false;
         }
     }
 }
