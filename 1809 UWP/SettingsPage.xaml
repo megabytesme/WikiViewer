@@ -2,60 +2,90 @@
     x:Class="_1809_UWP.SettingsPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:local="using:_1809_UWP"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
     mc:Ignorable="d"
-    Background="Transparent">
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
 
-    <Grid Padding="16,12">
-        <StackPanel Spacing="12">
-            <TextBlock Text="Settings" Style="{ThemeResource HeaderTextBlockStyle}" Margin="0,0,0,12"/>
+    <ScrollViewer>
+        <StackPanel Spacing="16" Padding="16,12" HorizontalAlignment="Center">
 
-            <ToggleSwitch x:Name="CachingToggle"
-              Header="Enable Article Caching"
-              IsOn="True"
-              Toggled="CachingToggle_Toggled">
-                <ToggleSwitch.OffContent>
-                    <TextBlock Text="Articles will not be saved for offline use."/>
-                </ToggleSwitch.OffContent>
-                <ToggleSwitch.OnContent>
-                    <TextBlock Text="Articles will be cached to improve speed and allow offline reading."/>
-                </ToggleSwitch.OnContent>
-            </ToggleSwitch>
-            
-            <StackPanel BorderBrush="{ThemeResource SystemControlForegroundBaseLowBrush}" 
-                        BorderThickness="0,1,0,0" 
-                        Padding="0,12,0,0"
-                        Spacing="8">
+            <TextBlock Text="Settings" Style="{ThemeResource TitleTextBlockStyle}" HorizontalAlignment="Center" Margin="8,0,0,8"/>
 
-                <TextBlock Text="Cache Management" Style="{ThemeResource SubtitleTextBlockStyle}"/>
+            <Border
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="16"
+                MaxWidth="500">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Account" Style="{ThemeResource SubtitleTextBlockStyle}" HorizontalAlignment="Center"/>
 
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-
-                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock Text="Storage Used by Cache"/>
-                        <TextBlock x:Name="CacheSizeText" 
-                                   Text="Calculating..." 
-                                   Style="{ThemeResource BodyTextBlockStyle}"
-                                   Opacity="0.7"/>
+                    <StackPanel x:Name="LoggedInState" Spacing="16" Orientation="Horizontal" Visibility="Collapsed">
+                        <muxc:PersonPicture x:Name="ProfilePicture" ProfilePicture="/Assets/StoreLogo.png" DisplayName="User" Width="64" Height="64"/>
+                        <StackPanel VerticalAlignment="Center" Spacing="4">
+                            <TextBlock x:Name="UsernameText" Text="Username" Style="{ThemeResource BodyStrongTextBlockStyle}"/>
+                            <HyperlinkButton Content="Sign out" Click="SignOutButton_Click" Padding="0"/>
+                        </StackPanel>
                     </StackPanel>
 
-                    <Button x:Name="ClearCacheButton" 
-                            Grid.Column="1"
-                            Content="Clear Cache" 
-                            Style="{ThemeResource AccentButtonStyle}"
-                            Click="ClearCacheButton_Click"
-                            VerticalAlignment="Center"/>
-                </Grid>
+                    <StackPanel x:Name="LoggedOutState" Spacing="8" Visibility="Collapsed">
+                        <TextBlock Text="You are not signed in." Style="{ThemeResource BodyTextBlockStyle}"/>
+                        <HyperlinkButton Content="Sign in to BetaWiki" Click="SignInButton_Click" Padding="0"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
 
-                <Button Content="About" Click="AboutButton_Click" Width="160"/>
+            <Border
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="16"
+                MaxWidth="500">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Storage" Style="{ThemeResource SubtitleTextBlockStyle}" HorizontalAlignment="Center"/>
 
-            </StackPanel>
+                    <Grid VerticalAlignment="Center">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Enable Article Caching" VerticalAlignment="Center" Style="{ThemeResource BodyStrongTextBlockStyle}"/>
+                        <ToggleSwitch x:Name="CachingToggle" Toggled="CachingToggle_Toggled" VerticalAlignment="Center" HorizontalAlignment="Right" OffContent="" OnContent="" Margin="300,0,-110,0"/>
+                    </Grid>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="Storage Used" Style="{ThemeResource BodyStrongTextBlockStyle}"/>
+                            <TextBlock x:Name="CacheSizeText" Text="Calculating..." Style="{ThemeResource BodyTextBlockStyle}" Opacity="0.7"/>
+                        </StackPanel>
+                        <Button x:Name="ClearCacheButton" Grid.Column="1" Content="Clear Cache" Click="ClearCacheButton_Click" VerticalAlignment="Center" Style="{ThemeResource AccentButtonStyle}"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Border
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="16"
+                MaxWidth="500">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="About" Style="{ThemeResource SubtitleTextBlockStyle}" HorizontalAlignment="Center"/>
+                    <Grid>
+                        <Button Content="About WikiBeta" Click="AboutButton_Click" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
         </StackPanel>
-    </Grid>
+    </ScrollViewer>
 </Page>

@@ -17,13 +17,72 @@ namespace _1809_UWP
         protected override async void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
+            AuthService.AuthenticationStateChanged += AuthService_AuthenticationStateChanged;
+
+            UpdateUserUI();
             CachingToggle.IsOn = AppSettings.IsCachingEnabled;
             await UpdateCacheSizeDisplayAsync();
+        }
+
+        protected override void OnNavigatedFrom(NavigationEventArgs e)
+        {
+            base.OnNavigatedFrom(e);
+            AuthService.AuthenticationStateChanged -= AuthService_AuthenticationStateChanged;
+        }
+
+        private void AuthService_AuthenticationStateChanged(object sender, EventArgs e)
+        {
+            _ = Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, UpdateUserUI);
+        }
+
+        private void UpdateUserUI()
+        {
+            if (AuthService.IsLoggedIn)
+            {
+                LoggedInState.Visibility = Visibility.Visible;
+                LoggedOutState.Visibility = Visibility.Collapsed;
+                UsernameText.Text = AuthService.Username;
+                ProfilePicture.DisplayName = AuthService.Username;
+            }
+            else
+            {
+                LoggedInState.Visibility = Visibility.Collapsed;
+                LoggedOutState.Visibility = Visibility.Visible;
+            }
+        }
+
+        private void SignOutButton_Click(object sender, RoutedEventArgs e)
+        {
+            AuthService.Logout();
+        }
+
+        private void SignInButton_Click(object sender, RoutedEventArgs e)
+        {
+            (Window.Current.Content as Frame)?.Navigate(typeof(LoginPage));
         }
 
         private void CachingToggle_Toggled(object sender, RoutedEventArgs e)
         {
             AppSettings.IsCachingEnabled = CachingToggle.IsOn;
+        }
+
+        private async void ClearCacheButton_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new ContentDialog
+            {
+                Title = "Clear Cache?",
+                Content = "This will remove all saved articles and images. This action cannot be undone.",
+                PrimaryButtonText = "Clear",
+                CloseButtonText = "Cancel"
+            };
+
+            var result = await dialog.ShowAsync();
+
+            if (result == ContentDialogResult.Primary)
+            {
+                await ArticleCacheManager.ClearCacheAsync();
+                await UpdateCacheSizeDisplayAsync();
+            }
         }
 
         private async Task UpdateCacheSizeDisplayAsync()
@@ -47,29 +106,6 @@ namespace _1809_UWP
             ClearCacheButton.IsEnabled = cacheSizeBytes > 0;
         }
 
-        private async void ClearCacheButton_Click(object sender, RoutedEventArgs e)
-        {
-            var dialog = new ContentDialog
-            {
-                Title = "Clear Cache?",
-                Content = "This will remove all saved articles and images. This action cannot be undone.",
-                PrimaryButtonText = "Clear",
-                CloseButtonText = "Cancel"
-            };
-
-            var result = await dialog.ShowAsync();
-
-            if (result == ContentDialogResult.Primary)
-            {
-                ClearCacheButton.IsEnabled = false;
-                CacheSizeText.Text = "Clearing...";
-
-                await ArticleCacheManager.ClearCacheAsync();
-
-                await UpdateCacheSizeDisplayAsync();
-            }
-        }
-
         private async void AboutButton_Click(object sender, RoutedEventArgs e)
         {
             var dialog = new ContentDialog
@@ -86,55 +122,22 @@ namespace _1809_UWP
                             new Run() { Text = "Version 2.0.0.0 (1809_UWP)" },
                             new LineBreak(),
                             new Run() { Text = "Copyright © 2025 MegaBytesMe" },
-                            new LineBreak(),
-                            new LineBreak(),
+                            new LineBreak(), new LineBreak(),
                             new Run() { Text = "Source code available on " },
-                            new Hyperlink()
-                            {
-                                NavigateUri = new Uri("https://github.com/megabytesme/WikiBeta"),
-                                Inlines = { new Run() { Text = "GitHub" } },
-                            },
+                            new Hyperlink() { NavigateUri = new Uri("https://github.com/megabytesme/WikiBeta"), Inlines = { new Run() { Text = "GitHub" } }, },
                             new LineBreak(),
                             new Run() { Text = "Anything wrong? Let us know: " },
-                            new Hyperlink()
-                            {
-                                NavigateUri = new Uri(
-                                    "https://github.com/megabytesme/WikiBeta/issues"
-                                ),
-                                Inlines = { new Run() { Text = "Support" } },
-                            },
+                            new Hyperlink() { NavigateUri = new Uri("https://github.com/megabytesme/WikiBeta/issues"), Inlines = { new Run() { Text = "Support" } }, },
                             new LineBreak(),
                             new Run() { Text = "Privacy Policy: " },
-                            new Hyperlink()
-                            {
-                                NavigateUri = new Uri(
-                                    "https://github.com/megabytesme/WikiBeta/blob/master/PRIVACYPOLICY.md"
-                                ),
-                                Inlines = { new Run() { Text = "Privacy Policy" } },
-                            },
-                            new LineBreak(),
-                            new LineBreak(),
+                            new Hyperlink() { NavigateUri = new Uri("https://github.com/megabytesme/WikiBeta/blob/master/PRIVACYPOLICY.md"), Inlines = { new Run() { Text = "Privacy Policy" } }, },
+                            new LineBreak(), new LineBreak(),
                             new Run() { Text = "Like what you see? View my " },
-                            new Hyperlink()
-                            {
-                                NavigateUri = new Uri("https://github.com/megabytesme"),
-                                Inlines = { new Run() { Text = "GitHub" } },
-                            },
+                            new Hyperlink() { NavigateUri = new Uri("https://github.com/megabytesme"), Inlines = { new Run() { Text = "GitHub" } }, },
                             new Run() { Text = " and maybe my " },
-                            new Hyperlink()
-                            {
-                                NavigateUri = new Uri(
-                                    "https://apps.microsoft.com/search?query=megabytesme"
-                                ),
-                                Inlines = { new Run() { Text = "Other Apps" } },
-                            },
-                            new LineBreak(),
-                            new LineBreak(),
-                            new Run()
-                            {
-                                Text =
-                                    "WikiBeta is an app which allows you to view the Beta Wiki without your web browser, online and offline (after caching).",
-                            },
+                            new Hyperlink() { NavigateUri = new Uri("https://apps.microsoft.com/search?query=megabytesme"), Inlines = { new Run() { Text = "Other Apps" } }, },
+                            new LineBreak(), new LineBreak(),
+                            new Run() { Text = "WikiBeta is an app which allows you to view the Beta Wiki without your web browser, online and offline (after caching).", },
                         },
                         TextWrapping = TextWrapping.Wrap,
                     },
