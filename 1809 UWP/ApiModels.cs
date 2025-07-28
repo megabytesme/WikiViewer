@@ -205,4 +205,23 @@ namespace _1809_UWP
         [System.Text.Json.Serialization.JsonPropertyName("watchtoken")]
         public string WatchToken { get; set; }
     }
+
+    public class FavouriteItem
+    {
+        public string DisplayTitle { get; set; }
+
+        public string ArticlePageTitle { get; set; }
+
+        public string TalkPageTitle { get; set; }
+
+        public bool IsArticleAvailable => !string.IsNullOrEmpty(ArticlePageTitle);
+        public bool IsTalkAvailable => !string.IsNullOrEmpty(TalkPageTitle);
+
+        public string ImageUrl { get; set; }
+
+        public FavouriteItem(string baseTitle)
+        {
+            DisplayTitle = baseTitle;
+        }
+    }
 }

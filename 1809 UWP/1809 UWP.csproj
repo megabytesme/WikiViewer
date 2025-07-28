@@ -133,6 +133,7 @@
       <DependentUpon>ArticleViewerPage.xaml</DependentUpon>
     </Compile>
     <Compile Include="AuthService.cs" />
+    <Compile Include="BooleanToVisibilityConverter.cs" />
     <Compile Include="CredentialService.cs" />
     <Compile Include="EditPage.xaml.cs">
       <DependentUpon>EditPage.xaml</DependentUpon>
