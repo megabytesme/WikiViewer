@@ -80,12 +80,12 @@
                 MaxWidth="500">
                 <StackPanel Spacing="12">
                     <TextBlock Text="About" Style="{ThemeResource SubtitleTextBlockStyle}" HorizontalAlignment="Center"/>
-                    <Grid>
-                        <Button Content="About WikiBeta" Click="AboutButton_Click" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                    </Grid>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="12">
+                        <Button Content="About WikiBeta" Click="AboutButton_Click" VerticalAlignment="Center"/>
+                        <Button Content="Disclaimer" Click="DisclaimerButton_Click" VerticalAlignment="Center"/>
+                    </StackPanel>
                 </StackPanel>
             </Border>
-
         </StackPanel>
     </ScrollViewer>
 </Page>

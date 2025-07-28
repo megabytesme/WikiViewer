@@ -126,7 +126,7 @@ namespace _1809_UWP
                             new Run() { Text = "Source code available on " },
                             new Hyperlink() { NavigateUri = new Uri("https://github.com/megabytesme/WikiBeta"), Inlines = { new Run() { Text = "GitHub" } }, },
                             new LineBreak(),
-                            new Run() { Text = "Anything wrong? Let us know: " },
+                            new Run() { Text = "Anything wrong? Let me know: " },
                             new Hyperlink() { NavigateUri = new Uri("https://github.com/megabytesme/WikiBeta/issues"), Inlines = { new Run() { Text = "Support" } }, },
                             new LineBreak(),
                             new Run() { Text = "Privacy Policy: " },
@@ -137,7 +137,36 @@ namespace _1809_UWP
                             new Run() { Text = " and maybe my " },
                             new Hyperlink() { NavigateUri = new Uri("https://apps.microsoft.com/search?query=megabytesme"), Inlines = { new Run() { Text = "Other Apps" } }, },
                             new LineBreak(), new LineBreak(),
-                            new Run() { Text = "WikiBeta is an app which allows you to view the Beta Wiki without your web browser, online and offline (after caching).", },
+                            new Run() { Text = "WikiBeta is an unofficial, third-party client for browsing the BetaWiki without your web browser, online and offline (after caching).", },
+                        },
+                        TextWrapping = TextWrapping.Wrap,
+                    },
+                },
+                CloseButtonText = "OK",
+            };
+            await dialog.ShowAsync();
+        }
+
+        private async void DisclaimerButton_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new ContentDialog
+            {
+                Title = "Disclaimer",
+                Content = new ScrollViewer()
+                {
+                    Content = new TextBlock()
+                    {
+                        Inlines =
+                        {
+                            new Run() { Text = "This is an unofficial, third-party client for browsing BetaWiki. This app was created by " },
+                            new Hyperlink() { NavigateUri = new Uri("https://github.com/megabytesme"), Inlines = { new Run() { Text = "MegaBytesMe" } }, },
+                            new Run() { Text = " and is not affiliated with, endorsed, or sponsored by the official BetaWiki team." },
+                            new LineBreak(), new LineBreak(),
+                            new Run() { Text = "All article data, content, and trademarks are the property of BetaWiki and its respective contributors. This app simply provides a native viewing experience for publicly available content." },
+                            new LineBreak(), new LineBreak(),
+                            new Run() { Text = "You can view the official BetaWiki here: " },
+                            new Hyperlink() { NavigateUri = new Uri("https://betawiki.net/"), Inlines = { new Run() { Text = "BetaWiki" } }, },
+                            new LineBreak(),
                         },
                         TextWrapping = TextWrapping.Wrap,
                     },
