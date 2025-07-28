@@ -12,6 +12,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Windows.ApplicationModel.DataTransfer;
 using Windows.Foundation;
 using Windows.Graphics;
 using Windows.Storage;
@@ -228,6 +229,7 @@ namespace _1809_UWP
         private async void Page_Loaded(object sender, RoutedEventArgs e)
         {
             ApplyAcrylicToTitleBar();
+            DataTransferManager.GetForCurrentView().DataRequested += OnDataRequested;
             if (_isInitialized)
                 return;
             try
@@ -262,6 +264,7 @@ namespace _1809_UWP
 
         private void ArticleViewerPage_Unloaded(object sender, RoutedEventArgs e)
         {
+            DataTransferManager.GetForCurrentView().DataRequested -= OnDataRequested;
             AuthService.AuthenticationStateChanged -= OnAuthenticationStateChanged;
             this.ActualThemeChanged -= (s, ev) => ApplyAcrylicToTitleBar();
             if (ArticleDisplayWebView?.CoreWebView2 != null)
@@ -645,6 +648,27 @@ namespace _1809_UWP
             if (!string.IsNullOrEmpty(_pageTitleToFetch))
             {
                 Frame.Navigate(typeof(EditPage), _pageTitleToFetch);
+            }
+        }
+
+        private void ShareButton_Click(object sender, RoutedEventArgs e)
+        {
+            DataTransferManager.ShowShareUI();
+        }
+
+        private void OnDataRequested(DataTransferManager sender, DataRequestedEventArgs args)
+        {
+            DataRequest request = args.Request;
+
+            if (!string.IsNullOrEmpty(_pageTitleToFetch) && !_pageTitleToFetch.Equals("random", StringComparison.OrdinalIgnoreCase))
+            {
+                request.Data.Properties.Title = ArticleTitle.Text;
+                request.Data.Properties.Description = "Check out this article on BetaWiki.";
+                request.Data.SetWebLink(new Uri($"https://betawiki.net/wiki/{_pageTitleToFetch}"));
+            }
+            else
+            {
+                request.FailWithDisplayText("There is no article loaded to share.");
             }
         }
 

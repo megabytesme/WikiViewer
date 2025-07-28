@@ -60,7 +60,11 @@
                           Icon="Edit" 
                           Label="Edit" 
                           Click="EditButton_Click" 
-                          Visibility="Visible"/>
+                          Visibility="Collapsed"/>
+            <AppBarButton x:Name="ShareButton"
+                          Icon="Share"
+                          Label="Share"
+                          Click="ShareButton_Click"/>
         </CommandBar>
 
         <Grid x:Name="WorkerWebViewHost" Visibility="Collapsed"/>
