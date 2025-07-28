@@ -12,6 +12,7 @@ using Windows.UI.Core;
 using Windows.UI.ViewManagement;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Documents;
 using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Navigation;
 using muxc = Microsoft.UI.Xaml.Controls;
@@ -36,6 +37,7 @@ namespace _1809_UWP
 
         private async void MainPage_Loaded(object sender, RoutedEventArgs e)
         {
+            await CheckAndShowFirstRunDisclaimerAsync();
             while (!WebViewApiService.IsInitialized)
             {
                 await Task.Delay(100);
@@ -68,6 +70,43 @@ namespace _1809_UWP
             else
             {
                 Debug.WriteLine("[MainPage] No saved credentials found.");
+            }
+        }
+
+        private async Task CheckAndShowFirstRunDisclaimerAsync()
+        {
+            if (!AppSettings.HasShownDisclaimer)
+            {
+                var dialog = new ContentDialog
+                {
+                    Title = "Welcome & Disclaimer",
+                    Content = new ScrollViewer()
+                    {
+                        Content = new TextBlock()
+                        {
+                            Inlines =
+                    {
+                        new Run() { Text = "This is an unofficial, third-party client for browsing BetaWiki. This app was created by " },
+                        new Hyperlink() { NavigateUri = new Uri("https://github.com/megabytesme"), Inlines = { new Run() { Text = "MegaBytesMe" } } },
+                        new Run() { Text = " and is not affiliated with, endorsed, or sponsored by the official BetaWiki team." },
+                        new LineBreak(), new LineBreak(),
+                        new Run() { Text = "All article data, content, and trademarks are the property of BetaWiki and its respective contributors." },
+                        new LineBreak(), new LineBreak(),
+                        new Run() { Text = "This disclaimer is available to view again in the settings." },
+                        new LineBreak(), new LineBreak(),
+                        new Run() { Text = "You can view the official BetaWiki here: " },
+                        new Hyperlink() { NavigateUri = new Uri("https://betawiki.net/"), Inlines = { new Run() { Text = "BetaWiki" } } }
+                    },
+                            TextWrapping = TextWrapping.Wrap,
+                        },
+                    },
+                    CloseButtonText = "I Understand",
+                    DefaultButton = ContentDialogButton.Close
+                };
+
+                await dialog.ShowAsync();
+
+                AppSettings.HasShownDisclaimer = true;
             }
         }
 
