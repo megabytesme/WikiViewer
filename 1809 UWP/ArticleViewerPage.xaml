@@ -8,6 +8,12 @@
     Loaded="Page_Loaded">
 
     <Page.Resources>
+        <AcrylicBrush x:Key="TransparentAcrylic"
+                          BackgroundSource="Backdrop"
+                          TintColor="{ThemeResource SystemAltHighColor}"
+                          TintOpacity="0.4"
+                          FallbackColor="{ThemeResource SystemAltHighColor}"/>
+
         <Storyboard x:Name="FadeInAnimation">
             <DoubleAnimation
                 Storyboard.TargetName="LoadingOverlay"
@@ -48,12 +54,13 @@
 
         <CommandBar VerticalAlignment="Bottom" 
                     Grid.RowSpan="2" 
-                    Background="{ThemeResource SystemControlAcrylicElementBrush}">
+                    Background="{ThemeResource TransparentAcrylic}"
+                    Margin="0,0,15,0">
             <AppBarButton x:Name="EditButton" 
                           Icon="Edit" 
                           Label="Edit" 
                           Click="EditButton_Click" 
-                          Visibility="Collapsed"/>
+                          Visibility="Visible"/>
         </CommandBar>
 
         <Grid x:Name="WorkerWebViewHost" Visibility="Collapsed"/>
@@ -61,13 +68,8 @@
         <Grid x:Name="LoadingOverlay" 
               Opacity="0" 
               IsHitTestVisible="False" 
-              Grid.RowSpan="2">
-            <Grid.Background>
-                <AcrylicBrush BackgroundSource="Backdrop"
-                              TintColor="{ThemeResource SystemAltHighColor}"
-                              TintOpacity="0.7"
-                              FallbackColor="{ThemeResource SystemAltHighColor}"/>
-            </Grid.Background>
+              Grid.RowSpan="2"
+              Background="{ThemeResource TransparentAcrylic}">
 
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
                 <ProgressRing IsActive="True" Width="60" Height="60"/>
