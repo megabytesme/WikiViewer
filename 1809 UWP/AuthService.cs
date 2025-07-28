@@ -9,75 +9,61 @@ namespace _1809_UWP
     public static class AuthService
     {
         public static event EventHandler AuthenticationStateChanged;
-        private static bool _isLoggedIn = false;
+        public static bool IsLoggedIn { get; private set; }
+        public static string Username { get; private set; }
         private const string ApiUrl = "https://betawiki.net/api.php";
 
-        public static bool IsLoggedIn
+        private static async Task<string> GetStringFromWebView()
         {
-            get => _isLoggedIn;
-            private set
-            {
-                if (_isLoggedIn != value)
-                {
-                    _isLoggedIn = value;
-                    AuthenticationStateChanged?.Invoke(null, EventArgs.Empty);
-                }
-            }
+            var webView = WebViewApiService.GetWebView();
+            if (webView == null) throw new InvalidOperationException("WebView not available.");
+            string html = await webView.ExecuteScriptAsync("document.documentElement.outerHTML");
+            string fullHtml = JsonSerializer.Deserialize<string>(html ?? "null");
+            var doc = new HtmlAgilityPack.HtmlDocument();
+            doc.LoadHtml(fullHtml);
+            return doc.DocumentNode.SelectSingleNode("//body/pre")?.InnerText;
         }
 
-        public static string Username { get; private set; }
-        public static string CsrfToken { get; private set; }
-
-        private static void SetLoginState(string username, string csrfToken)
+        public static async Task PerformLoginAsync(string username, string password)
         {
-            Username = username;
-            CsrfToken = csrfToken;
-            IsLoggedIn = true;
-        }
-
-        public static void Logout()
-        {
-            Username = null;
-            CsrfToken = null;
-            IsLoggedIn = false;
-            CredentialService.ClearCredentials();
-            Debug.WriteLine("[AuthService] User logged out and credentials cleared.");
-        }
-
-        public static async Task<string> PerformLoginAsync(string username, string password, ApiHelper apiHelper)
-        {
-            if (apiHelper == null) throw new InvalidOperationException("ApiHelper cannot be null.");
-
-            string tokenUrl = $"{ApiUrl}?action=query&meta=tokens&type=login&format=json";
-            string tokenJson = await apiHelper.GetAsync(tokenUrl);
-            if (string.IsNullOrWhiteSpace(tokenJson)) throw new Exception("API returned empty response for login token.");
-
+            await WebViewApiService.NavigateAsync($"{ApiUrl}?action=query&meta=tokens&type=login&format=json");
+            string tokenJson = await GetStringFromWebView();
             var tokenResponse = JsonSerializer.Deserialize<LoginApiTokenResponse>(tokenJson);
             string loginToken = tokenResponse?.query?.tokens?.logintoken;
-            if (string.IsNullOrEmpty(loginToken)) throw new Exception($"Failed to retrieve login token. Response: {tokenJson}");
+
+            if (string.IsNullOrEmpty(loginToken))
+            {
+                throw new Exception("Failed to retrieve a login token.");
+            }
 
             var loginPostData = new Dictionary<string, string>
             {
                 { "action", "login" }, { "format", "json" }, { "lgname", username },
                 { "lgpassword", password }, { "lgtoken", loginToken }
             };
-            string loginJson = await apiHelper.PostAsync(ApiUrl, loginPostData);
-            if (string.IsNullOrWhiteSpace(loginJson)) throw new Exception("API returned empty response for login POST.");
 
-            var loginResponse = JsonSerializer.Deserialize<LoginResultResponse>(loginJson);
-            if (loginResponse?.login?.result != "Success") throw new Exception($"Login failed: {loginResponse?.login?.result ?? "Unknown"}.");
+            await WebViewApiService.NavigateWithPostAsync(ApiUrl, loginPostData);
+            string resultJson = await GetStringFromWebView();
+            var resultResponse = JsonSerializer.Deserialize<LoginResultResponse>(resultJson);
 
-            string csrfUrl = $"{ApiUrl}?action=query&meta=tokens&format=json";
-            string csrfJson = await apiHelper.GetAsync(csrfUrl);
-            if (string.IsNullOrWhiteSpace(csrfJson)) throw new Exception("API returned empty response for CSRF token.");
+            if (resultResponse?.login?.result == "Success")
+            {
+                IsLoggedIn = true;
+                Username = resultResponse.login.lgusername;
+                AuthenticationStateChanged?.Invoke(null, EventArgs.Empty);
+            }
+            else
+            {
+                throw new Exception($"Login failed: {resultResponse?.login?.result ?? "Unknown error"}");
+            }
+        }
 
-            var csrfResponse = JsonSerializer.Deserialize<CsrfTokenResponse>(csrfJson);
-            string csrfToken = csrfResponse?.query?.tokens?.csrftoken;
-            if (string.IsNullOrEmpty(csrfToken) || csrfToken == "+\\") throw new Exception("Failed to retrieve a valid CSRF token after login.");
-
-            SetLoginState(loginResponse.login.lgusername, csrfToken);
-
-            return loginResponse.login.lgusername;
+        public static void Logout()
+        {
+            IsLoggedIn = false;
+            Username = null;
+            CredentialService.ClearCredentials();
+            AuthenticationStateChanged?.Invoke(null, EventArgs.Empty);
         }
     }
 }

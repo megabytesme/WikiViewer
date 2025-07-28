@@ -1,10 +1,8 @@
 ﻿using Microsoft.UI.Xaml.Controls;
-using Microsoft.Web.WebView2.Core;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Net.Http;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -23,9 +21,7 @@ namespace _1809_UWP
     public sealed partial class MainPage : Page
     {
         private CancellationTokenSource _suggestionCts;
-        private TaskCompletionSource<string> _apiResultTcs;
         public WebView2 PublicApiWebView => ApiFetchWebView;
-        private ApiHelper _apiHelper;
 
         public MainPage()
         {
@@ -40,7 +36,7 @@ namespace _1809_UWP
 
         private async void MainPage_Loaded(object sender, RoutedEventArgs e)
         {
-            while (_apiHelper == null)
+            while (!WebViewApiService.IsInitialized)
             {
                 await Task.Delay(100);
             }
@@ -59,7 +55,7 @@ namespace _1809_UWP
 
                 try
                 {
-                    await AuthService.PerformLoginAsync(savedCreds.Username, savedCreds.Password, _apiHelper);
+                    await AuthService.PerformLoginAsync(savedCreds.Username, savedCreds.Password);
                     Debug.WriteLine("[MainPage] Auto-login successful.");
                 }
                 catch (Exception ex)
@@ -99,39 +95,11 @@ namespace _1809_UWP
             try
             {
                 await ApiFetchWebView.EnsureCoreWebView2Async();
-                ApiFetchWebView.CoreWebView2.NavigationCompleted += ApiFetchWebView_NavigationCompleted;
-                _apiHelper = new ApiHelper(this.PublicApiWebView.CoreWebView2);
+                WebViewApiService.Initialize(ApiFetchWebView);
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Failed to initialize API WebView: {ex.Message}");
-            }
-        }
-
-        private async void ApiFetchWebView_NavigationCompleted(CoreWebView2 sender, CoreWebView2NavigationCompletedEventArgs args)
-        {
-            if (_apiResultTcs == null || _apiResultTcs.Task.IsCompleted)
-            {
-                return;
-            }
-
-            if (!args.IsSuccess)
-            {
-                _apiResultTcs.TrySetException(new HttpRequestException($"API navigation failed with status: {args.WebErrorStatus}"));
-                return;
-            }
-
-            try
-            {
-                string script = "document.body.innerText;";
-                string scriptResult = await sender.ExecuteScriptAsync(script);
-                string resultJson = JsonSerializer.Deserialize<string>(scriptResult);
-
-                _apiResultTcs.TrySetResult(resultJson);
-            }
-            catch (Exception ex)
-            {
-                _apiResultTcs.TrySetException(ex);
             }
         }
 
@@ -168,13 +136,10 @@ namespace _1809_UWP
         private void SetupTitleBar()
         {
             CoreApplication.GetCurrentView().TitleBar.ExtendViewIntoTitleBar = true;
-
             Window.Current.SetTitleBar(AppTitleBar);
-
             var titleBar = ApplicationView.GetForCurrentView().TitleBar;
             titleBar.ButtonBackgroundColor = Colors.Transparent;
             titleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
-
             CoreApplication.GetCurrentView().TitleBar.LayoutMetricsChanged += (s, e) => UpdateTitleBarLayout();
         }
 
@@ -218,16 +183,13 @@ namespace _1809_UWP
                         targetPage = typeof(ArticleViewerPage);
                         pageParameter = "Main Page";
                         break;
-
                     case "random":
                         targetPage = typeof(ArticleViewerPage);
                         pageParameter = "random";
                         break;
-
                     case "login":
                         targetPage = typeof(LoginPage);
                         break;
-
                     case "userpage":
                         if (AuthService.IsLoggedIn)
                         {
@@ -275,9 +237,46 @@ namespace _1809_UWP
                 await Task.Delay(300, token);
                 string url = $"https://betawiki.net/api.php?action=opensearch&format=json&limit=10&search={Uri.EscapeDataString(query)}";
 
-                _apiResultTcs = new TaskCompletionSource<string>();
-                ApiFetchWebView.CoreWebView2.Navigate(url);
-                string json = await _apiResultTcs.Task;
+                await WebViewApiService.NavigateAsync(url);
+                var webView = WebViewApiService.GetWebView();
+                string json = null;
+
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                while (stopwatch.Elapsed.TotalSeconds < 10)
+                {
+                    if (token.IsCancellationRequested) throw new TaskCanceledException();
+
+                    string html = await webView.ExecuteScriptAsync("document.documentElement.outerHTML");
+                    string fullHtml = JsonSerializer.Deserialize<string>(html ?? "null");
+
+                    if (!string.IsNullOrEmpty(fullHtml))
+                    {
+                        if (fullHtml.Contains("Verifying you are human") || fullHtml.Contains("checking your browser"))
+                        {
+                            await Task.Delay(500, token);
+                            continue;
+                        }
+
+                        var doc = new HtmlAgilityPack.HtmlDocument();
+                        doc.LoadHtml(fullHtml);
+                        string text = doc.DocumentNode.SelectSingleNode("//body/pre")?.InnerText ?? doc.DocumentNode.InnerText;
+
+                        if (!string.IsNullOrEmpty(text) && text.Trim().StartsWith("["))
+                        {
+                            json = text.Trim();
+                            break;
+                        }
+                    }
+                    await Task.Delay(500, token);
+                }
+
+                if (json == null)
+                {
+                    throw new Exception("Failed to retrieve valid search suggestions.");
+                }
+
+                if (token.IsCancellationRequested) return;
+
                 using (JsonDocument doc = JsonDocument.Parse(json))
                 {
                     JsonElement root = doc.RootElement;
@@ -297,7 +296,7 @@ namespace _1809_UWP
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Suggestion fetch via WebView failed: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Suggestion fetch failed: {ex.Message}");
                 sender.ItemsSource = null;
             }
         }
@@ -356,7 +355,6 @@ namespace _1809_UWP
             if (ContentFrame.Content is ArticleViewerPage articlePage && articlePage.GoBackInPage())
             {
                 NavView.IsBackEnabled = ContentFrame.CanGoBack || articlePage.CanGoBackInPage;
-
                 return true;
             }
 
