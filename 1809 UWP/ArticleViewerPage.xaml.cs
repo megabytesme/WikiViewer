@@ -651,6 +651,42 @@ namespace _1809_UWP
             }
         }
 
+        private async void FavoriteButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(_pageTitleToFetch)) return;
+
+            if (FavoritesService.IsFavorite(_pageTitleToFetch))
+            {
+                await FavoritesService.RemoveFavoriteAsync(_pageTitleToFetch);
+            }
+            else
+            {
+                await FavoritesService.AddFavoriteAsync(_pageTitleToFetch);
+            }
+            UpdateFavoriteButton();
+        }
+
+        private void UpdateFavoriteButton()
+        {
+            if (string.IsNullOrEmpty(_pageTitleToFetch) || _pageTitleToFetch.Equals("random", StringComparison.OrdinalIgnoreCase))
+            {
+                FavoriteButton.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            FavoriteButton.Visibility = Visibility.Visible;
+            if (FavoritesService.IsFavorite(_pageTitleToFetch))
+            {
+                FavoriteButton.Label = "Remove from Favorites";
+                FavoriteButton.Icon = new SymbolIcon(Symbol.UnFavorite);
+            }
+            else
+            {
+                FavoriteButton.Label = "Add to Favorites";
+                FavoriteButton.Icon = new SymbolIcon(Symbol.Favorite);
+            }
+        }
+
         private void ShareButton_Click(object sender, RoutedEventArgs e)
         {
             DataTransferManager.ShowShareUI();

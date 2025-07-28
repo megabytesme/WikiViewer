@@ -137,6 +137,10 @@
     <Compile Include="EditPage.xaml.cs">
       <DependentUpon>EditPage.xaml</DependentUpon>
     </Compile>
+    <Compile Include="FavouritesService.cs" />
+    <Compile Include="FavouritesPage.xaml.cs">
+      <DependentUpon>FavouritesPage.xaml</DependentUpon>
+    </Compile>
     <Compile Include="LoginPage.xaml.cs">
       <DependentUpon>LoginPage.xaml</DependentUpon>
     </Compile>
@@ -239,6 +243,9 @@
       <SubType>Designer</SubType>
     </Page>
     <Page Include="EditPage.xaml">
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="FavouritesPage.xaml">
       <SubType>Designer</SubType>
     </Page>
     <Page Include="LoginPage.xaml">

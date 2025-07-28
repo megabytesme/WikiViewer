@@ -226,6 +226,9 @@ namespace _1809_UWP
                         targetPage = typeof(ArticleViewerPage);
                         pageParameter = "random";
                         break;
+                    case "favorites":
+                        targetPage = typeof(FavoritesPage);
+                        break;
                     case "login":
                         targetPage = typeof(LoginPage);
                         break;

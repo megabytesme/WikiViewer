@@ -1,0 +1,35 @@
+﻿<Page
+    x:Class="_1809_UWP.FavoritesPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Background="Transparent">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="Favorites" Style="{ThemeResource TitleTextBlockStyle}" Margin="24,12"/>
+
+        <ListView x:Name="FavoritesListView"
+                  Grid.Row="1"
+                  IsItemClickEnabled="True"
+                  ItemClick="FavoritesListView_ItemClick"
+                  SelectionMode="None">
+            <ListView.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock Text="{Binding}" Style="{ThemeResource BodyTextBlockStyle}" Margin="12,8"/>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+
+        <TextBlock x:Name="NoFavoritesTextBlock"
+                   Text="You haven't added any favorites yet."
+                   Grid.Row="1"
+                   Style="{ThemeResource SubtitleTextBlockStyle}"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   Visibility="Collapsed"/>
+    </Grid>
+</Page>

@@ -61,6 +61,10 @@
                           Label="Edit" 
                           Click="EditButton_Click" 
                           Visibility="Collapsed"/>
+            <AppBarButton x:Name="FavoriteButton"
+                  Icon="Favorite"
+                  Label="Add to Favorites"
+                  Click="FavoriteButton_Click"/>
             <AppBarButton x:Name="ShareButton"
                           Icon="Share"
                           Label="Share"
