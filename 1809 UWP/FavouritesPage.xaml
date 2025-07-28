@@ -5,16 +5,11 @@
     xmlns:local="using:_1809_UWP"
     Background="Transparent">
 
-    <Page.BottomAppBar>
-        <CommandBar x:Name="BottomCommandBar" Visibility="Collapsed">
-            <AppBarButton x:Name="DeleteButton" Icon="Delete" Label="Delete" Click="DeleteButton_Click"/>
-        </CommandBar>
-    </Page.BottomAppBar>
-
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <TextBlock Text="Favourites" Style="{ThemeResource TitleTextBlockStyle}" Margin="24,12"/>
@@ -49,7 +44,6 @@
                         <Rectangle Fill="{ThemeResource SubtleFillColorTransparentBrush}" Grid.Row="0"/>
 
                         <StackPanel Grid.Row="1" Padding="12" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}">
-
                             <TextBlock Text="{x:Bind DisplayTitle}" 
                                        Style="{ThemeResource SubtitleTextBlockStyle}" 
                                        TextWrapping="Wrap"/>
@@ -86,5 +80,14 @@
                    HorizontalAlignment="Center"
                    VerticalAlignment="Center"
                    Visibility="Collapsed"/>
+
+        <CommandBar x:Name="BottomCommandBar"
+                    Grid.Row="2"
+                    Visibility="Collapsed">
+            <AppBarButton x:Name="DeleteButton" 
+                          Icon="Delete" 
+                          Label="Delete" 
+                          Click="DeleteButton_Click"/>
+        </CommandBar>
     </Grid>
 </Page>
