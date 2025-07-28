@@ -655,13 +655,13 @@ namespace _1809_UWP
         {
             if (string.IsNullOrEmpty(_pageTitleToFetch)) return;
 
-            if (FavoritesService.IsFavorite(_pageTitleToFetch))
+            if (FavouritesService.IsFavourite(_pageTitleToFetch))
             {
-                await FavoritesService.RemoveFavoriteAsync(_pageTitleToFetch);
+                await FavouritesService.RemoveFavoriteAsync(_pageTitleToFetch);
             }
             else
             {
-                await FavoritesService.AddFavoriteAsync(_pageTitleToFetch);
+                await FavouritesService.AddFavoriteAsync(_pageTitleToFetch);
             }
             UpdateFavoriteButton();
         }
@@ -675,14 +675,14 @@ namespace _1809_UWP
             }
 
             FavoriteButton.Visibility = Visibility.Visible;
-            if (FavoritesService.IsFavorite(_pageTitleToFetch))
+            if (FavouritesService.IsFavourite(_pageTitleToFetch))
             {
-                FavoriteButton.Label = "Remove from Favorites";
+                FavoriteButton.Label = "Remove from Favourites";
                 FavoriteButton.Icon = new SymbolIcon(Symbol.UnFavorite);
             }
             else
             {
-                FavoriteButton.Label = "Add to Favorites";
+                FavoriteButton.Label = "Add to Favourites";
                 FavoriteButton.Icon = new SymbolIcon(Symbol.Favorite);
             }
         }

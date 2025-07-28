@@ -32,7 +32,7 @@
                     </StackPanel>
 
                     <StackPanel x:Name="LoggedOutState" Spacing="8" Visibility="Collapsed">
-                        <TextBlock Text="You are not signed in. Sign in to make edits." Style="{ThemeResource BodyTextBlockStyle}"/>
+                        <TextBlock Text="You are not signed in. Sign in to make edits and synchronise favourites!" Style="{ThemeResource BodyTextBlockStyle}"/>
                         <HyperlinkButton Content="Sign in to BetaWiki" Click="SignInButton_Click" Padding="0"/>
                     </StackPanel>
                 </StackPanel>

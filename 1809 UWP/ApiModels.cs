@@ -116,6 +116,17 @@ namespace _1809_UWP
         public string lgusername { get; set; }
     }
 
+    public class ClientLoginResponse
+    {
+        public ClientLoginResult clientlogin { get; set; }
+    }
+
+    public class ClientLoginResult
+    {
+        public string status { get; set; }
+        public string username { get; set; }
+    }
+
     public class CsrfTokenResponse
     {
         public QueryCsrf query { get; set; }
@@ -129,5 +140,69 @@ namespace _1809_UWP
     public class TokensCsrf
     {
         public string csrftoken { get; set; }
+    }
+
+    public class WatchlistQueryResponse
+    {
+        public WatchlistResult query { get; set; }
+    }
+
+    public class WatchlistResult
+    {
+        public List<WatchlistItem> watchlistraw { get; set; }
+    }
+
+    public class WatchlistItem
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("ns")]
+        public int Ns { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("title")]
+        public string Title { get; set; }
+    }
+
+    public class WatchlistApiResponse
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("watchlistraw")]
+        public List<WatchlistItem> WatchlistRaw { get; set; }
+    }
+
+    public class WatchActionResponse
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("watch")]
+        public List<WatchResult> Watch { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("unwatch")]
+        public List<WatchResult> Unwatch { get; set; }
+    }
+
+    public class WatchResult
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("title")]
+        public string Title { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("watched")]
+        public string Watched { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("unwatched")]
+        public string Unwatched { get; set; }
+    }
+
+    public class WatchTokenResponse
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("query")]
+        public WatchQueryResponse Query { get; set; }
+    }
+
+    public class WatchQueryResponse
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("tokens")]
+        public WatchTokens Tokens { get; set; }
+    }
+
+    public class WatchTokens
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("watchtoken")]
+        public string WatchToken { get; set; }
     }
 }

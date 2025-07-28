@@ -56,14 +56,11 @@
             <muxc:NavigationView.MenuItems>
                 <muxc:NavigationViewItem Content="Home" Tag="home" Icon="Home"/>
                 <muxc:NavigationViewItem Content="Random Article" Tag="random" Icon="Shuffle"/>
-                <muxc:NavigationViewItem Content="Favorites" Tag="favorites" Icon="Favorite"/>
+                <muxc:NavigationViewItem Content="Favourites" Tag="favourites" Icon="Favorite"/>
+                <muxc:NavigationViewItem x:Name="LoginNavItem" Content="Login" Tag="login" Icon="Contact"/>
             </muxc:NavigationView.MenuItems>
 
-            <muxc:NavigationView.PaneFooter>
-                <muxc:NavigationViewItem x:Name="LoginNavItem" Content="Login" Tag="login" Icon="Contact"/>
-            </muxc:NavigationView.PaneFooter>
-
-        <muxc:NavigationView.AutoSuggestBox>
+            <muxc:NavigationView.AutoSuggestBox>
                 <AutoSuggestBox x:Name="SearchBox"
                                 QueryIcon="Find"
                                 PlaceholderText="Search BetaWiki..."

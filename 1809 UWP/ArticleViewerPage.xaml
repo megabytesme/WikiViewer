@@ -63,7 +63,7 @@
                           Visibility="Collapsed"/>
             <AppBarButton x:Name="FavoriteButton"
                   Icon="Favorite"
-                  Label="Add to Favorites"
+                  Label="Add to Favourites"
                   Click="FavoriteButton_Click"/>
             <AppBarButton x:Name="ShareButton"
                           Icon="Share"
