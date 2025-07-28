@@ -50,19 +50,6 @@ namespace _1809_UWP
             AuthenticationStateChanged?.Invoke(null, EventArgs.Empty);
         }
 
-        private static async Task SyncAndMergeFavouritesOnLogin()
-        {
-            List<string> localFavourites = FavouritesService.GetFavourites();
-            var serverFavourites = await FetchWatchlistAsync();
-            var titlesToSync = new List<string>();
-            foreach (var localTitle in localFavourites)
-            {
-                if (serverFavourites.Add(localTitle)) { titlesToSync.Add(localTitle); }
-            }
-            if (titlesToSync.Any()) { await SyncMultipleFavouritesToServerAsync(titlesToSync, add: true); }
-            await FavouritesService.OverwriteLocalFavouritesAsync(serverFavourites);
-        }
-
         public static async void Logout()
         {
             if (!IsLoggedIn || string.IsNullOrEmpty(_csrfToken)) return;
@@ -91,6 +78,31 @@ namespace _1809_UWP
                 await FavouritesService.ClearAllLocalFavouritesAsync();
                 AuthenticationStateChanged?.Invoke(null, EventArgs.Empty);
             }
+        }
+
+        private static async Task SyncAndMergeFavouritesOnLogin()
+        {
+            Debug.WriteLine("[AuthService] Starting sync process...");
+
+            var pendingDeletes = FavouritesService.GetAndClearPendingDeletes();
+            if (pendingDeletes.Any())
+            {
+                Debug.WriteLine($"[AuthService] Syncing {pendingDeletes.Count} offline deletions to server...");
+                await SyncMultipleFavouritesToServerAsync(pendingDeletes, add: false);
+            }
+
+            var pendingAdds = FavouritesService.GetAndClearPendingAdds();
+            if (pendingAdds.Any())
+            {
+                Debug.WriteLine($"[AuthService] Syncing {pendingAdds.Count} offline additions to server...");
+                await SyncMultipleFavouritesToServerAsync(pendingAdds, add: true);
+            }
+            Debug.WriteLine("[AuthService] Fetching final list from server...");
+            var serverFavourites = await FetchWatchlistAsync();
+            Debug.WriteLine("[AuthService] Overwriting local state with server's watchlist.");
+            await FavouritesService.OverwriteLocalFavouritesAsync(serverFavourites);
+
+            Debug.WriteLine("[AuthService] Sync complete.");
         }
 
         public static async Task SyncSingleFavoriteToServerAsync(string pageTitle, bool add)

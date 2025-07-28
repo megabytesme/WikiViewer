@@ -11,7 +11,13 @@ namespace _1809_UWP
     public static class FavouritesService
     {
         private const string FavouritesFileName = "Favourites.json";
+        private const string PendingAddsFileName = "PendingAdds.json";
+        private const string PendingDeletesFileName = "PendingDeletes.json";
+
         private static HashSet<string> _Favourites;
+        private static HashSet<string> _pendingAdds;
+        private static HashSet<string> _pendingDeletes;
+
         private static bool _isInitialized = false;
 
         public static event EventHandler FavouritesChanged;
@@ -20,41 +26,52 @@ namespace _1809_UWP
         {
             if (_isInitialized) return;
 
+            _Favourites = await LoadSetFromFileAsync(FavouritesFileName);
+
+            _pendingAdds = await LoadSetFromFileAsync(PendingAddsFileName);
+            _pendingDeletes = await LoadSetFromFileAsync(PendingDeletesFileName);
+
+            _isInitialized = true;
+        }
+
+        private static async Task<HashSet<string>> LoadSetFromFileAsync(string fileName)
+        {
             try
             {
-                StorageFile file = await ApplicationData.Current.LocalFolder.TryGetItemAsync(FavouritesFileName) as StorageFile;
+                StorageFile file = await ApplicationData.Current.LocalFolder.TryGetItemAsync(fileName) as StorageFile;
                 if (file != null)
                 {
                     string json = await FileIO.ReadTextAsync(file);
-                    _Favourites = JsonSerializer.Deserialize<HashSet<string>>(json) ?? new HashSet<string>();
-                }
-                else
-                {
-                    _Favourites = new HashSet<string>();
+                    return JsonSerializer.Deserialize<HashSet<string>>(json) ?? new HashSet<string>();
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[FavouritesService] Failed to load Favourites: {ex.Message}");
-                _Favourites = new HashSet<string>();
+                Debug.WriteLine($"[FavouritesService] Failed to load {fileName}: {ex.Message}");
             }
-            _isInitialized = true;
+            return new HashSet<string>();
+        }
+
+        private static async Task SaveSetToFileAsync(HashSet<string> data, string fileName)
+        {
+            try
+            {
+                StorageFile file = await ApplicationData.Current.LocalFolder.CreateFileAsync(fileName, CreationCollisionOption.ReplaceExisting);
+                string json = JsonSerializer.Serialize(data);
+                await FileIO.WriteTextAsync(file, json);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[FavouritesService] Failed to save {fileName}: {ex.Message}");
+            }
         }
 
         private static async Task SaveAsync()
         {
-            if (!_isInitialized) return;
-            try
-            {
-                StorageFile file = await ApplicationData.Current.LocalFolder.CreateFileAsync(FavouritesFileName, CreationCollisionOption.ReplaceExisting);
-                string json = JsonSerializer.Serialize(_Favourites);
-                await FileIO.WriteTextAsync(file, json);
-                FavouritesChanged?.Invoke(null, EventArgs.Empty);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[FavouritesService] Failed to save Favourites: {ex.Message}");
-            }
+            await SaveSetToFileAsync(_Favourites, FavouritesFileName);
+            await SaveSetToFileAsync(_pendingAdds, PendingAddsFileName);
+            await SaveSetToFileAsync(_pendingDeletes, PendingDeletesFileName);
+            FavouritesChanged?.Invoke(null, EventArgs.Empty);
         }
 
         public static List<string> GetFavourites()
@@ -74,11 +91,16 @@ namespace _1809_UWP
             var cleanTitle = pageTitle.Replace('_', ' ');
             if (_Favourites.Add(cleanTitle))
             {
-                await SaveAsync();
                 if (AuthService.IsLoggedIn)
                 {
                     await AuthService.SyncSingleFavoriteToServerAsync(cleanTitle, add: true);
                 }
+                else
+                {
+                    _pendingDeletes.Remove(cleanTitle);
+                    _pendingAdds.Add(cleanTitle);
+                }
+                await SaveAsync();
             }
         }
 
@@ -87,23 +109,46 @@ namespace _1809_UWP
             var cleanTitle = pageTitle.Replace('_', ' ');
             if (_Favourites.Remove(cleanTitle))
             {
-                await SaveAsync();
                 if (AuthService.IsLoggedIn)
                 {
                     await AuthService.SyncSingleFavoriteToServerAsync(cleanTitle, add: false);
                 }
+                else
+                {
+                    _pendingAdds.Remove(cleanTitle);
+                    _pendingDeletes.Add(cleanTitle);
+                }
+                await SaveAsync();
             }
+        }
+
+        public static List<string> GetAndClearPendingAdds()
+        {
+            var adds = _pendingAdds.ToList();
+            _pendingAdds.Clear();
+            return adds;
+        }
+
+        public static List<string> GetAndClearPendingDeletes()
+        {
+            var deletes = _pendingDeletes.ToList();
+            _pendingDeletes.Clear();
+            return deletes;
         }
 
         public static async Task OverwriteLocalFavouritesAsync(HashSet<string> serverFavourites)
         {
             _Favourites = serverFavourites;
+            _pendingAdds.Clear();
+            _pendingDeletes.Clear();
             await SaveAsync();
         }
 
         public static async Task ClearAllLocalFavouritesAsync()
         {
             _Favourites.Clear();
+            _pendingAdds.Clear();
+            _pendingDeletes.Clear();
             await SaveAsync();
         }
     }
