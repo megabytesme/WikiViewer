@@ -1,4 +1,7 @@
-﻿using System;
+﻿using HtmlAgilityPack;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.Web.WebView2.Core;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -9,10 +12,8 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using HtmlAgilityPack;
-using Microsoft.UI.Xaml.Controls;
-using Microsoft.Web.WebView2.Core;
 using Windows.Foundation;
+using Windows.Graphics;
 using Windows.Storage;
 using Windows.UI;
 using Windows.UI.Xaml;
@@ -572,40 +573,42 @@ namespace _1809_UWP
             ArticleDisplayWebView.CoreWebView2.Navigate($"https://{VirtualHostName}/article.html");
         }
 
-        private async void ArticleDisplayWebView_NavigationStarting(
-            CoreWebView2 sender,
-            CoreWebView2NavigationStartingEventArgs args
-        )
+        private async void ArticleDisplayWebView_NavigationStarting(CoreWebView2 sender, CoreWebView2NavigationStartingEventArgs args)
         {
             Uri uri;
-            try
-            {
-                uri = new Uri(args.Uri);
-            }
-            catch
-            {
-                args.Cancel = true;
-                return;
-            }
+            try { uri = new Uri(args.Uri); }
+            catch { args.Cancel = true; return; }
+
             if (uri.Host.Equals(VirtualHostName, StringComparison.OrdinalIgnoreCase))
+            {
                 return;
+            }
+
             args.Cancel = true;
-            if (
-                uri.Host.Equals("betawiki.net", StringComparison.OrdinalIgnoreCase)
-                && uri.AbsolutePath.StartsWith("/wiki/")
-            )
+
+            if (uri.Host.Equals("betawiki.net", StringComparison.OrdinalIgnoreCase))
             {
-                string newTitle = Uri.UnescapeDataString(
-                    uri.AbsolutePath.Substring("/wiki/".Length)
-                );
-                _pageTitleToFetch = newTitle;
-                _articleHistory.Push(_pageTitleToFetch);
-                StartArticleFetch();
+                string newTitle = null;
+                if (uri.AbsolutePath.StartsWith("/wiki/"))
+                {
+                    newTitle = uri.AbsolutePath.Substring("/wiki/".Length);
+                }
+                else if (uri.AbsolutePath.StartsWith("/index.php") && uri.Query.Contains("title="))
+                {
+                    var queryParams = System.Web.HttpUtility.ParseQueryString(uri.Query);
+                    newTitle = queryParams["title"];
+                }
+
+                if (!string.IsNullOrEmpty(newTitle))
+                {
+                    _pageTitleToFetch = Uri.UnescapeDataString(newTitle);
+                    _articleHistory.Push(_pageTitleToFetch);
+                    StartArticleFetch();
+                    return;
+                }
             }
-            else
-            {
-                await Windows.System.Launcher.LaunchUriAsync(uri);
-            }
+
+            await Windows.System.Launcher.LaunchUriAsync(uri);
         }
 
         public bool GoBackInPage()
@@ -1002,13 +1005,10 @@ namespace _1809_UWP
                 workerSemaphore?.Dispose();
             }
 
-            foreach (
-                var link in doc.DocumentNode.SelectNodes("//a[@href]")
-                    ?? Enumerable.Empty<HtmlNode>()
-            )
+            foreach (var link in doc.DocumentNode.SelectNodes("//a[@href]") ?? Enumerable.Empty<HtmlNode>())
             {
                 string href = link.GetAttributeValue("href", "");
-                if (href.StartsWith("/wiki/"))
+                if (href.StartsWith("/wiki/") || href.StartsWith("/index.php?"))
                 {
                     link.SetAttributeValue("href", baseUrl + href);
                 }
