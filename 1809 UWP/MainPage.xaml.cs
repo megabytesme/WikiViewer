@@ -24,6 +24,7 @@ namespace _1809_UWP
         private CancellationTokenSource _suggestionCts;
         public static WebView2 ApiWorker { get; private set; }
         private bool _isPreflightCheckComplete = false;
+        private string _verificationUrl;
 
         public MainPage()
         {
@@ -32,10 +33,7 @@ namespace _1809_UWP
             ApplyBackdropOrAcrylic();
             SetupTitleBar();
             AuthService.AuthenticationStateChanged += AuthService_AuthenticationStateChanged;
-            this.Unloaded += (s, e) =>
-            {
-                AuthService.AuthenticationStateChanged -= AuthService_AuthenticationStateChanged;
-            };
+            this.Unloaded += (s, e) => { AuthService.AuthenticationStateChanged -= AuthService_AuthenticationStateChanged; };
             this.Loaded += MainPage_Loaded;
         }
 
@@ -48,53 +46,64 @@ namespace _1809_UWP
                 await ApiWorker.EnsureCoreWebView2Async();
             }
 
-            await PerformPreflightCheckAsync();
-
-            if (ContentFrame.Content != null)
-                return;
+            if (ContentFrame.Content == null)
+            {
+                NavView.SelectedItem = NavView.MenuItems.OfType<muxc.NavigationViewItem>().FirstOrDefault();
+                ContentFrame.Navigate(typeof(ArticleViewerPage), "Main Page");
+            }
 
             await CheckAndShowFirstRunDisclaimerAsync();
+            await PerformPreflightCheckAsync();
             await TryAutoLoginAsync();
         }
 
         private async Task PerformPreflightCheckAsync()
         {
+            ConnectionInfoBar.IsOpen = false;
+
             try
             {
-                Debug.WriteLine("[MainPage] Performing pre-flight check for Cloudflare...");
+                Debug.WriteLine("[MainPage] Performing non-blocking pre-flight check...");
                 await ArticleProcessingService.PageExistsAsync("Main Page", ApiWorker);
                 Debug.WriteLine("[MainPage] Pre-flight check successful. Connection is clear.");
-                _isPreflightCheckComplete = true;
             }
             catch (NeedsUserVerificationException ex)
             {
-                Debug.WriteLine(
-                    "[MainPage] Pre-flight check failed. Cloudflare verification required."
-                );
-                _isPreflightCheckComplete = true;
-                ContentFrame.Navigate(typeof(ArticleViewerPage), ex.Url);
+                Debug.WriteLine("[MainPage] Pre-flight check failed. Cloudflare verification required.");
+                _verificationUrl = ex.Url;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine(
-                    $"[MainPage] Pre-flight check failed with a critical error: {ex.Message}"
-                );
+                Debug.WriteLine($"[MainPage] Pre-flight check failed with a general error: {ex.Message}");
 
-                _isPreflightCheckComplete = false;
-
-                var dialog = new ContentDialog
+                if (!AppSettings.HasShownDisclaimer)
                 {
-                    Title = "Connection Error",
-                    Content =
-                        $"Could not establish a connection to BetaWiki. Please check your network and restart the app.\n\nError: {ex.GetType().Name}",
-                    CloseButtonText = "Close App",
-                };
-
-                var result = await dialog.ShowAsync();
-                if (result == ContentDialogResult.None || result == ContentDialogResult.Primary)
-                {
+                    var dialog = new ContentDialog
+                    {
+                        Title = "Connection Required for First Launch",
+                        Content = "WikiBeta needs to connect to the internet for its first use to set things up. Please check your connection and restart the app.",
+                        CloseButtonText = "Close App"
+                    };
+                    await dialog.ShowAsync();
                     Application.Current.Exit();
                 }
+                else
+                {
+                    ConnectionInfoBar.Title = "Offline Mode";
+                    ConnectionInfoBar.Message = "Could not connect to BetaWiki. Only cached articles and favourites are available.";
+                    InfoBarButton.Visibility = Visibility.Collapsed;
+                    ConnectionInfoBar.Severity = muxc.InfoBarSeverity.Error;
+                    ConnectionInfoBar.IsOpen = true;
+                }
+            }
+        }
+
+        private void InfoBarButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (!string.IsNullOrEmpty(_verificationUrl))
+            {
+                ContentFrame.Navigate(typeof(ArticleViewerPage), _verificationUrl);
+                ConnectionInfoBar.IsOpen = false;
             }
         }
 
