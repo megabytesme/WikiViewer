@@ -332,30 +332,37 @@ namespace _1809_UWP
             if (e.SourcePageType == typeof(SettingsPage))
             {
                 NavView.SelectedItem = NavView.SettingsItem;
+                return;
+            }
+
+            string targetTag = null;
+            if (e.SourcePageType == typeof(FavouritesPage))
+            {
+                targetTag = "favourites";
+            }
+            else if (e.SourcePageType == typeof(LoginPage))
+            {
+                targetTag = "login";
             }
             else if (e.SourcePageType == typeof(ArticleViewerPage) && e.Parameter is string pageParameter)
             {
                 if (pageParameter.Equals("Main Page", StringComparison.OrdinalIgnoreCase))
                 {
-                    NavView.SelectedItem = NavView.MenuItems
-                        .OfType<muxc.NavigationViewItem>()
-                        .FirstOrDefault(item => "home".Equals(item.Tag as string));
+                    targetTag = "home";
                 }
                 else if (pageParameter.Equals("random", StringComparison.OrdinalIgnoreCase))
                 {
-                    NavView.SelectedItem = NavView.MenuItems
-                        .OfType<muxc.NavigationViewItem>()
-                        .FirstOrDefault(item => "random".Equals(item.Tag as string));
+                    targetTag = "random";
                 }
-                else
+                else if (pageParameter.Equals($"User:{AuthService.Username}", StringComparison.OrdinalIgnoreCase))
                 {
-                    NavView.SelectedItem = null;
+                    targetTag = "userpage";
                 }
             }
-            else
-            {
-                NavView.SelectedItem = null;
-            }
+
+            NavView.SelectedItem = NavView.MenuItems
+                .OfType<muxc.NavigationViewItem>()
+                .FirstOrDefault(item => string.Equals(item.Tag as string, targetTag));
         }
 
         private void NavView_BackRequested(muxc.NavigationView sender, muxc.NavigationViewBackRequestedEventArgs args)
