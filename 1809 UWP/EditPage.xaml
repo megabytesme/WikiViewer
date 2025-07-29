@@ -8,21 +8,43 @@
     mc:Ignorable="d"
     Background="Transparent">
 
+    <Page.Resources>
+        <Storyboard x:Name="FadeInWebView">
+            <DoubleAnimation
+                Storyboard.TargetName="EditWebView"
+                Storyboard.TargetProperty="Opacity"
+                From="0" To="1" Duration="0:0:0.350"
+                EnableDependentAnimation="True"/>
+        </Storyboard>
+        <Storyboard x:Name="FadeOutOverlay">
+            <DoubleAnimation
+                Storyboard.TargetName="LoadingOverlay"
+                Storyboard.TargetProperty="Opacity"
+                From="1" To="0" Duration="0:0:0.350"
+                EnableDependentAnimation="True"/>
+        </Storyboard>
+    </Page.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="52"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <CommandBar Grid.Row="0" DefaultLabelPosition="Right">
-            <AppBarButton x:Name="CancelButton" Icon="Cancel" Label="Cancel" Click="Cancel_Click"/>
-            <CommandBar.Content>
-                <TextBlock x:Name="PageTitle" Style="{ThemeResource TitleTextBlockStyle}" Margin="12,0"/>
-            </CommandBar.Content>
-        </CommandBar>
+        <Grid Grid.Row="0" Style="{StaticResource PageTitleBarGridStyle}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="PageTitle" Style="{StaticResource PageTitleBarTextStyle}"/>
+            <AppBarButton x:Name="CancelButton" Icon="Cancel" Label="Cancel" Click="Cancel_Click" 
+                          VerticalAlignment="Center" Grid.Column="1"/>
+        </Grid>
 
-        <muxc:WebView2 x:Name="EditWebView" Grid.Row="1" />
+        <muxc:WebView2 x:Name="EditWebView" Grid.Row="1" Opacity="0" />
 
-        <ProgressRing x:Name="LoadingRing" Grid.RowSpan="2" Width="60" Height="60" IsActive="True"/>
+        <Grid x:Name="LoadingOverlay" Grid.RowSpan="2" Background="{StaticResource PageTitleBarAcrylicBrush}">
+            <ProgressRing Width="60" Height="60" IsActive="True"/>
+        </Grid>
     </Grid>
 </Page>

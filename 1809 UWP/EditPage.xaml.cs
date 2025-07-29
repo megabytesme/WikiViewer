@@ -1,5 +1,6 @@
 ﻿using Microsoft.Web.WebView2.Core;
 using System;
+using System.Threading.Tasks;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Navigation;
@@ -52,7 +53,7 @@ namespace _1809_UWP
         {
             if (!args.IsSuccess)
             {
-                LoadingRing.IsActive = false;
+                LoadingOverlay.Visibility = Visibility.Collapsed;
                 PageTitle.Text = "Failed to load editor";
                 return;
             }
@@ -60,9 +61,13 @@ namespace _1809_UWP
             var isDarkTheme = Application.Current.RequestedTheme == ApplicationTheme.Dark;
             string css = GetThemeCss(isDarkTheme);
             string script = $"var style = document.createElement('style'); style.innerHTML = `{css}`; document.head.appendChild(style);";
-
             await sender.ExecuteScriptAsync(script);
-            LoadingRing.IsActive = false;
+
+            await Task.Delay(250);
+
+            FadeOutOverlay.Begin();
+            FadeInWebView.Begin();
+            FadeOutOverlay.Completed += (s, e) => LoadingOverlay.IsHitTestVisible = false;
         }
 
         private void Cancel_Click(object sender, RoutedEventArgs e)
