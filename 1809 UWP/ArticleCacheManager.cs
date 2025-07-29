@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
@@ -92,9 +93,11 @@ public static class ArticleCacheManager
 
     private static string GetHashedFileName(string pageTitle)
     {
+        string sanitizedTitle = string.Join("_", pageTitle.Split(Path.GetInvalidFileNameChars()));
+
         var hash = System
             .Security.Cryptography.SHA1.Create()
-            .ComputeHash(Encoding.UTF8.GetBytes(pageTitle.ToLowerInvariant()));
+            .ComputeHash(Encoding.UTF8.GetBytes(sanitizedTitle.ToLowerInvariant()));
         return hash.Aggregate("", (s, b) => s + b.ToString("x2"));
     }
 

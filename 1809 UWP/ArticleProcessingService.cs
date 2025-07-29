@@ -181,6 +181,10 @@ namespace _1809_UWP
                     string originalSrc = img.GetAttributeValue("srcset", null)?.Split(',').FirstOrDefault()?.Trim().Split(' ')[0] ?? img.GetAttributeValue("src", null);
                     if (urlToLocalPathMap.TryGetValue(originalSrc, out string localImagePath))
                     {
+                        if (!localImagePath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
+                        {
+                            localImagePath = Path.ChangeExtension(localImagePath, ".png");
+                        }
                         img.SetAttributeValue("src", $"https://{ArticleViewerPage.VirtualHostName}{localImagePath}");
                         img.Attributes.Remove("srcset");
                     }
@@ -197,12 +201,13 @@ namespace _1809_UWP
 
             var extension = Path.GetExtension(imageUrl.LocalPath).ToLowerInvariant();
             var hash = System.Security.Cryptography.SHA1.Create().ComputeHash(Encoding.UTF8.GetBytes(imageUrl.AbsoluteUri));
-            var fileName = hash.Aggregate("", (s, b) => s + b.ToString("x2")) + extension;
-
+            var baseFileName = hash.Aggregate("", (s, b) => s + b.ToString("x2"));
+            var finalFileName = baseFileName + ".png";
             var imageCacheFolder = await ApplicationData.Current.LocalFolder.CreateFolderAsync("cache", CreationCollisionOption.OpenIfExists);
-            var cachedFile = await imageCacheFolder.TryGetItemAsync(fileName) as StorageFile;
-            if (cachedFile != null) return $"/cache/{fileName}";
+            var fileToCheck = (extension == ".svg") ? baseFileName + ".svg" : finalFileName;
+            var cachedFile = await imageCacheFolder.TryGetItemAsync(fileToCheck) as StorageFile;
 
+            if (cachedFile != null) return $"/cache/{fileToCheck}";
             string base64Data = null;
             var tcs = new TaskCompletionSource<string>();
 
@@ -228,12 +233,31 @@ namespace _1809_UWP
                     if (!await navTcs.Task) throw new Exception("Image navigation failed.");
 
                     const string rasterImageScript = @"(function() { const img = document.querySelector('img'); if (img && img.naturalWidth > 0) { const canvas = document.createElement('canvas'); canvas.width = img.naturalWidth; canvas.height = img.naturalHeight; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0); return canvas.toDataURL('image/png').split(',')[1]; } return null; })();";
-                    const string svgScript = @"(function() { if (document.documentElement && document.documentElement.tagName.toLowerCase() === 'svg') { const svgText = new XMLSerializer().serializeToString(document.documentElement); return window.btoa(unescape(encodeURIComponent(svgText))); } return null; })();";
 
-                    string scriptToExecute = (extension == ".svg") ? svgScript : rasterImageScript;
+                    const string svgSourceScript = @"(function() { if (document.documentElement && document.documentElement.tagName.toLowerCase() === 'svg') { return new XMLSerializer().serializeToString(document.documentElement); } return null; })();";
 
-                    string scriptResult = await worker.CoreWebView2.ExecuteScriptAsync(scriptToExecute);
-                    tcs.TrySetResult(string.IsNullOrEmpty(scriptResult) || scriptResult == "null" ? null : JsonSerializer.Deserialize<string>(scriptResult));
+                    if (extension == ".svg")
+                    {
+                        string svgContent = await worker.CoreWebView2.ExecuteScriptAsync(svgSourceScript);
+                        if (!string.IsNullOrEmpty(svgContent) && svgContent != "null")
+                        {
+                            var rawSvgFile = await imageCacheFolder.CreateFileAsync(baseFileName + ".svg", CreationCollisionOption.ReplaceExisting);
+                            await FileIO.WriteTextAsync(rawSvgFile, JsonSerializer.Deserialize<string>(svgContent));
+
+                            const string svgToPngScript = @"(function() { const sourceElement = document.documentElement; const canvas = document.createElement('canvas'); const width = sourceElement.width.baseVal.value || 300; const height = sourceElement.height.baseVal.value || 150; if (width === 0 || height === 0) return null; canvas.width = width; canvas.height = height; const ctx = canvas.getContext('2d'); ctx.drawImage(sourceElement, 0, 0, width, height); return canvas.toDataURL('image/png').split(',')[1]; })();";
+                            string pngResult = await worker.CoreWebView2.ExecuteScriptAsync(svgToPngScript);
+                            tcs.TrySetResult(string.IsNullOrEmpty(pngResult) || pngResult == "null" ? null : JsonSerializer.Deserialize<string>(pngResult));
+                        }
+                        else
+                        {
+                            tcs.TrySetResult(null);
+                        }
+                    }
+                    else
+                    {
+                        string scriptResult = await worker.CoreWebView2.ExecuteScriptAsync(rasterImageScript);
+                        tcs.TrySetResult(string.IsNullOrEmpty(scriptResult) || scriptResult == "null" ? null : JsonSerializer.Deserialize<string>(scriptResult));
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -251,11 +275,11 @@ namespace _1809_UWP
 
             if (string.IsNullOrEmpty(base64Data)) return null;
 
-            var newFile = await imageCacheFolder.CreateFileAsync(fileName, CreationCollisionOption.ReplaceExisting);
+            var newFile = await imageCacheFolder.CreateFileAsync(baseFileName + ".png", CreationCollisionOption.ReplaceExisting);
             var bytes = Convert.FromBase64String(base64Data);
             await FileIO.WriteBytesAsync(newFile, bytes);
 
-            return $"/cache/{fileName}";
+            return $"/cache/{finalFileName}";
         }
 
         public static async Task<DateTime?> FetchLastUpdatedTimestampAsync(string pageTitle, WebView2 worker)
