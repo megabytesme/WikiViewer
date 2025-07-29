@@ -23,7 +23,7 @@
     </Page.Resources>
 
     <Grid>
-        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Visible">
             <GridView x:Name="FavouritesGridView"
                       Padding="24,52,24,48"
                       IsItemClickEnabled="False"
@@ -87,14 +87,15 @@
                    VerticalAlignment="Center"
                    Visibility="Collapsed"/>
 
-        <Grid VerticalAlignment="Top" Style="{StaticResource PageTitleBarGridStyle}" Margin="0,0,7,0">
+        <Grid VerticalAlignment="Top" Style="{StaticResource PageTitleBarGridStyle}" Margin="0,0,15,0">
             <TextBlock Text="Favourites" Style="{StaticResource PageTitleBarTextStyle}"/>
         </Grid>
 
         <CommandBar x:Name="BottomCommandBar"
                     VerticalAlignment="Bottom"
                     Background="{StaticResource PageTitleBarAcrylicBrush}"
-                    Visibility="Collapsed">
+                    Visibility="Collapsed"
+                    Margin="0,0,15,0">
             <AppBarButton x:Name="DeleteButton" 
                           Icon="Delete" 
                           Label="Delete" 
