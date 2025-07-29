@@ -224,11 +224,6 @@ namespace _1809_UWP
                         string virtualHostUrl = imageNode.GetAttributeValue("src", null);
                         if (!string.IsNullOrEmpty(virtualHostUrl))
                         {
-                            if (virtualHostUrl.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
-                            {
-                                virtualHostUrl = Path.ChangeExtension(virtualHostUrl, ".png");
-                            }
-
                             string uwpImageUrl = virtualHostUrl.Replace(
                                 $"https://{ArticleViewerPage.VirtualHostName}",
                                 "ms-appdata:///local"

@@ -10,9 +10,17 @@ namespace _1809_UWP
         {
             if (value is string imageUrl && !string.IsNullOrEmpty(imageUrl))
             {
-                return new BitmapImage(new Uri(imageUrl));
-            }
+                var imageUri = new Uri(imageUrl);
 
+                if (imageUrl.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new SvgImageSource(imageUri);
+                }
+                else
+                {
+                    return new BitmapImage(imageUri);
+                }
+            }
             return null;
         }
 
