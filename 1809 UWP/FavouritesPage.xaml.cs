@@ -1,11 +1,11 @@
-﻿using HtmlAgilityPack;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Windows.System;
+using HtmlAgilityPack;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Navigation;
@@ -69,16 +69,18 @@ namespace _1809_UWP
             {
                 _isCachingInProgress = true;
 
-                var allFavouriteArticles = FavouritesService.GetFavourites()
+                var allFavouriteArticles = FavouritesService
+                    .GetFavourites()
                     .Where(t => !t.StartsWith("Talk:") && !t.StartsWith("User talk:"))
                     .ToList();
 
-                if (!allFavouriteArticles.Any()) return;
+                if (!allFavouriteArticles.Any())
+                    return;
 
                 var checkTasks = allFavouriteArticles.Select(async title => new
                 {
                     Title = title,
-                    IsCached = await ArticleCacheManager.GetCacheMetadataAsync(title) != null
+                    IsCached = await ArticleCacheManager.GetCacheMetadataAsync(title) != null,
                 });
                 var cacheStatusResults = await Task.WhenAll(checkTasks);
 
@@ -89,7 +91,9 @@ namespace _1809_UWP
 
                 if (titlesToCache.Any())
                 {
-                    Debug.WriteLine($"[FAV PAGE] Found {titlesToCache.Count} uncached favourites. Starting background cache task.");
+                    Debug.WriteLine(
+                        $"[FAV PAGE] Found {titlesToCache.Count} uncached favourites. Starting background cache task."
+                    );
                     await BackgroundCacheService.CacheFavouritesAsync(titlesToCache);
                     Debug.WriteLine("[FAV PAGE] Background cache task has completed.");
                 }
@@ -100,7 +104,9 @@ namespace _1809_UWP
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[FAV PAGE] An error occurred during background cache check: {ex.Message}");
+                Debug.WriteLine(
+                    $"[FAV PAGE] An error occurred during background cache check: {ex.Message}"
+                );
             }
             finally
             {
@@ -110,11 +116,15 @@ namespace _1809_UWP
 
         private async void OnArticleCached(object sender, ArticleCachedEventArgs e)
         {
-            var itemToUpdate = _favouritesCollection.FirstOrDefault(item => item.ArticlePageTitle == e.PageTitle);
+            var itemToUpdate = _favouritesCollection.FirstOrDefault(item =>
+                item.ArticlePageTitle == e.PageTitle
+            );
 
             if (itemToUpdate != null)
             {
-                Debug.WriteLine($"[FAV PAGE] Received cache update for '{e.PageTitle}'. Updating image.");
+                Debug.WriteLine(
+                    $"[FAV PAGE] Received cache update for '{e.PageTitle}'. Updating image."
+                );
                 await FindAndSetLeadImage(itemToUpdate);
             }
         }
@@ -191,28 +201,47 @@ namespace _1809_UWP
 
         private async Task FindAndSetLeadImage(FavouriteItem item)
         {
-            if (string.IsNullOrEmpty(item.ArticlePageTitle)) return;
+            item.ImageUrl = "ms-appx:///Assets/Square150x150Logo.png";
 
-            string cachedHtml = await ArticleCacheManager.GetCachedArticleHtmlAsync(item.ArticlePageTitle);
-            if (string.IsNullOrEmpty(cachedHtml)) return;
-
-            var doc = new HtmlDocument();
-            doc.LoadHtml(cachedHtml);
-
-            var firstImageNode = doc.DocumentNode.SelectSingleNode($"//img[contains(@src, '{ArticleViewerPage.VirtualHostName}')]");
-            if (firstImageNode != null)
+            if (!string.IsNullOrEmpty(item.ArticlePageTitle))
             {
-                string virtualHostUrl = firstImageNode.GetAttributeValue("src", null);
-                if (!string.IsNullOrEmpty(virtualHostUrl))
-                {
-                    string uwpImageUrl = virtualHostUrl.Replace(
-                        $"https://{ArticleViewerPage.VirtualHostName}",
-                        "ms-appdata:///local"
-                    );
+                string cachedHtml = await ArticleCacheManager.GetCachedArticleHtmlAsync(item.ArticlePageTitle);
 
-                    item.ImageUrl = uwpImageUrl;
+                if (!string.IsNullOrEmpty(cachedHtml))
+                {
+                    var doc = new HtmlDocument();
+                    doc.LoadHtml(cachedHtml);
+
+                    HtmlNode imageNode = null;
+                    imageNode = doc.DocumentNode.SelectSingleNode($"//table[contains(@class, 'infobox')]//img[contains(@src, '{ArticleViewerPage.VirtualHostName}')]");
+                    if (imageNode == null)
+                    {
+                        imageNode = doc.DocumentNode.SelectSingleNode($"//img[contains(@src, '{ArticleViewerPage.VirtualHostName}')]");
+                    }
+
+                    if (imageNode != null)
+                    {
+                        string virtualHostUrl = imageNode.GetAttributeValue("src", null);
+                        if (!string.IsNullOrEmpty(virtualHostUrl))
+                        {
+                            if (virtualHostUrl.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
+                            {
+                                virtualHostUrl = Path.ChangeExtension(virtualHostUrl, ".png");
+                            }
+
+                            string uwpImageUrl = virtualHostUrl.Replace(
+                                $"https://{ArticleViewerPage.VirtualHostName}",
+                                "ms-appdata:///local"
+                            );
+                            item.ImageUrl = uwpImageUrl;
+                        }
+                    }
                 }
             }
+
+            Debug.WriteLine(
+                $"[FAV PAGE] Set image for '{item.DisplayTitle}': {item.ImageUrl}"
+            );
         }
 
         private async void NavigateToArticleIfItExists(string pageTitle)
@@ -233,7 +262,8 @@ namespace _1809_UWP
                     var dialog = new ContentDialog
                     {
                         Title = "Page Does Not Exist",
-                        Content = $"The page \"{pageTitle.Replace('_', ' ')}\" has not been created yet. Would you like to create it?",
+                        Content =
+                            $"The page \"{pageTitle.Replace('_', ' ')}\" has not been created yet. Would you like to create it?",
                         PrimaryButtonText = "Create",
                         CloseButtonText = "Cancel",
                         XamlRoot = this.XamlRoot,
@@ -266,7 +296,8 @@ namespace _1809_UWP
                 var errorDialog = new ContentDialog
                 {
                     Title = "An Error Occurred",
-                    Content = $"Could not verify the page's status. Please try again.\n\nError: {ex.Message}",
+                    Content =
+                        $"Could not verify the page's status. Please try again.\n\nError: {ex.Message}",
                     CloseButtonText = "OK",
                     XamlRoot = this.XamlRoot,
                 };
