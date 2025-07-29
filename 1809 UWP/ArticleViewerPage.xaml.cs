@@ -6,10 +6,8 @@ using Microsoft.Web.WebView2.Core;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Foundation;
 using Windows.Storage;
-using Windows.UI;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
-using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Navigation;
 
 namespace _1809_UWP
@@ -23,12 +21,10 @@ namespace _1809_UWP
         private readonly Stack<string> _articleHistory = new Stack<string>();
         private double _titleBarHeight = 0;
         public bool CanGoBackInPage => _articleHistory.Count > 1;
-        private readonly TypedEventHandler<FrameworkElement, object> _themeChangedHandler;
 
         public ArticleViewerPage()
         {
             this.InitializeComponent();
-            this.ActualThemeChanged += _themeChangedHandler;
             AuthService.AuthenticationStateChanged += OnAuthenticationStateChanged;
         }
 
@@ -115,7 +111,6 @@ namespace _1809_UWP
         {
             DataTransferManager.GetForCurrentView().DataRequested -= OnDataRequested;
             AuthService.AuthenticationStateChanged -= OnAuthenticationStateChanged;
-            this.ActualThemeChanged -= _themeChangedHandler;
 
             if (ArticleDisplayWebView?.CoreWebView2 != null)
             {
