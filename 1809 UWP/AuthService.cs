@@ -133,10 +133,11 @@ namespace _1809_UWP
             var serverFavourites = await FetchWatchlistAsync(worker);
             Debug.WriteLine("[AuthService] Overwriting local state with server's watchlist.");
             await FavouritesService.OverwriteLocalFavouritesAsync(serverFavourites);
-            await BackgroundCacheService.CacheFavouritesAsync(serverFavourites, worker);
+
+            await BackgroundCacheService.CacheFavouritesAsync(serverFavourites);
+
             Debug.WriteLine("[AuthService] Sync complete.");
         }
-
         public static async Task SyncSingleFavoriteToServerAsync(string pageTitle, bool add)
         {
             await SyncMultipleFavouritesToServerAsync(new List<string> { pageTitle }, add);
