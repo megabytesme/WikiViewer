@@ -498,7 +498,7 @@ namespace _1809_UWP
             return $@"<style>
 {cssVariables}
 html, body {{ background-color: transparent !important; color: var(--text-primary); font-family: 'Segoe UI Variable', 'Segoe UI', sans-serif; margin: 0; padding: 0; font-size: 15px; -webkit-font-smoothing: antialiased; }}
-.mw-parser-output {{ padding: 0px 16px 12px 16px; }}
+.mw-parser-output {{ padding: 30px 16px 30px 16px; }}
 a {{ color: var(--link-color); text-decoration: none; }} a:hover {{ text-decoration: underline; }}
 a.selflink, a.new {{ color: var(--text-secondary); pointer-events: none; text-decoration: none; }}
 img {{ max-width: 100%; height: auto; border-radius: 4px; }} .mw-editsection {{ display: none; }}

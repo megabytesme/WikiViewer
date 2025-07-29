@@ -8,12 +8,6 @@
     Loaded="Page_Loaded">
 
     <Page.Resources>
-        <AcrylicBrush x:Key="TransparentAcrylic"
-                          BackgroundSource="Backdrop"
-                          TintColor="{ThemeResource SystemAltHighColor}"
-                          TintOpacity="0.4"
-                          FallbackColor="{ThemeResource SystemAltHighColor}"/>
-
         <Storyboard x:Name="FadeInAnimation">
             <DoubleAnimation
                 Storyboard.TargetName="LoadingOverlay"
@@ -31,30 +25,19 @@
     </Page.Resources>
 
     <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
-
-        <muxc:WebView2 x:Name="ArticleDisplayWebView"
-                       Grid.Row="0"
-                       Grid.RowSpan="2"/>
+        <muxc:WebView2 x:Name="ArticleDisplayWebView"/>
 
         <Grid x:Name="TitleBarBackground"
-              Grid.Row="0"
               VerticalAlignment="Top"
-              SizeChanged="TitleBar_SizeChanged"
+              Style="{StaticResource PageTitleBarGridStyle}"
               Margin="0,0,15,0">
-
             <TextBlock x:Name="ArticleTitle" 
-                       Style="{ThemeResource HeaderTextBlockStyle}" 
-                       TextWrapping="Wrap"
-                       Margin="12,12,12,12"/>
+                       Style="{StaticResource PageTitleBarTextStyle}" 
+                       TextWrapping="Wrap"/>
         </Grid>
 
-        <CommandBar VerticalAlignment="Bottom" 
-                    Grid.RowSpan="2" 
-                    Background="{ThemeResource TransparentAcrylic}"
+        <CommandBar VerticalAlignment="Bottom"
+                    Background="{StaticResource PageTitleBarAcrylicBrush}"
                     Margin="0,0,15,0">
             <AppBarButton x:Name="EditButton" 
                           Icon="Edit" 
@@ -62,9 +45,9 @@
                           Click="EditButton_Click" 
                           Visibility="Collapsed"/>
             <AppBarButton x:Name="FavoriteButton"
-                  Icon="Favorite"
-                  Label="Add to Favourites"
-                  Click="FavoriteButton_Click"/>
+                          Icon="Favorite"
+                          Label="Add to Favourites"
+                          Click="FavoriteButton_Click"/>
             <AppBarButton x:Name="ShareButton"
                           Icon="Share"
                           Label="Share"
@@ -73,10 +56,8 @@
 
         <Grid x:Name="LoadingOverlay" 
               Opacity="0" 
-              IsHitTestVisible="False" 
-              Grid.RowSpan="2"
-              Background="{ThemeResource TransparentAcrylic}">
-
+              IsHitTestVisible="False"
+              Background="{StaticResource PageTitleBarAcrylicBrush}">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
                 <ProgressRing IsActive="True" Width="60" Height="60"/>
                 <TextBlock x:Name="LoadingText" Text="Loading..." HorizontalAlignment="Center"/>
@@ -84,7 +65,7 @@
             </StackPanel>
         </Grid>
 
-        <Grid x:Name="VerificationPanel" Grid.RowSpan="2" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Visibility="Collapsed">
+        <Grid x:Name="VerificationPanel" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Visibility="Collapsed">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>

@@ -27,7 +27,6 @@ namespace _1809_UWP
         public ArticleViewerPage()
         {
             this.InitializeComponent();
-            _themeChangedHandler = (s, e) => ApplyAcrylicToTitleBar();
             this.ActualThemeChanged += _themeChangedHandler;
             AuthService.AuthenticationStateChanged += OnAuthenticationStateChanged;
         }
@@ -65,7 +64,6 @@ namespace _1809_UWP
 
         private async void Page_Loaded(object sender, RoutedEventArgs e)
         {
-            ApplyAcrylicToTitleBar();
             DataTransferManager.GetForCurrentView().DataRequested += OnDataRequested;
             if (_isInitialized)
                 return;
@@ -140,7 +138,6 @@ namespace _1809_UWP
 
             try
             {
-                // Use the authenticated worker if we are logged in, otherwise use the main one.
                 var worker = MainPage.ApiWorker;
 
                 var (processedHtml, resolvedTitle) = await ArticleProcessingService.FetchAndCacheArticleAsync(_pageTitleToFetch, fetchStopwatch, false, worker);
@@ -334,24 +331,6 @@ namespace _1809_UWP
             {
                 request.FailWithDisplayText("There is no article loaded to share.");
             }
-        }
-
-        private void ApplyAcrylicToTitleBar()
-        {
-            var acrylicBrush = new AcrylicBrush
-            {
-                BackgroundSource = AcrylicBackgroundSource.Backdrop,
-                TintOpacity = 0.4,
-            };
-            if (this.ActualTheme == ElementTheme.Dark)
-            {
-                acrylicBrush.TintColor = Colors.Black;
-            }
-            else
-            {
-                acrylicBrush.TintColor = Colors.White;
-            }
-            TitleBarBackground.Background = acrylicBrush;
         }
 
         private void TitleBar_SizeChanged(object sender, SizeChangedEventArgs e)

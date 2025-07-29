@@ -11,6 +11,24 @@
                     <local:BooleanToVisibilityConverter x:Key="GlobalBoolToVisibility" />
                     <local:StringUrlToImageSourceConverter x:Key="GlobalUrlToImageConverter" />
                 </ResourceDictionary>
+                <ResourceDictionary>
+                    <AcrylicBrush x:Key="PageTitleBarAcrylicBrush"
+                                  BackgroundSource="Backdrop"
+                                  TintColor="{ThemeResource SystemAltHighColor}"
+                                  TintOpacity="0.4"
+                                  FallbackColor="{ThemeResource SystemAltHighColor}"/>
+
+                    <Style x:Key="PageTitleBarGridStyle" TargetType="Grid">
+                        <Setter Property="Height" Value="52"/>
+                        <Setter Property="Background" Value="{StaticResource PageTitleBarAcrylicBrush}"/>
+                    </Style>
+
+                    <Style x:Key="PageTitleBarTextStyle" TargetType="TextBlock" BasedOn="{StaticResource TitleTextBlockStyle}">
+                        <Setter Property="VerticalAlignment" Value="Center"/>
+                        <Setter Property="HorizontalAlignment" Value="Left"/>
+                        <Setter Property="Margin" Value="12,0"/>
+                    </Style>
+                </ResourceDictionary>
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>
