@@ -37,68 +37,72 @@
 
         <TextBlock Text="Favourites" Style="{ThemeResource TitleTextBlockStyle}" Margin="24,12"/>
 
-        <GridView x:Name="FavouritesGridView"
-                  Grid.Row="1"
-                  Padding="24,0,24,24"
-                  IsItemClickEnabled="False"
-                  SelectionMode="Multiple"
-                  SelectionChanged="FavouritesGridView_SelectionChanged"
-                  HorizontalAlignment="Center">
+        <ScrollViewer Grid.Row="1" 
+                      HorizontalScrollBarVisibility="Disabled" 
+                      VerticalScrollBarVisibility="Auto">
 
-            <GridView.ItemContainerStyle>
-                <Style TargetType="GridViewItem">
-                    <Setter Property="Margin" Value="8"/>
-                </Style>
-            </GridView.ItemContainerStyle>
+            <GridView x:Name="FavouritesGridView"
+                      Padding="24,0,24,24"
+                      IsItemClickEnabled="False"
+                      SelectionMode="Multiple"
+                      SelectionChanged="FavouritesGridView_SelectionChanged"
+                      HorizontalAlignment="Center">
 
-            <GridView.ItemTemplate>
-                <DataTemplate x:DataType="local:FavouriteItem">
-                    <Grid Width="280" 
-                          MinHeight="200"
-                          BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                          BorderThickness="1"
-                          Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                          CornerRadius="{ThemeResource ControlCornerRadius}">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="*" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
+                <GridView.ItemContainerStyle>
+                    <Style TargetType="GridViewItem">
+                        <Setter Property="Margin" Value="8"/>
+                    </Style>
+                </GridView.ItemContainerStyle>
 
-                        <Rectangle Grid.Row="0">
-                            <Rectangle.Fill>
-                                <ImageBrush ImageSource="{x:Bind ImageUrl, Mode=OneWay, Converter={StaticResource GlobalUrlToImageConverter}}" Stretch="UniformToFill"/>
-                            </Rectangle.Fill>
-                        </Rectangle>
-                        
-                        <StackPanel Grid.Row="1" Padding="12" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}">
-                            <TextBlock Text="{x:Bind DisplayTitle}" 
-                                       Style="{ThemeResource SubtitleTextBlockStyle}" 
-                                       TextWrapping="Wrap"/>
+                <GridView.ItemTemplate>
+                    <DataTemplate x:DataType="local:FavouriteItem">
+                        <Grid Width="280" 
+                              MinHeight="200"
+                              BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                              BorderThickness="1"
+                              Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                              CornerRadius="{ThemeResource ControlCornerRadius}">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
 
-                            <Grid Margin="0,8,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
+                            <Rectangle Grid.Row="0">
+                                <Rectangle.Fill>
+                                    <ImageBrush ImageSource="{x:Bind ImageUrl, Mode=OneWay, Converter={StaticResource GlobalUrlToImageConverter}}" Stretch="UniformToFill"/>
+                                </Rectangle.Fill>
+                            </Rectangle>
 
-                                <Button Grid.Column="0"
-                                        Content="Article" 
-                                        Click="ArticleButton_Click" 
-                                        Tag="{x:Bind}"
-                                        Visibility="{x:Bind IsArticleAvailable, Converter={StaticResource GlobalBoolToVisibility}}"/>
+                            <StackPanel Grid.Row="1" Padding="12" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}">
+                                <TextBlock Text="{x:Bind DisplayTitle}" 
+                                           Style="{ThemeResource SubtitleTextBlockStyle}" 
+                                           TextWrapping="Wrap"/>
 
-                                <Button Grid.Column="1"
-                                        Content="Talk" 
-                                        Margin="8,0,0,0"
-                                        Click="TalkButton_Click"
-                                        Tag="{x:Bind}"
-                                        Visibility="{x:Bind IsTalkAvailable, Converter={StaticResource GlobalBoolToVisibility}}"/>
-                            </Grid>
-                        </StackPanel>
-                    </Grid>
-                </DataTemplate>
-            </GridView.ItemTemplate>
-        </GridView>
+                                <Grid Margin="0,8,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <Button Grid.Column="0"
+                                            Content="Article" 
+                                            Click="ArticleButton_Click" 
+                                            Tag="{x:Bind}"
+                                            Visibility="{x:Bind IsArticleAvailable, Converter={StaticResource GlobalBoolToVisibility}}"/>
+
+                                    <Button Grid.Column="1"
+                                            Content="Talk" 
+                                            Margin="8,0,0,0"
+                                            Click="TalkButton_Click"
+                                            Tag="{x:Bind}"
+                                            Visibility="{x:Bind IsTalkAvailable, Converter={StaticResource GlobalBoolToVisibility}}"/>
+                                </Grid>
+                            </StackPanel>
+                        </Grid>
+                    </DataTemplate>
+                </GridView.ItemTemplate>
+            </GridView>
+        </ScrollViewer>
 
         <TextBlock x:Name="NoFavouritesTextBlock"
                    Text="You haven't added any Favourites yet."

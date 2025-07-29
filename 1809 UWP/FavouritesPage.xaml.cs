@@ -182,7 +182,8 @@ namespace _1809_UWP
                         Title = "Page Does Not Exist",
                         Content = $"The page \"{pageTitle.Replace('_', ' ')}\" has not been created yet. Would you like to create it?",
                         PrimaryButtonText = "Create",
-                        CloseButtonText = "Cancel"
+                        CloseButtonText = "Cancel",
+                        XamlRoot = this.XamlRoot,
                     };
 
                     var result = await dialog.ShowAsync();
@@ -195,7 +196,8 @@ namespace _1809_UWP
                             {
                                 Title = "Login Required",
                                 Content = "You must be logged in to create or edit pages.",
-                                CloseButtonText = "OK"
+                                CloseButtonText = "OK",
+                                XamlRoot = this.XamlRoot,
                             };
                             await loginDialog.ShowAsync();
                         }
@@ -212,7 +214,8 @@ namespace _1809_UWP
                 {
                     Title = "An Error Occurred",
                     Content = $"Could not verify the page's status. Please try again.\n\nError: {ex.Message}",
-                    CloseButtonText = "OK"
+                    CloseButtonText = "OK",
+                    XamlRoot = this.XamlRoot,
                 };
                 await errorDialog.ShowAsync();
             }
