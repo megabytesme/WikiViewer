@@ -1,18 +1,12 @@
-﻿using Microsoft.UI.Xaml.Controls;
-using Microsoft.Web.WebView2.Core;
-using System;
-using System.Collections.Concurrent;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Net.Http;
-using System.Runtime.InteropServices.WindowsRuntime;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.UI.Xaml.Controls;
 using Windows.ApplicationModel.Core;
-using Windows.Foundation;
-using Windows.Storage.Streams;
 using Windows.UI;
 using Windows.UI.Core;
 using Windows.UI.ViewManagement;
@@ -29,6 +23,7 @@ namespace _1809_UWP
     {
         private CancellationTokenSource _suggestionCts;
         public static WebView2 ApiWorker { get; private set; }
+        private bool _isPreflightCheckComplete = false;
 
         public MainPage()
         {
@@ -37,7 +32,10 @@ namespace _1809_UWP
             ApplyBackdropOrAcrylic();
             SetupTitleBar();
             AuthService.AuthenticationStateChanged += AuthService_AuthenticationStateChanged;
-            this.Unloaded += (s, e) => { AuthService.AuthenticationStateChanged -= AuthService_AuthenticationStateChanged; };
+            this.Unloaded += (s, e) =>
+            {
+                AuthService.AuthenticationStateChanged -= AuthService_AuthenticationStateChanged;
+            };
             this.Loaded += MainPage_Loaded;
         }
 
@@ -50,8 +48,54 @@ namespace _1809_UWP
                 await ApiWorker.EnsureCoreWebView2Async();
             }
 
+            await PerformPreflightCheckAsync();
+
+            if (ContentFrame.Content != null)
+                return;
+
             await CheckAndShowFirstRunDisclaimerAsync();
-            bool loggedIn = await TryAutoLoginAsync();
+            await TryAutoLoginAsync();
+        }
+
+        private async Task PerformPreflightCheckAsync()
+        {
+            try
+            {
+                Debug.WriteLine("[MainPage] Performing pre-flight check for Cloudflare...");
+                await ArticleProcessingService.PageExistsAsync("Main Page", ApiWorker);
+                Debug.WriteLine("[MainPage] Pre-flight check successful. Connection is clear.");
+                _isPreflightCheckComplete = true;
+            }
+            catch (NeedsUserVerificationException ex)
+            {
+                Debug.WriteLine(
+                    "[MainPage] Pre-flight check failed. Cloudflare verification required."
+                );
+                _isPreflightCheckComplete = true;
+                ContentFrame.Navigate(typeof(ArticleViewerPage), ex.Url);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(
+                    $"[MainPage] Pre-flight check failed with a critical error: {ex.Message}"
+                );
+
+                _isPreflightCheckComplete = false;
+
+                var dialog = new ContentDialog
+                {
+                    Title = "Connection Error",
+                    Content =
+                        $"Could not establish a connection to BetaWiki. Please check your network and restart the app.\n\nError: {ex.GetType().Name}",
+                    CloseButtonText = "Close App",
+                };
+
+                var result = await dialog.ShowAsync();
+                if (result == ContentDialogResult.None || result == ContentDialogResult.Primary)
+                {
+                    Application.Current.Exit();
+                }
+            }
         }
 
         private async Task<bool> TryAutoLoginAsync()
@@ -60,7 +104,9 @@ namespace _1809_UWP
             var savedCreds = CredentialService.LoadCredentials();
             if (savedCreds != null)
             {
-                Debug.WriteLine($"[MainPage] Found saved credentials for user: {savedCreds.Username}.");
+                Debug.WriteLine(
+                    $"[MainPage] Found saved credentials for user: {savedCreds.Username}."
+                );
                 LoginNavItem.Content = "Signing in...";
                 try
                 {
@@ -96,23 +142,50 @@ namespace _1809_UWP
                         Content = new TextBlock()
                         {
                             Inlines =
-                    {
-                        new Run() { Text = "This is an unofficial, third-party client for browsing BetaWiki. This app was created by " },
-                        new Hyperlink() { NavigateUri = new Uri("https://github.com/megabytesme"), Inlines = { new Run() { Text = "MegaBytesMe" } } },
-                        new Run() { Text = " and is not affiliated with, endorsed, or sponsored by the official BetaWiki team." },
-                        new LineBreak(), new LineBreak(),
-                        new Run() { Text = "All article data, content, and trademarks are the property of BetaWiki and its respective contributors." },
-                        new LineBreak(), new LineBreak(),
-                        new Run() { Text = "This disclaimer is available to view again in the settings." },
-                        new LineBreak(), new LineBreak(),
-                        new Run() { Text = "You can view the official BetaWiki here: " },
-                        new Hyperlink() { NavigateUri = new Uri("https://betawiki.net/"), Inlines = { new Run() { Text = "BetaWiki" } } }
-                    },
+                            {
+                                new Run()
+                                {
+                                    Text =
+                                        "This is an unofficial, third-party client for browsing BetaWiki. This app was created by ",
+                                },
+                                new Hyperlink()
+                                {
+                                    NavigateUri = new Uri("https://github.com/megabytesme"),
+                                    Inlines = { new Run() { Text = "MegaBytesMe" } },
+                                },
+                                new Run()
+                                {
+                                    Text =
+                                        " and is not affiliated with, endorsed, or sponsored by the official BetaWiki team.",
+                                },
+                                new LineBreak(),
+                                new LineBreak(),
+                                new Run()
+                                {
+                                    Text =
+                                        "All article data, content, and trademarks are the property of BetaWiki and its respective contributors.",
+                                },
+                                new LineBreak(),
+                                new LineBreak(),
+                                new Run()
+                                {
+                                    Text =
+                                        "This disclaimer is available to view again in the settings.",
+                                },
+                                new LineBreak(),
+                                new LineBreak(),
+                                new Run() { Text = "You can view the official BetaWiki here: " },
+                                new Hyperlink()
+                                {
+                                    NavigateUri = new Uri("https://betawiki.net/"),
+                                    Inlines = { new Run() { Text = "BetaWiki" } },
+                                },
+                            },
                             TextWrapping = TextWrapping.Wrap,
                         },
                     },
                     CloseButtonText = "I Understand",
-                    DefaultButton = ContentDialogButton.Close
+                    DefaultButton = ContentDialogButton.Close,
                 };
 
                 await dialog.ShowAsync();
@@ -123,29 +196,43 @@ namespace _1809_UWP
 
         private void AuthService_AuthenticationStateChanged(object sender, EventArgs e)
         {
-            _ = Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
-            {
-                if (AuthService.IsLoggedIn)
+            _ = Dispatcher.RunAsync(
+                Windows.UI.Core.CoreDispatcherPriority.Normal,
+                () =>
                 {
-                    LoginNavItem.Content = AuthService.Username;
-                    LoginNavItem.Icon = new FontIcon { FontFamily = new FontFamily("Segoe MDL2 Assets"), Glyph = "" };
-                    LoginNavItem.Tag = "userpage";
+                    if (AuthService.IsLoggedIn)
+                    {
+                        LoginNavItem.Content = AuthService.Username;
+                        LoginNavItem.Icon = new FontIcon
+                        {
+                            FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                            Glyph = "",
+                        };
+                        LoginNavItem.Tag = "userpage";
+                    }
+                    else
+                    {
+                        LoginNavItem.Content = "Login";
+                        LoginNavItem.Icon = new FontIcon
+                        {
+                            FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                            Glyph = "",
+                        };
+                        LoginNavItem.Tag = "login";
+                    }
                 }
-                else
-                {
-                    LoginNavItem.Content = "Login";
-                    LoginNavItem.Icon = new FontIcon { FontFamily = new FontFamily("Segoe MDL2 Assets"), Glyph = "" };
-                    LoginNavItem.Tag = "login";
-                }
-            });
+            );
         }
 
         private void OnNavigationRequested(Type sourcePageType, object parameter)
         {
-            _ = Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
-            {
-                ContentFrame.Navigate(sourcePageType, parameter);
-            });
+            _ = Dispatcher.RunAsync(
+                CoreDispatcherPriority.Normal,
+                () =>
+                {
+                    ContentFrame.Navigate(sourcePageType, parameter);
+                }
+            );
         }
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -164,7 +251,12 @@ namespace _1809_UWP
 
         private void ApplyBackdropOrAcrylic()
         {
-            if (Windows.Foundation.Metadata.ApiInformation.IsApiContractPresent("Windows.Foundation.UniversalApiContract", 12))
+            if (
+                Windows.Foundation.Metadata.ApiInformation.IsApiContractPresent(
+                    "Windows.Foundation.UniversalApiContract",
+                    12
+                )
+            )
             {
                 muxc.BackdropMaterial.SetApplyToRootOrPageBackground(this, true);
             }
@@ -175,7 +267,7 @@ namespace _1809_UWP
                     BackgroundSource = AcrylicBackgroundSource.HostBackdrop,
                     TintColor = Colors.Transparent,
                     TintOpacity = 0.6,
-                    FallbackColor = Color.FromArgb(255, 40, 40, 40)
+                    FallbackColor = Color.FromArgb(255, 40, 40, 40),
                 };
             }
         }
@@ -187,15 +279,20 @@ namespace _1809_UWP
             var titleBar = ApplicationView.GetForCurrentView().TitleBar;
             titleBar.ButtonBackgroundColor = Colors.Transparent;
             titleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
-            CoreApplication.GetCurrentView().TitleBar.LayoutMetricsChanged += (s, e) => UpdateTitleBarLayout();
+            CoreApplication.GetCurrentView().TitleBar.LayoutMetricsChanged += (s, e) =>
+                UpdateTitleBarLayout();
         }
 
         private void UpdateTitleBarLayout()
         {
             if (CoreApplication.GetCurrentView().TitleBar.ExtendViewIntoTitleBar)
             {
-                LeftPaddingColumn.Width = new GridLength(CoreApplication.GetCurrentView().TitleBar.SystemOverlayLeftInset);
-                RightPaddingColumn.Width = new GridLength(CoreApplication.GetCurrentView().TitleBar.SystemOverlayRightInset);
+                LeftPaddingColumn.Width = new GridLength(
+                    CoreApplication.GetCurrentView().TitleBar.SystemOverlayLeftInset
+                );
+                RightPaddingColumn.Width = new GridLength(
+                    CoreApplication.GetCurrentView().TitleBar.SystemOverlayRightInset
+                );
             }
             else
             {
@@ -206,14 +303,19 @@ namespace _1809_UWP
 
         private void NavView_Loaded(object sender, RoutedEventArgs e)
         {
-            if (ContentFrame.Content == null)
+            if (_isPreflightCheckComplete && ContentFrame.Content == null)
             {
-                NavView.SelectedItem = NavView.MenuItems.OfType<muxc.NavigationViewItem>().FirstOrDefault();
+                NavView.SelectedItem = NavView
+                    .MenuItems.OfType<muxc.NavigationViewItem>()
+                    .FirstOrDefault();
                 ContentFrame.Navigate(typeof(ArticleViewerPage), "Main Page");
             }
         }
 
-        private void NavView_ItemInvoked(muxc.NavigationView sender, muxc.NavigationViewItemInvokedEventArgs args)
+        private void NavView_ItemInvoked(
+            muxc.NavigationView sender,
+            muxc.NavigationViewItemInvokedEventArgs args
+        )
         {
             Type targetPage = null;
             string pageParameter = null;
@@ -252,14 +354,24 @@ namespace _1809_UWP
 
             if (targetPage != null)
             {
-                if (ContentFrame.SourcePageType != targetPage || (ContentFrame.GetNavigationState() as string) != pageParameter)
+                if (
+                    ContentFrame.SourcePageType != targetPage
+                    || (ContentFrame.GetNavigationState() as string) != pageParameter
+                )
                 {
-                    ContentFrame.Navigate(targetPage, pageParameter, args.RecommendedNavigationTransitionInfo);
+                    ContentFrame.Navigate(
+                        targetPage,
+                        pageParameter,
+                        args.RecommendedNavigationTransitionInfo
+                    );
                 }
             }
         }
 
-        private void SearchBox_QuerySubmitted(AutoSuggestBox sender, AutoSuggestBoxQuerySubmittedEventArgs args)
+        private void SearchBox_QuerySubmitted(
+            AutoSuggestBox sender,
+            AutoSuggestBoxQuerySubmittedEventArgs args
+        )
         {
             if (!string.IsNullOrEmpty(args.QueryText))
             {
@@ -267,9 +379,13 @@ namespace _1809_UWP
             }
         }
 
-        private async void SearchBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
+        private async void SearchBox_TextChanged(
+            AutoSuggestBox sender,
+            AutoSuggestBoxTextChangedEventArgs args
+        )
         {
-            if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput) return;
+            if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput)
+                return;
 
             string query = sender.Text;
             if (string.IsNullOrWhiteSpace(query) || query.Length < 2)
@@ -285,11 +401,13 @@ namespace _1809_UWP
             try
             {
                 await Task.Delay(300, token);
-                string url = $"https://betawiki.net/api.php?action=opensearch&format=json&limit=10&search={Uri.EscapeDataString(query)}";
+                string url =
+                    $"https://betawiki.net/api.php?action=opensearch&format=json&limit=10&search={Uri.EscapeDataString(query)}";
 
                 string json = await ApiRequestService.GetJsonFromApiAsync(url, ApiWorker);
 
-                if (token.IsCancellationRequested) return;
+                if (token.IsCancellationRequested)
+                    return;
 
                 if (string.IsNullOrEmpty(json))
                 {
@@ -324,10 +442,13 @@ namespace _1809_UWP
 
         private void ContentFrame_Navigated(object sender, NavigationEventArgs e)
         {
-            bool canGoBackInArticlePage = (ContentFrame.Content as ArticleViewerPage)?.CanGoBackInPage ?? false;
+            bool canGoBackInArticlePage =
+                (ContentFrame.Content as ArticleViewerPage)?.CanGoBackInPage ?? false;
             NavView.IsBackEnabled = ContentFrame.CanGoBack || canGoBackInArticlePage;
             SystemNavigationManager.GetForCurrentView().AppViewBackButtonVisibility =
-                NavView.IsBackEnabled ? AppViewBackButtonVisibility.Visible : AppViewBackButtonVisibility.Collapsed;
+                NavView.IsBackEnabled
+                    ? AppViewBackButtonVisibility.Visible
+                    : AppViewBackButtonVisibility.Collapsed;
 
             if (e.SourcePageType == typeof(SettingsPage))
             {
@@ -344,7 +465,10 @@ namespace _1809_UWP
             {
                 targetTag = "login";
             }
-            else if (e.SourcePageType == typeof(ArticleViewerPage) && e.Parameter is string pageParameter)
+            else if (
+                e.SourcePageType == typeof(ArticleViewerPage)
+                && e.Parameter is string pageParameter
+            )
             {
                 if (pageParameter.Equals("Main Page", StringComparison.OrdinalIgnoreCase))
                 {
@@ -354,18 +478,26 @@ namespace _1809_UWP
                 {
                     targetTag = "random";
                 }
-                else if (pageParameter.Equals($"User:{AuthService.Username}", StringComparison.OrdinalIgnoreCase))
+                else if (
+                    pageParameter.Equals(
+                        $"User:{AuthService.Username}",
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
                 {
                     targetTag = "userpage";
                 }
             }
 
-            NavView.SelectedItem = NavView.MenuItems
-                .OfType<muxc.NavigationViewItem>()
+            NavView.SelectedItem = NavView
+                .MenuItems.OfType<muxc.NavigationViewItem>()
                 .FirstOrDefault(item => string.Equals(item.Tag as string, targetTag));
         }
 
-        private void NavView_BackRequested(muxc.NavigationView sender, muxc.NavigationViewBackRequestedEventArgs args)
+        private void NavView_BackRequested(
+            muxc.NavigationView sender,
+            muxc.NavigationViewBackRequestedEventArgs args
+        )
         {
             TryGoBack();
         }

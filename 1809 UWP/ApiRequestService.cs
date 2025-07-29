@@ -16,6 +16,26 @@ namespace _1809_UWP
 {
     public static class ApiRequestService
     {
+        public static async Task CopyApiCookiesAsync(CoreWebView2 source, CoreWebView2 destination)
+        {
+            var sourceCookies = await source.CookieManager.GetCookiesAsync("https://betawiki.net");
+            if (sourceCookies == null) return;
+
+            foreach (var cookie in sourceCookies)
+            {
+                var newCookie = destination.CookieManager.CreateCookie(
+                    cookie.Name, cookie.Value, cookie.Domain, cookie.Path);
+
+                newCookie.Expires = cookie.Expires;
+                newCookie.IsHttpOnly = cookie.IsHttpOnly;
+                newCookie.IsSecure = cookie.IsSecure;
+                newCookie.SameSite = cookie.SameSite;
+
+                destination.CookieManager.AddOrUpdateCookie(newCookie);
+            }
+            Debug.WriteLine($"[API Service] Copied {sourceCookies.Count} cookies to new worker.");
+        }
+
         private static async Task<string> GetContentFromUrlCore(string url, Func<string, string> validationLogic, WebView2 worker)
         {
             return await CoreApplication.MainView.CoreWindow.Dispatcher.RunTaskAsync(async () =>
@@ -34,10 +54,7 @@ namespace _1809_UWP
 
                 worker.CoreWebView2.Navigate(url);
 
-                if (!await navCompleteTcs.Task)
-                {
-                    throw new Exception($"Navigation failed for URL {url}");
-                }
+                await navCompleteTcs.Task;
 
                 var stopwatch = Stopwatch.StartNew();
                 while (stopwatch.Elapsed.TotalSeconds < 15)
@@ -50,9 +67,8 @@ namespace _1809_UWP
                     string fullHtml = JsonSerializer.Deserialize<string>(scriptResult);
                     if (string.IsNullOrEmpty(fullHtml)) continue;
 
-                    if (fullHtml.Contains("g-recaptcha"))
+                    if (fullHtml.Contains("g-recaptcha") || fullHtml.Contains("Verifying you are human"))
                         throw new NeedsUserVerificationException("Interactive user verification required.", url);
-                    if (fullHtml.Contains("Verifying you are human")) continue;
 
                     string extractedContent = validationLogic(fullHtml);
                     if (extractedContent != null)

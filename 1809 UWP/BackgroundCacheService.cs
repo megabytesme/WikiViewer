@@ -39,6 +39,12 @@ namespace _1809_UWP
                         {
                             tempWorker = new WebView2();
                             App.UIHost.Children.Add(tempWorker);
+                            await tempWorker.EnsureCoreWebView2Async();
+
+                            if (MainPage.ApiWorker?.CoreWebView2 != null)
+                            {
+                                await ApiRequestService.CopyApiCookiesAsync(MainPage.ApiWorker.CoreWebView2, tempWorker.CoreWebView2);
+                            }
 
                             var stopwatch = Stopwatch.StartNew();
                             await ArticleProcessingService.FetchAndCacheArticleAsync(title, stopwatch, false, tempWorker);

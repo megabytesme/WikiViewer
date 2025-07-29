@@ -1,8 +1,8 @@
-﻿using Microsoft.Web.WebView2.Core;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using Microsoft.Web.WebView2.Core;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Foundation;
 using Windows.Storage;
@@ -17,6 +17,7 @@ namespace _1809_UWP
     public sealed partial class ArticleViewerPage : Page
     {
         private string _pageTitleToFetch = "";
+        private string _verificationUrl = null;
         public const string VirtualHostName = "local.betawiki-app.net";
         private bool _isInitialized = false;
         private readonly Stack<string> _articleHistory = new Stack<string>();
@@ -47,7 +48,13 @@ namespace _1809_UWP
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
-            if (e.Parameter is string pageTitle && !string.IsNullOrEmpty(pageTitle))
+
+            if (e.Parameter is string url && (url.StartsWith("http") || url.StartsWith("https")))
+            {
+                _verificationUrl = url;
+                _pageTitleToFetch = "";
+            }
+            else if (e.Parameter is string pageTitle && !string.IsNullOrEmpty(pageTitle))
             {
                 _pageTitleToFetch = pageTitle.Replace(' ', '_');
                 if (_articleHistory.Count == 0 || _articleHistory.Peek() != _pageTitleToFetch)
@@ -56,6 +63,7 @@ namespace _1809_UWP
                     _articleHistory.Push(_pageTitleToFetch);
                 }
             }
+
             EditButton.Visibility = AuthService.IsLoggedIn
                 ? Visibility.Visible
                 : Visibility.Collapsed;
@@ -64,14 +72,14 @@ namespace _1809_UWP
 
         private async void Page_Loaded(object sender, RoutedEventArgs e)
         {
+            Environment.SetEnvironmentVariable("WEBVIEW2_DEFAULT_BACKGROUND_COLOR", "00FFFFFF");
+
             DataTransferManager.GetForCurrentView().DataRequested += OnDataRequested;
             if (_isInitialized)
                 return;
 
             try
             {
-                Environment.SetEnvironmentVariable("WEBVIEW2_DEFAULT_BACKGROUND_COLOR", "00FFFFFF");
-
                 await ArticleDisplayWebView.EnsureCoreWebView2Async();
 
                 var tempFolder = ApplicationData.Current.LocalFolder.Path;
@@ -81,14 +89,16 @@ namespace _1809_UWP
                     CoreWebView2HostResourceAccessKind.Allow
                 );
 
-                ArticleDisplayWebView.CoreWebView2.NavigationCompleted +=
-                    ArticleDisplayWebView_ContentNavigationCompleted;
                 ArticleDisplayWebView.CoreWebView2.NavigationStarting +=
                     ArticleDisplayWebView_NavigationStarting;
 
                 this.Unloaded += ArticleViewerPage_Unloaded;
                 _isInitialized = true;
-                if (!string.IsNullOrEmpty(_pageTitleToFetch))
+
+                if (
+                    !string.IsNullOrEmpty(_pageTitleToFetch)
+                    || !string.IsNullOrEmpty(_verificationUrl)
+                )
                 {
                     StartArticleFetch();
                 }
@@ -126,7 +136,14 @@ namespace _1809_UWP
 
         private async void StartArticleFetch()
         {
-            if (!_isInitialized || VerificationPanel.Visibility == Visibility.Visible) return;
+            if (!string.IsNullOrEmpty(_verificationUrl))
+            {
+                ShowVerificationPanelAndRetry(_verificationUrl);
+                return;
+            }
+
+            if (!_isInitialized || VerificationPanel.Visibility == Visibility.Visible)
+                return;
 
             var fetchStopwatch = Stopwatch.StartNew();
 
@@ -140,7 +157,13 @@ namespace _1809_UWP
             {
                 var worker = MainPage.ApiWorker;
 
-                var (processedHtml, resolvedTitle) = await ArticleProcessingService.FetchAndCacheArticleAsync(_pageTitleToFetch, fetchStopwatch, false, worker);
+                var (processedHtml, resolvedTitle) =
+                    await ArticleProcessingService.FetchAndCacheArticleAsync(
+                        _pageTitleToFetch,
+                        fetchStopwatch,
+                        false,
+                        worker
+                    );
 
                 if (_pageTitleToFetch.Equals("random", StringComparison.OrdinalIgnoreCase))
                 {
@@ -152,7 +175,10 @@ namespace _1809_UWP
 
                 await DisplayProcessedHtml(processedHtml);
 
-                var lastUpdated = await ArticleProcessingService.FetchLastUpdatedTimestampAsync(_pageTitleToFetch, worker);
+                var lastUpdated = await ArticleProcessingService.FetchLastUpdatedTimestampAsync(
+                    _pageTitleToFetch,
+                    worker
+                );
                 if (lastUpdated.HasValue)
                 {
                     LastUpdatedText.Text = $"Last updated: {lastUpdated.Value.ToLocalTime():g}";
@@ -364,7 +390,6 @@ namespace _1809_UWP
         {
             HideLoadingOverlay();
             VerificationPanel.Visibility = Visibility.Visible;
-
             await VerificationWebView.EnsureCoreWebView2Async();
 
             TypedEventHandler<
@@ -373,7 +398,7 @@ namespace _1809_UWP
             > successHandler = null;
             successHandler = async (sender, args) =>
             {
-                if (args.IsSuccess)
+                if (args.IsSuccess && !sender.Source.Contains("challenges.cloudflare.com"))
                 {
                     await Dispatcher.RunAsync(
                         Windows.UI.Core.CoreDispatcherPriority.Normal,
@@ -381,7 +406,11 @@ namespace _1809_UWP
                         {
                             VerificationWebView.CoreWebView2.NavigationCompleted -= successHandler;
                             VerificationPanel.Visibility = Visibility.Collapsed;
-                            StartArticleFetch();
+
+                            Debug.WriteLine(
+                                "[Captcha] Verification successful. Navigating to Main Page."
+                            );
+                            Frame.Navigate(typeof(ArticleViewerPage), "Main Page");
                         }
                     );
                 }

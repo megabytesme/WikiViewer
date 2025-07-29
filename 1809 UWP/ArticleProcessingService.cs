@@ -1,6 +1,3 @@
-using HtmlAgilityPack;
-using Microsoft.UI.Xaml.Controls;
-using Microsoft.Web.WebView2.Core;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -10,6 +7,9 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using HtmlAgilityPack;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.Web.WebView2.Core;
 using Windows.ApplicationModel.Core;
 using Windows.Foundation;
 using Windows.Storage;
@@ -22,7 +22,12 @@ namespace _1809_UWP
     {
         private const string ApiBaseUrl = "https://betawiki.net/api.php";
 
-        public static async Task<(string Html, string ResolvedTitle)> FetchAndCacheArticleAsync(string pageTitle, Stopwatch stopwatch, bool forceRefresh = false, WebView2 worker = null)
+        public static async Task<(string Html, string ResolvedTitle)> FetchAndCacheArticleAsync(
+            string pageTitle,
+            Stopwatch stopwatch,
+            bool forceRefresh = false,
+            WebView2 worker = null
+        )
         {
             var workerToUse = worker ?? MainPage.ApiWorker;
 
@@ -34,12 +39,21 @@ namespace _1809_UWP
 
             if (pageTitle.Equals("random", StringComparison.OrdinalIgnoreCase))
             {
-                string randomTitleJson = await ApiRequestService.GetJsonFromApiAsync($"{ApiBaseUrl}?action=query&list=random&rnnamespace=0&rnlimit=1&format=json", workerToUse);
-                if (string.IsNullOrEmpty(randomTitleJson)) throw new Exception("Failed to retrieve a response for a random page from the API.");
+                string randomTitleJson = await ApiRequestService.GetJsonFromApiAsync(
+                    $"{ApiBaseUrl}?action=query&list=random&rnnamespace=0&rnlimit=1&format=json",
+                    workerToUse
+                );
+                if (string.IsNullOrEmpty(randomTitleJson))
+                    throw new Exception(
+                        "Failed to retrieve a response for a random page from the API."
+                    );
 
-                var randomResponse = JsonSerializer.Deserialize<RandomQueryResponse>(randomTitleJson);
+                var randomResponse = JsonSerializer.Deserialize<RandomQueryResponse>(
+                    randomTitleJson
+                );
                 resolvedTitle = randomResponse?.query?.random?.FirstOrDefault()?.title;
-                if (string.IsNullOrEmpty(resolvedTitle)) throw new Exception("Failed to get a random title from API response.");
+                if (string.IsNullOrEmpty(resolvedTitle))
+                    throw new Exception("Failed to get a random title from API response.");
             }
 
             bool isConnected = NetworkInterface.GetIsNetworkAvailable();
@@ -47,11 +61,23 @@ namespace _1809_UWP
             if (AppSettings.IsCachingEnabled && !forceRefresh)
             {
                 var cachedMetadata = await ArticleCacheManager.GetCacheMetadataAsync(resolvedTitle);
-                DateTime? remoteTimestamp = isConnected ? await FetchLastUpdatedTimestampAsync(resolvedTitle, workerToUse) : null;
+                DateTime? remoteTimestamp = isConnected
+                    ? await FetchLastUpdatedTimestampAsync(resolvedTitle, workerToUse)
+                    : null;
 
-                if (cachedMetadata != null && (!isConnected || remoteTimestamp == null || remoteTimestamp.Value.ToUniversalTime() <= cachedMetadata.LastUpdated.ToUniversalTime()))
+                if (
+                    cachedMetadata != null
+                    && (
+                        !isConnected
+                        || remoteTimestamp == null
+                        || remoteTimestamp.Value.ToUniversalTime()
+                            <= cachedMetadata.LastUpdated.ToUniversalTime()
+                    )
+                )
                 {
-                    string cachedHtml = await ArticleCacheManager.GetCachedArticleHtmlAsync(resolvedTitle);
+                    string cachedHtml = await ArticleCacheManager.GetCachedArticleHtmlAsync(
+                        resolvedTitle
+                    );
                     if (!string.IsNullOrEmpty(cachedHtml))
                     {
                         return (cachedHtml, resolvedTitle);
@@ -61,7 +87,9 @@ namespace _1809_UWP
 
             if (!isConnected)
             {
-                throw new Exception("No network connection and a fresh copy of the article is needed.");
+                throw new Exception(
+                    "No network connection and a fresh copy of the article is needed."
+                );
             }
 
             string pageUrl = $"https://betawiki.net/wiki/{Uri.EscapeDataString(resolvedTitle)}";
@@ -71,21 +99,34 @@ namespace _1809_UWP
             var lastUpdated = await FetchLastUpdatedTimestampAsync(resolvedTitle, workerToUse);
             if (AppSettings.IsCachingEnabled && lastUpdated.HasValue)
             {
-                await ArticleCacheManager.SaveArticleToCacheAsync(resolvedTitle, processedHtml, lastUpdated.Value);
+                await ArticleCacheManager.SaveArticleToCacheAsync(
+                    resolvedTitle,
+                    processedHtml,
+                    lastUpdated.Value
+                );
             }
 
             return (processedHtml, resolvedTitle);
         }
 
-        public static async Task<string> ProcessHtmlAsync(string rawHtml, Stopwatch stopwatch, WebView2 worker)
+        public static async Task<string> ProcessHtmlAsync(
+            string rawHtml,
+            Stopwatch stopwatch,
+            WebView2 worker
+        )
         {
             var doc = new HtmlDocument();
             doc.LoadHtml(rawHtml);
-            var contentNode = doc.DocumentNode.SelectSingleNode("//div[@id='mw-content-text']") ?? doc.DocumentNode;
+            var contentNode =
+                doc.DocumentNode.SelectSingleNode("//div[@id='mw-content-text']")
+                ?? doc.DocumentNode;
 
             await ProcessImagesInDocument(doc, worker);
 
-            foreach (var link in doc.DocumentNode.SelectNodes("//a[@href]") ?? Enumerable.Empty<HtmlNode>())
+            foreach (
+                var link in doc.DocumentNode.SelectNodes("//a[@href]")
+                    ?? Enumerable.Empty<HtmlNode>()
+            )
             {
                 string href = link.GetAttributeValue("href", "");
                 if (href.StartsWith("/wiki/") || href.StartsWith("/index.php?"))
@@ -112,25 +153,36 @@ namespace _1809_UWP
                     .Distinct()
                     .ToList();
                 var titles = string.Join("|", imageFileNames.Select(Uri.EscapeDataString));
-                var imageUrlApi = $"{ApiBaseUrl}?action=query&prop=imageinfo&iiprop=url&format=json&titles={titles}";
+                var imageUrlApi =
+                    $"{ApiBaseUrl}?action=query&prop=imageinfo&iiprop=url&format=json&titles={titles}";
 
                 try
                 {
-                    string imageJsonResponse = await ApiRequestService.GetJsonFromApiAsync(imageUrlApi, worker);
+                    string imageJsonResponse = await ApiRequestService.GetJsonFromApiAsync(
+                        imageUrlApi,
+                        worker
+                    );
                     if (!string.IsNullOrEmpty(imageJsonResponse))
                     {
-                        var imageInfoResponse = JsonSerializer.Deserialize<ImageQueryResponse>(imageJsonResponse);
+                        var imageInfoResponse = JsonSerializer.Deserialize<ImageQueryResponse>(
+                            imageJsonResponse
+                        );
                         if (imageInfoResponse?.query?.pages != null)
                         {
-                            var imageUrlMap = imageInfoResponse.query.pages.Values
-                                .Where(p => p.imageinfo?.FirstOrDefault()?.url != null)
+                            var imageUrlMap = imageInfoResponse
+                                .query.pages.Values.Where(p =>
+                                    p.imageinfo?.FirstOrDefault()?.url != null
+                                )
                                 .ToDictionary(p => p.title, p => p.imageinfo.First().url);
 
                             if (imageUrlMap.Any())
                             {
                                 foreach (var link in imageLinks)
                                 {
-                                    string lookupKey = Uri.UnescapeDataString(link.GetAttributeValue("href", "").Substring(6)).Replace('_', ' ');
+                                    string lookupKey = Uri.UnescapeDataString(
+                                            link.GetAttributeValue("href", "").Substring(6)
+                                        )
+                                        .Replace('_', ' ');
                                     if (imageUrlMap.TryGetValue(lookupKey, out string fullImageUrl))
                                     {
                                         var img = link.SelectSingleNode(".//img");
@@ -149,43 +201,62 @@ namespace _1809_UWP
             }
 
             var allImages = doc.DocumentNode.SelectNodes("//img");
-            if (allImages == null || !allImages.Any()) return;
+            if (allImages == null || !allImages.Any())
+                return;
 
             using (var semaphore = new SemaphoreSlim(Environment.ProcessorCount))
             {
                 var uniqueImageUrls = allImages
-                    .Select(img => img.GetAttributeValue("srcset", null)?.Split(',').FirstOrDefault()?.Trim().Split(' ')[0] ?? img.GetAttributeValue("src", null))
+                    .Select(img =>
+                        img.GetAttributeValue("srcset", null)
+                            ?.Split(',')
+                            .FirstOrDefault()
+                            ?.Trim()
+                            .Split(' ')[0] ?? img.GetAttributeValue("src", null)
+                    )
                     .Where(src => !string.IsNullOrEmpty(src) && !src.StartsWith("data:"))
                     .Distinct()
                     .ToList();
 
-                var downloadTasks = uniqueImageUrls.Select(async originalUrl =>
-                {
-                    await semaphore.WaitAsync();
-                    try
+                var downloadTasks = uniqueImageUrls
+                    .Select(async originalUrl =>
                     {
-                        string localPath = await DownloadAndCacheImageAsync(originalUrl);
-                        return new { OriginalUrl = originalUrl, LocalPath = localPath };
-                    }
-                    finally
-                    {
-                        semaphore.Release();
-                    }
-                }).ToList();
+                        await semaphore.WaitAsync();
+                        try
+                        {
+                            string localPath = await DownloadAndCacheImageAsync(originalUrl);
+                            return new { OriginalUrl = originalUrl, LocalPath = localPath };
+                        }
+                        finally
+                        {
+                            semaphore.Release();
+                        }
+                    })
+                    .ToList();
 
                 var downloadResults = await Task.WhenAll(downloadTasks);
-                var urlToLocalPathMap = downloadResults.Where(r => r.LocalPath != null).ToDictionary(r => r.OriginalUrl, r => r.LocalPath);
+                var urlToLocalPathMap = downloadResults
+                    .Where(r => r.LocalPath != null)
+                    .ToDictionary(r => r.OriginalUrl, r => r.LocalPath);
 
                 foreach (var img in allImages)
                 {
-                    string originalSrc = img.GetAttributeValue("srcset", null)?.Split(',').FirstOrDefault()?.Trim().Split(' ')[0] ?? img.GetAttributeValue("src", null);
+                    string originalSrc =
+                        img.GetAttributeValue("srcset", null)
+                            ?.Split(',')
+                            .FirstOrDefault()
+                            ?.Trim()
+                            .Split(' ')[0] ?? img.GetAttributeValue("src", null);
                     if (urlToLocalPathMap.TryGetValue(originalSrc, out string localImagePath))
                     {
                         if (!localImagePath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
                         {
                             localImagePath = Path.ChangeExtension(localImagePath, ".png");
                         }
-                        img.SetAttributeValue("src", $"https://{ArticleViewerPage.VirtualHostName}{localImagePath}");
+                        img.SetAttributeValue(
+                            "src",
+                            $"https://{ArticleViewerPage.VirtualHostName}{localImagePath}"
+                        );
                         img.Attributes.Remove("srcset");
                     }
                 }
@@ -195,113 +266,165 @@ namespace _1809_UWP
         private static async Task<string> DownloadAndCacheImageAsync(string originalUrl)
         {
             if (!Uri.TryCreate(new Uri("https://betawiki.net"), originalUrl, out Uri imageUrl))
-            {
                 return null;
-            }
 
             var extension = Path.GetExtension(imageUrl.LocalPath).ToLowerInvariant();
-            var hash = System.Security.Cryptography.SHA1.Create().ComputeHash(Encoding.UTF8.GetBytes(imageUrl.AbsoluteUri));
+            var hash = System
+                .Security.Cryptography.SHA1.Create()
+                .ComputeHash(Encoding.UTF8.GetBytes(imageUrl.AbsoluteUri));
             var baseFileName = hash.Aggregate("", (s, b) => s + b.ToString("x2"));
             var finalFileName = baseFileName + ".png";
-            var imageCacheFolder = await ApplicationData.Current.LocalFolder.CreateFolderAsync("cache", CreationCollisionOption.OpenIfExists);
-            var fileToCheck = (extension == ".svg") ? baseFileName + ".svg" : finalFileName;
-            var cachedFile = await imageCacheFolder.TryGetItemAsync(fileToCheck) as StorageFile;
+            var imageCacheFolder = await ApplicationData.Current.LocalFolder.CreateFolderAsync(
+                "cache",
+                CreationCollisionOption.OpenIfExists
+            );
 
-            if (cachedFile != null) return $"/cache/{fileToCheck}";
+            var cachedPngFile =
+                await imageCacheFolder.TryGetItemAsync(finalFileName) as StorageFile;
+            if (cachedPngFile != null)
+                return $"/cache/{finalFileName}";
+
             string base64Data = null;
             var tcs = new TaskCompletionSource<string>();
 
-            _ = CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
-            {
-                if (App.UIHost == null) { tcs.TrySetResult(null); return; }
-
-                var worker = new WebView2();
-                try
+            _ = CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(
+                CoreDispatcherPriority.Normal,
+                async () =>
                 {
-                    App.UIHost.Children.Add(worker);
-                    await worker.EnsureCoreWebView2Async();
-
-                    var navTcs = new TaskCompletionSource<bool>();
-                    TypedEventHandler<CoreWebView2, CoreWebView2NavigationCompletedEventArgs> navHandler = null;
-                    navHandler = (s, e) => {
-                        s.NavigationCompleted -= navHandler;
-                        navTcs.TrySetResult(e.IsSuccess);
-                    };
-                    worker.CoreWebView2.NavigationCompleted += navHandler;
-                    worker.CoreWebView2.Navigate(imageUrl.AbsoluteUri);
-
-                    if (!await navTcs.Task) throw new Exception("Image navigation failed.");
-
-                    const string rasterImageScript = @"(function() { const img = document.querySelector('img'); if (img && img.naturalWidth > 0) { const canvas = document.createElement('canvas'); canvas.width = img.naturalWidth; canvas.height = img.naturalHeight; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0); return canvas.toDataURL('image/png').split(',')[1]; } return null; })();";
-
-                    const string svgSourceScript = @"(function() { if (document.documentElement && document.documentElement.tagName.toLowerCase() === 'svg') { return new XMLSerializer().serializeToString(document.documentElement); } return null; })();";
-
-                    if (extension == ".svg")
+                    if (App.UIHost == null || MainPage.ApiWorker?.CoreWebView2 == null)
                     {
-                        string svgContent = await worker.CoreWebView2.ExecuteScriptAsync(svgSourceScript);
-                        if (!string.IsNullOrEmpty(svgContent) && svgContent != "null")
-                        {
-                            var rawSvgFile = await imageCacheFolder.CreateFileAsync(baseFileName + ".svg", CreationCollisionOption.ReplaceExisting);
-                            await FileIO.WriteTextAsync(rawSvgFile, JsonSerializer.Deserialize<string>(svgContent));
+                        tcs.TrySetResult(null);
+                        return;
+                    }
 
-                            const string svgToPngScript = @"(function() { const sourceElement = document.documentElement; const canvas = document.createElement('canvas'); const width = sourceElement.width.baseVal.value || 300; const height = sourceElement.height.baseVal.value || 150; if (width === 0 || height === 0) return null; canvas.width = width; canvas.height = height; const ctx = canvas.getContext('2d'); ctx.drawImage(sourceElement, 0, 0, width, height); return canvas.toDataURL('image/png').split(',')[1]; })();";
-                            string pngResult = await worker.CoreWebView2.ExecuteScriptAsync(svgToPngScript);
-                            tcs.TrySetResult(string.IsNullOrEmpty(pngResult) || pngResult == "null" ? null : JsonSerializer.Deserialize<string>(pngResult));
+                    var tempWorker = new WebView2();
+                    try
+                    {
+                        App.UIHost.Children.Add(tempWorker);
+                        await tempWorker.EnsureCoreWebView2Async();
+
+                        await ApiRequestService.CopyApiCookiesAsync(
+                            MainPage.ApiWorker.CoreWebView2,
+                            tempWorker.CoreWebView2
+                        );
+
+                        var navTcs = new TaskCompletionSource<bool>();
+                        TypedEventHandler<
+                            CoreWebView2,
+                            CoreWebView2NavigationCompletedEventArgs
+                        > navHandler = null;
+                        navHandler = (s, e) =>
+                        {
+                            s.NavigationCompleted -= navHandler;
+                            navTcs.TrySetResult(e.IsSuccess);
+                        };
+                        tempWorker.CoreWebView2.NavigationCompleted += navHandler;
+                        tempWorker.CoreWebView2.Navigate(imageUrl.AbsoluteUri);
+
+                        if (!await navTcs.Task)
+                            throw new Exception(
+                                $"Image navigation failed for {imageUrl.AbsoluteUri}"
+                            );
+
+                        const string rasterImageScript =
+                            @"(function() { const img = document.querySelector('img'); if (img && img.naturalWidth > 0) { const canvas = document.createElement('canvas'); canvas.width = img.naturalWidth; canvas.height = img.naturalHeight; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0); return canvas.toDataURL('image/png').split(',')[1]; } return null; })();";
+                        const string svgToPngScript =
+                            @"(function() { return new Promise((resolve, reject) => { const sourceElement = document.documentElement; if (sourceElement.tagName.toLowerCase() !== 'svg') { resolve(null); return; } const canvas = document.createElement('canvas'); let width = 0; let height = 0; if (sourceElement.width && sourceElement.width.baseVal && sourceElement.width.baseVal.value > 0) { width = sourceElement.width.baseVal.value; height = sourceElement.height.baseVal.value; } else if (sourceElement.hasAttribute('viewBox')) { const viewBox = sourceElement.getAttribute('viewBox').split(/[ ,]+/); if (viewBox.length >= 4) { width = parseFloat(viewBox[2]); height = parseFloat(viewBox[3]); } } if (width === 0 || height === 0) { width = 32; height = 32; } canvas.width = width; canvas.height = height; const ctx = canvas.getContext('2d'); const img = new Image(); img.onload = function() { ctx.drawImage(img, 0, 0, width, height); URL.revokeObjectURL(img.src); resolve(canvas.toDataURL('image/png').split(',')[1]); }; img.onerror = function() { URL.revokeObjectURL(img.src); reject('Failed to load SVG blob into image element.'); }; const svgBlob = new Blob([new XMLSerializer().serializeToString(sourceElement)], {type: 'image/svg+xml;charset=utf-8'}); const url = URL.createObjectURL(svgBlob); img.src = url; }); })();";
+
+                        if (extension == ".svg")
+                        {
+                            string scriptResult = await tempWorker.CoreWebView2.ExecuteScriptAsync(
+                                svgToPngScript
+                            );
+                            tcs.TrySetResult(
+                                string.IsNullOrEmpty(scriptResult) || scriptResult == "null"
+                                    ? null
+                                    : JsonSerializer.Deserialize<string>(scriptResult)
+                            );
                         }
                         else
                         {
-                            tcs.TrySetResult(null);
+                            string scriptResult = await tempWorker.CoreWebView2.ExecuteScriptAsync(
+                                rasterImageScript
+                            );
+                            tcs.TrySetResult(
+                                string.IsNullOrEmpty(scriptResult) || scriptResult == "null"
+                                    ? null
+                                    : JsonSerializer.Deserialize<string>(scriptResult)
+                            );
                         }
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        string scriptResult = await worker.CoreWebView2.ExecuteScriptAsync(rasterImageScript);
-                        tcs.TrySetResult(string.IsNullOrEmpty(scriptResult) || scriptResult == "null" ? null : JsonSerializer.Deserialize<string>(scriptResult));
+                        Debug.WriteLine(
+                            $"[ImageDownloader] Critical failure for {imageUrl}. Reason: {ex.Message}"
+                        );
+                        tcs.TrySetResult(null);
+                    }
+                    finally
+                    {
+                        App.UIHost.Children.Remove(tempWorker);
+                        tempWorker.Close();
                     }
                 }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[ImageDownloader] Failed for {imageUrl}. Reason: {ex.Message}");
-                    tcs.TrySetResult(null);
-                }
-                finally
-                {
-                    App.UIHost.Children.Remove(worker);
-                    worker.Close();
-                }
-            });
+            );
 
             base64Data = await tcs.Task;
+            if (string.IsNullOrEmpty(base64Data))
+            {
+                Debug.WriteLine(
+                    $"[ImageDownloader] Failed to get base64 data for {imageUrl}. Skipping cache."
+                );
+                return null;
+            }
 
-            if (string.IsNullOrEmpty(base64Data)) return null;
-
-            var newFile = await imageCacheFolder.CreateFileAsync(baseFileName + ".png", CreationCollisionOption.ReplaceExisting);
+            var newFile = await imageCacheFolder.CreateFileAsync(
+                finalFileName,
+                CreationCollisionOption.ReplaceExisting
+            );
             var bytes = Convert.FromBase64String(base64Data);
             await FileIO.WriteBytesAsync(newFile, bytes);
 
+            Debug.WriteLine(
+                $"[ImageDownloader] Cached image {imageUrl} as {finalFileName} in {imageCacheFolder.Path}"
+            );
             return $"/cache/{finalFileName}";
         }
 
-        public static async Task<DateTime?> FetchLastUpdatedTimestampAsync(string pageTitle, WebView2 worker)
+        public static async Task<DateTime?> FetchLastUpdatedTimestampAsync(
+            string pageTitle,
+            WebView2 worker
+        )
         {
-            if (string.IsNullOrEmpty(pageTitle) || pageTitle.Equals("random", StringComparison.OrdinalIgnoreCase)) return null;
-            string url = $"{ApiBaseUrl}?action=query&prop=revisions&titles={Uri.EscapeDataString(pageTitle)}&rvprop=timestamp&rvlimit=1&format=json";
+            if (
+                string.IsNullOrEmpty(pageTitle)
+                || pageTitle.Equals("random", StringComparison.OrdinalIgnoreCase)
+            )
+                return null;
+            string url =
+                $"{ApiBaseUrl}?action=query&prop=revisions&titles={Uri.EscapeDataString(pageTitle)}&rvprop=timestamp&rvlimit=1&format=json";
             try
             {
                 string json = await ApiRequestService.GetJsonFromApiAsync(url, worker);
                 var response = JsonSerializer.Deserialize<TimestampQueryResponse>(json);
-                return response?.query?.pages?.Values.FirstOrDefault()?.Revisions?.FirstOrDefault()?.Timestamp;
+                return response
+                    ?.query?.pages?.Values.FirstOrDefault()
+                    ?.Revisions?.FirstOrDefault()
+                    ?.Timestamp;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[PROCESSOR] Failed to get timestamp for '{pageTitle}': {ex.Message}");
+                Debug.WriteLine(
+                    $"[PROCESSOR] Failed to get timestamp for '{pageTitle}': {ex.Message}"
+                );
                 return null;
             }
         }
 
         public static async Task<bool> PageExistsAsync(string pageTitle, WebView2 worker)
         {
-            if (string.IsNullOrEmpty(pageTitle)) return false;
+            if (string.IsNullOrEmpty(pageTitle))
+                return false;
 
             var workerToUse = worker ?? MainPage.ApiWorker;
             var escapedTitle = Uri.EscapeDataString(pageTitle);
@@ -310,7 +433,8 @@ namespace _1809_UWP
             try
             {
                 string json = await ApiRequestService.GetJsonFromApiAsync(url, workerToUse);
-                if (string.IsNullOrEmpty(json)) return false;
+                if (string.IsNullOrEmpty(json))
+                    return false;
 
                 using (var doc = JsonDocument.Parse(json))
                 {
@@ -323,10 +447,16 @@ namespace _1809_UWP
                 }
                 return true;
             }
+            catch (NeedsUserVerificationException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[PROCESSOR] PageExistsAsync check failed for '{pageTitle}': {ex.Message}");
-                return true;
+                Debug.WriteLine(
+                    $"[PROCESSOR] PageExistsAsync check failed for '{pageTitle}': {ex.Message}"
+                );
+                throw new Exception($"Page check failed for '{pageTitle}'", ex);
             }
         }
 
@@ -334,11 +464,16 @@ namespace _1809_UWP
         {
             var doc = new HtmlDocument();
             doc.LoadHtml(rawHtml);
-            var contentNode = doc.DocumentNode.SelectSingleNode("//div[@id='mw-content-text']") ?? doc.DocumentNode;
+            var contentNode =
+                doc.DocumentNode.SelectSingleNode("//div[@id='mw-content-text']")
+                ?? doc.DocumentNode;
 
             await ProcessImagesInDocument(doc, worker);
 
-            foreach (var link in doc.DocumentNode.SelectNodes("//a[@href]") ?? Enumerable.Empty<HtmlNode>())
+            foreach (
+                var link in doc.DocumentNode.SelectNodes("//a[@href]")
+                    ?? Enumerable.Empty<HtmlNode>()
+            )
             {
                 string href = link.GetAttributeValue("href", "");
                 if (href.StartsWith("/wiki/") || href.StartsWith("/index.php?"))
