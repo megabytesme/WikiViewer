@@ -14,6 +14,7 @@ namespace _1809_UWP
 {
     public sealed partial class FavouritesPage : Page
     {
+        private static bool _isCachingInProgress = false;
         private readonly ObservableCollection<FavouriteItem> _favouritesCollection =
             new ObservableCollection<FavouriteItem>();
 
@@ -29,6 +30,7 @@ namespace _1809_UWP
             FavouritesService.FavouritesChanged += OnFavouritesChanged;
             BackgroundCacheService.ArticleCached += OnArticleCached;
             LoadFavourites();
+            _ = CheckAndStartCachingFavouritesAsync();
         }
 
         protected override void OnNavigatedFrom(NavigationEventArgs e)
@@ -53,6 +55,57 @@ namespace _1809_UWP
             }
             FadeOutAnimation.Completed += onAnimationCompleted;
             FadeOutAnimation.Begin();
+        }
+
+        private async Task CheckAndStartCachingFavouritesAsync()
+        {
+            if (_isCachingInProgress)
+            {
+                Debug.WriteLine("[FAV PAGE] Caching is already in progress. Skipping.");
+                return;
+            }
+
+            try
+            {
+                _isCachingInProgress = true;
+
+                var allFavouriteArticles = FavouritesService.GetFavourites()
+                    .Where(t => !t.StartsWith("Talk:") && !t.StartsWith("User talk:"))
+                    .ToList();
+
+                if (!allFavouriteArticles.Any()) return;
+
+                var checkTasks = allFavouriteArticles.Select(async title => new
+                {
+                    Title = title,
+                    IsCached = await ArticleCacheManager.GetCacheMetadataAsync(title) != null
+                });
+                var cacheStatusResults = await Task.WhenAll(checkTasks);
+
+                var titlesToCache = cacheStatusResults
+                    .Where(r => !r.IsCached)
+                    .Select(r => r.Title)
+                    .ToList();
+
+                if (titlesToCache.Any())
+                {
+                    Debug.WriteLine($"[FAV PAGE] Found {titlesToCache.Count} uncached favourites. Starting background cache task.");
+                    await BackgroundCacheService.CacheFavouritesAsync(titlesToCache);
+                    Debug.WriteLine("[FAV PAGE] Background cache task has completed.");
+                }
+                else
+                {
+                    Debug.WriteLine("[FAV PAGE] All favourites are already cached.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[FAV PAGE] An error occurred during background cache check: {ex.Message}");
+            }
+            finally
+            {
+                _isCachingInProgress = false;
+            }
         }
 
         private async void OnArticleCached(object sender, ArticleCachedEventArgs e)
