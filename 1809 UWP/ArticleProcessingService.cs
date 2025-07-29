@@ -1,14 +1,15 @@
+using HtmlAgilityPack;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.Web.WebView2.Core;
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Net.NetworkInformation;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using HtmlAgilityPack;
-using Microsoft.UI.Xaml.Controls;
-using Microsoft.Web.WebView2.Core;
 using Windows.ApplicationModel.Core;
 using Windows.Foundation;
 using Windows.Storage;
@@ -19,49 +20,9 @@ namespace _1809_UWP
 {
     public static class ArticleProcessingService
     {
-        public static async Task<bool> PageExistsAsync(string pageTitle, WebView2 worker)
-        {
-            if (string.IsNullOrEmpty(pageTitle))
-                return false;
-
-            var workerToUse = worker ?? MainPage.ApiWorker;
-            var escapedTitle = Uri.EscapeDataString(pageTitle);
-            var url = $"{ApiBaseUrl}?action=query&titles={escapedTitle}&format=json";
-
-            try
-            {
-                string json = await ApiRequestService.GetJsonFromApiAsync(url, workerToUse);
-                if (string.IsNullOrEmpty(json))
-                    return false;
-
-                using (var doc = JsonDocument.Parse(json))
-                {
-                    var pages = doc.RootElement.GetProperty("query").GetProperty("pages");
-                    var firstPage = pages.EnumerateObject().FirstOrDefault();
-                    if (firstPage.Value.TryGetProperty("missing", out _))
-                    {
-                        return false;
-                    }
-                }
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine(
-                    $"[PROCESSOR] PageExistsAsync check failed for '{pageTitle}': {ex.Message}"
-                );
-                return true;
-            }
-        }
-
         private const string ApiBaseUrl = "https://betawiki.net/api.php";
 
-        public static async Task<(string Html, string ResolvedTitle)> FetchAndCacheArticleAsync(
-            string pageTitle,
-            Stopwatch stopwatch,
-            bool forceRefresh = false,
-            WebView2 worker = null
-        )
+        public static async Task<(string Html, string ResolvedTitle)> FetchAndCacheArticleAsync(string pageTitle, Stopwatch stopwatch, bool forceRefresh = false, WebView2 worker = null)
         {
             var workerToUse = worker ?? MainPage.ApiWorker;
 
@@ -73,21 +34,12 @@ namespace _1809_UWP
 
             if (pageTitle.Equals("random", StringComparison.OrdinalIgnoreCase))
             {
-                string randomTitleJson = await ApiRequestService.GetJsonFromApiAsync(
-                    $"{ApiBaseUrl}?action=query&list=random&rnnamespace=0&rnlimit=1&format=json",
-                    workerToUse
-                );
-                if (string.IsNullOrEmpty(randomTitleJson))
-                    throw new Exception(
-                        "Failed to retrieve a response for a random page from the API."
-                    );
+                string randomTitleJson = await ApiRequestService.GetJsonFromApiAsync($"{ApiBaseUrl}?action=query&list=random&rnnamespace=0&rnlimit=1&format=json", workerToUse);
+                if (string.IsNullOrEmpty(randomTitleJson)) throw new Exception("Failed to retrieve a response for a random page from the API.");
 
-                var randomResponse = JsonSerializer.Deserialize<RandomQueryResponse>(
-                    randomTitleJson
-                );
+                var randomResponse = JsonSerializer.Deserialize<RandomQueryResponse>(randomTitleJson);
                 resolvedTitle = randomResponse?.query?.random?.FirstOrDefault()?.title;
-                if (string.IsNullOrEmpty(resolvedTitle))
-                    throw new Exception("Failed to get a random title from API response.");
+                if (string.IsNullOrEmpty(resolvedTitle)) throw new Exception("Failed to get a random title from API response.");
             }
 
             bool isConnected = NetworkInterface.GetIsNetworkAvailable();
@@ -95,28 +47,13 @@ namespace _1809_UWP
             if (AppSettings.IsCachingEnabled && !forceRefresh)
             {
                 var cachedMetadata = await ArticleCacheManager.GetCacheMetadataAsync(resolvedTitle);
-                DateTime? remoteTimestamp = isConnected
-                    ? await FetchLastUpdatedTimestampAsync(resolvedTitle, workerToUse)
-                    : null;
+                DateTime? remoteTimestamp = isConnected ? await FetchLastUpdatedTimestampAsync(resolvedTitle, workerToUse) : null;
 
-                if (
-                    cachedMetadata != null
-                    && (
-                        !isConnected
-                        || remoteTimestamp == null
-                        || remoteTimestamp.Value.ToUniversalTime()
-                            <= cachedMetadata.LastUpdated.ToUniversalTime()
-                    )
-                )
+                if (cachedMetadata != null && (!isConnected || remoteTimestamp == null || remoteTimestamp.Value.ToUniversalTime() <= cachedMetadata.LastUpdated.ToUniversalTime()))
                 {
-                    string cachedHtml = await ArticleCacheManager.GetCachedArticleHtmlAsync(
-                        resolvedTitle
-                    );
+                    string cachedHtml = await ArticleCacheManager.GetCachedArticleHtmlAsync(resolvedTitle);
                     if (!string.IsNullOrEmpty(cachedHtml))
                     {
-                        Debug.WriteLine(
-                            $"[PROCESSOR] Using up-to-date cache for '{resolvedTitle}'."
-                        );
                         return (cachedHtml, resolvedTitle);
                     }
                 }
@@ -124,52 +61,31 @@ namespace _1809_UWP
 
             if (!isConnected)
             {
-                throw new Exception(
-                    "No network connection and a fresh copy of the article is needed."
-                );
+                throw new Exception("No network connection and a fresh copy of the article is needed.");
             }
 
-            Debug.WriteLine($"[PROCESSOR] Fetching fresh copy of '{resolvedTitle}' from network.");
             string pageUrl = $"https://betawiki.net/wiki/{Uri.EscapeDataString(resolvedTitle)}";
             var freshHtml = await ApiRequestService.GetRawHtmlFromUrlAsync(pageUrl, workerToUse);
-
             var processedHtml = await ProcessHtmlAsync(freshHtml, stopwatch, workerToUse);
 
             var lastUpdated = await FetchLastUpdatedTimestampAsync(resolvedTitle, workerToUse);
             if (AppSettings.IsCachingEnabled && lastUpdated.HasValue)
             {
-                await ArticleCacheManager.SaveArticleToCacheAsync(
-                    resolvedTitle,
-                    processedHtml,
-                    lastUpdated.Value
-                );
+                await ArticleCacheManager.SaveArticleToCacheAsync(resolvedTitle, processedHtml, lastUpdated.Value);
             }
 
             return (processedHtml, resolvedTitle);
         }
 
-        public static async Task<string> ProcessHtmlAsync(
-            string rawHtml,
-            Stopwatch stopwatch,
-            WebView2 worker
-        )
+        public static async Task<string> ProcessHtmlAsync(string rawHtml, Stopwatch stopwatch, WebView2 worker)
         {
-            Debug.WriteLine(
-                $"[PERF] Entering ProcessHtmlAsync at: {stopwatch.ElapsedMilliseconds} ms"
-            );
-
             var doc = new HtmlDocument();
             doc.LoadHtml(rawHtml);
-            var contentNode =
-                doc.DocumentNode.SelectSingleNode("//div[@id='mw-content-text']")
-                ?? doc.DocumentNode;
+            var contentNode = doc.DocumentNode.SelectSingleNode("//div[@id='mw-content-text']") ?? doc.DocumentNode;
 
-            await ProcessImagesInDocument(doc, stopwatch, worker);
+            await ProcessImagesInDocument(doc, worker);
 
-            foreach (
-                var link in doc.DocumentNode.SelectNodes("//a[@href]")
-                    ?? Enumerable.Empty<HtmlNode>()
-            )
+            foreach (var link in doc.DocumentNode.SelectNodes("//a[@href]") ?? Enumerable.Empty<HtmlNode>())
             {
                 string href = link.GetAttributeValue("href", "");
                 if (href.StartsWith("/wiki/") || href.StartsWith("/index.php?"))
@@ -182,58 +98,39 @@ namespace _1809_UWP
             string styleBlock = GetCssForTheme(isDarkTheme);
 
             return $@"
-        <!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>{styleBlock}</head>
-        <body><div class='mw-parser-output'>{contentNode.InnerHtml}</div></body></html>";
+            <!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>{styleBlock}</head>
+            <body><div class='mw-parser-output'>{contentNode.InnerHtml}</div></body></html>";
         }
 
-        private static async Task ProcessImagesInDocument(
-            HtmlDocument doc,
-            Stopwatch stopwatch,
-            WebView2 worker
-        )
+        private static async Task ProcessImagesInDocument(HtmlDocument doc, WebView2 worker)
         {
             var imageLinks = doc.DocumentNode.SelectNodes("//a[starts-with(@href, '/wiki/File:')]");
             if (imageLinks != null && imageLinks.Any())
             {
-                long startTime = stopwatch.ElapsedMilliseconds;
                 var imageFileNames = imageLinks
                     .Select(link => link.GetAttributeValue("href", "").Substring(6))
                     .Distinct()
                     .ToList();
                 var titles = string.Join("|", imageFileNames.Select(Uri.EscapeDataString));
-                var imageUrlApi =
-                    $"{ApiBaseUrl}?action=query&prop=imageinfo&iiprop=url&format=json&titles={titles}";
-                Debug.WriteLine(
-                    $"[PERF] Image URL lookup API call took: {stopwatch.ElapsedMilliseconds - startTime} ms"
-                );
+                var imageUrlApi = $"{ApiBaseUrl}?action=query&prop=imageinfo&iiprop=url&format=json&titles={titles}";
 
                 try
                 {
-                    string imageJsonResponse = await ApiRequestService.GetJsonFromApiAsync(
-                        imageUrlApi,
-                        worker
-                    );
+                    string imageJsonResponse = await ApiRequestService.GetJsonFromApiAsync(imageUrlApi, worker);
                     if (!string.IsNullOrEmpty(imageJsonResponse))
                     {
-                        var imageInfoResponse = JsonSerializer.Deserialize<ImageQueryResponse>(
-                            imageJsonResponse
-                        );
+                        var imageInfoResponse = JsonSerializer.Deserialize<ImageQueryResponse>(imageJsonResponse);
                         if (imageInfoResponse?.query?.pages != null)
                         {
-                            var imageUrlMap = imageInfoResponse
-                                .query.pages.Values.Where(p =>
-                                    p.imageinfo?.FirstOrDefault()?.url != null
-                                )
+                            var imageUrlMap = imageInfoResponse.query.pages.Values
+                                .Where(p => p.imageinfo?.FirstOrDefault()?.url != null)
                                 .ToDictionary(p => p.title, p => p.imageinfo.First().url);
 
                             if (imageUrlMap.Any())
                             {
                                 foreach (var link in imageLinks)
                                 {
-                                    string lookupKey = Uri.UnescapeDataString(
-                                            link.GetAttributeValue("href", "").Substring(6)
-                                        )
-                                        .Replace('_', ' ');
+                                    string lookupKey = Uri.UnescapeDataString(link.GetAttributeValue("href", "").Substring(6)).Replace('_', ' ');
                                     if (imageUrlMap.TryGetValue(lookupKey, out string fullImageUrl))
                                     {
                                         var img = link.SelectSingleNode(".//img");
@@ -252,221 +149,160 @@ namespace _1809_UWP
             }
 
             var allImages = doc.DocumentNode.SelectNodes("//img");
-            if (allImages == null || !allImages.Any())
-                return;
+            if (allImages == null || !allImages.Any()) return;
 
-            using (var workerSemaphore = new SemaphoreSlim(Environment.ProcessorCount))
+            using (var semaphore = new SemaphoreSlim(Environment.ProcessorCount))
             {
                 var uniqueImageUrls = allImages
-                    .Select(img =>
-                        img.GetAttributeValue("srcset", null)
-                            ?.Split(',')
-                            .FirstOrDefault()
-                            ?.Trim()
-                            .Split(' ')[0] ?? img.GetAttributeValue("src", null)
-                    )
+                    .Select(img => img.GetAttributeValue("srcset", null)?.Split(',').FirstOrDefault()?.Trim().Split(' ')[0] ?? img.GetAttributeValue("src", null))
                     .Where(src => !string.IsNullOrEmpty(src) && !src.StartsWith("data:"))
                     .Distinct()
                     .ToList();
 
-                var downloadTasks = uniqueImageUrls
-                    .Select(async originalUrl =>
+                var downloadTasks = uniqueImageUrls.Select(async originalUrl =>
+                {
+                    await semaphore.WaitAsync();
+                    try
                     {
-                        try
-                        {
-                            Debug.WriteLine(
-                                $"[IMG-DEBUG] Attempting to process URL: \"{originalUrl}\""
-                            );
-
-                            Uri resultUri;
-                            var urlToParse = originalUrl.StartsWith("//")
-                                ? "https:" + originalUrl
-                                : originalUrl;
-
-                            if (
-                                !Uri.TryCreate(
-                                    new Uri("https://betawiki.net"),
-                                    urlToParse,
-                                    out resultUri
-                                )
-                            )
-                            {
-                                Debug.WriteLine(
-                                    $"[IMG-DEBUG] FAILED: Uri.TryCreate returned false for \"{urlToParse}\""
-                                );
-                                return new { OriginalUrl = originalUrl, LocalPath = (string)null };
-                            }
-
-                            Debug.WriteLine(
-                                $"[IMG-DEBUG] SUCCESS: Created URI: \"{resultUri.AbsoluteUri}\" with LocalPath: \"{resultUri.LocalPath}\""
-                            );
-
-                            await workerSemaphore.WaitAsync();
-                            try
-                            {
-                                string localPath = await DownloadAndCacheImageAsync(resultUri);
-                                return new { OriginalUrl = originalUrl, LocalPath = localPath };
-                            }
-                            finally
-                            {
-                                workerSemaphore.Release();
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Debug.WriteLine(
-                                $"[IMG-DEBUG] EXCEPTION for URL \"{originalUrl}\": {ex.GetType().Name} - {ex.Message}"
-                            );
-                            return new { OriginalUrl = originalUrl, LocalPath = (string)null };
-                        }
-                    })
-                    .ToList();
+                        string localPath = await DownloadAndCacheImageAsync(originalUrl);
+                        return new { OriginalUrl = originalUrl, LocalPath = localPath };
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
+                }).ToList();
 
                 var downloadResults = await Task.WhenAll(downloadTasks);
-                var urlToLocalPathMap = downloadResults
-                    .Where(r => r.LocalPath != null)
-                    .ToDictionary(r => r.OriginalUrl, r => r.LocalPath);
+                var urlToLocalPathMap = downloadResults.Where(r => r.LocalPath != null).ToDictionary(r => r.OriginalUrl, r => r.LocalPath);
 
                 foreach (var img in allImages)
                 {
-                    string originalSrc =
-                        img.GetAttributeValue("srcset", null)
-                            ?.Split(',')
-                            .FirstOrDefault()
-                            ?.Trim()
-                            .Split(' ')[0] ?? img.GetAttributeValue("src", null);
+                    string originalSrc = img.GetAttributeValue("srcset", null)?.Split(',').FirstOrDefault()?.Trim().Split(' ')[0] ?? img.GetAttributeValue("src", null);
                     if (urlToLocalPathMap.TryGetValue(originalSrc, out string localImagePath))
                     {
-                        img.SetAttributeValue(
-                            "src",
-                            $"https://{ArticleViewerPage.VirtualHostName}{localImagePath}"
-                        );
+                        img.SetAttributeValue("src", $"https://{ArticleViewerPage.VirtualHostName}{localImagePath}");
                         img.Attributes.Remove("srcset");
                     }
                 }
             }
         }
 
-        private static async Task<string> DownloadAndCacheImageAsync(Uri imageUrl)
+        private static async Task<string> DownloadAndCacheImageAsync(string originalUrl)
         {
-            if (imageUrl == null)
+            if (!Uri.TryCreate(new Uri("https://betawiki.net"), originalUrl, out Uri imageUrl))
+            {
                 return null;
+            }
 
-            var fileName = System
-                .Security.Cryptography.SHA1.Create()
-                .ComputeHash(Encoding.UTF8.GetBytes(imageUrl.AbsoluteUri))
-                .Aggregate("", (s, b) => s + b.ToString("x2"));
+            var extension = Path.GetExtension(imageUrl.LocalPath).ToLowerInvariant();
+            var hash = System.Security.Cryptography.SHA1.Create().ComputeHash(Encoding.UTF8.GetBytes(imageUrl.AbsoluteUri));
+            var fileName = hash.Aggregate("", (s, b) => s + b.ToString("x2")) + extension;
 
-            var imageCacheFolder = await ApplicationData.Current.LocalFolder.CreateFolderAsync(
-                "cache",
-                CreationCollisionOption.OpenIfExists
-            );
+            var imageCacheFolder = await ApplicationData.Current.LocalFolder.CreateFolderAsync("cache", CreationCollisionOption.OpenIfExists);
             var cachedFile = await imageCacheFolder.TryGetItemAsync(fileName) as StorageFile;
-            if (cachedFile != null)
-                return $"/cache/{fileName}";
+            if (cachedFile != null) return $"/cache/{fileName}";
 
             string base64Data = null;
             var tcs = new TaskCompletionSource<string>();
 
-            _ = CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(
-                CoreDispatcherPriority.Normal,
-                async () =>
+            _ = CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
+            {
+                if (App.UIHost == null) { tcs.TrySetResult(null); return; }
+
+                var worker = new WebView2();
+                try
                 {
-                    if (App.UIHost == null)
-                    {
-                        tcs.TrySetResult(null);
-                        return;
-                    }
+                    App.UIHost.Children.Add(worker);
+                    await worker.EnsureCoreWebView2Async();
 
-                    var worker = new WebView2();
-                    try
-                    {
-                        App.UIHost.Children.Add(worker);
-                        await worker.EnsureCoreWebView2Async();
+                    var navTcs = new TaskCompletionSource<bool>();
+                    TypedEventHandler<CoreWebView2, CoreWebView2NavigationCompletedEventArgs> navHandler = null;
+                    navHandler = (s, e) => {
+                        s.NavigationCompleted -= navHandler;
+                        navTcs.TrySetResult(e.IsSuccess);
+                    };
+                    worker.CoreWebView2.NavigationCompleted += navHandler;
+                    worker.CoreWebView2.Navigate(imageUrl.AbsoluteUri);
 
-                        var navTcs = new TaskCompletionSource<bool>();
-                        TypedEventHandler<
-                            CoreWebView2,
-                            CoreWebView2NavigationCompletedEventArgs
-                        > navHandler = null;
-                        navHandler = (s, e) =>
-                        {
-                            s.NavigationCompleted -= navHandler;
-                            navTcs.TrySetResult(e.IsSuccess);
-                        };
-                        worker.CoreWebView2.NavigationCompleted += navHandler;
-                        worker.CoreWebView2.Navigate(imageUrl.AbsoluteUri);
+                    if (!await navTcs.Task) throw new Exception("Image navigation failed.");
 
-                        if (!await navTcs.Task)
-                            throw new Exception("Image navigation failed.");
+                    const string rasterImageScript = @"(function() { const img = document.querySelector('img'); if (img && img.naturalWidth > 0) { const canvas = document.createElement('canvas'); canvas.width = img.naturalWidth; canvas.height = img.naturalHeight; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0); return canvas.toDataURL('image/png').split(',')[1]; } return null; })();";
+                    const string svgScript = @"(function() { if (document.documentElement && document.documentElement.tagName.toLowerCase() === 'svg') { const svgText = new XMLSerializer().serializeToString(document.documentElement); return window.btoa(unescape(encodeURIComponent(svgText))); } return null; })();";
 
-                        const string script =
-                            @"(function() { let base64Data = null; const img = document.querySelector('img'); if (img && img.naturalWidth > 0) { const canvas = document.createElement('canvas'); canvas.width = img.naturalWidth; canvas.height = img.naturalHeight; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0); base64Data = canvas.toDataURL('image/png').split(',')[1]; } else if (document.documentElement && document.documentElement.tagName.toLowerCase() === 'svg') { const svgText = new XMLSerializer().serializeToString(document.documentElement); base64Data = window.btoa(unescape(encodeURIComponent(svgText))); } return base64Data; })();";
-                        string scriptResult = await worker.CoreWebView2.ExecuteScriptAsync(script);
+                    string scriptToExecute = (extension == ".svg") ? svgScript : rasterImageScript;
 
-                        tcs.TrySetResult(
-                            string.IsNullOrEmpty(scriptResult) || scriptResult == "null"
-                                ? null
-                                : JsonSerializer.Deserialize<string>(scriptResult)
-                        );
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine(
-                            $"[ImageDownloader] Failed for {imageUrl}. Reason: {ex.Message}"
-                        );
-                        tcs.TrySetResult(null);
-                    }
-                    finally
-                    {
-                        App.UIHost.Children.Remove(worker);
-                        worker.Close();
-                    }
+                    string scriptResult = await worker.CoreWebView2.ExecuteScriptAsync(scriptToExecute);
+                    tcs.TrySetResult(string.IsNullOrEmpty(scriptResult) || scriptResult == "null" ? null : JsonSerializer.Deserialize<string>(scriptResult));
                 }
-            );
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[ImageDownloader] Failed for {imageUrl}. Reason: {ex.Message}");
+                    tcs.TrySetResult(null);
+                }
+                finally
+                {
+                    App.UIHost.Children.Remove(worker);
+                    worker.Close();
+                }
+            });
 
             base64Data = await tcs.Task;
 
-            if (string.IsNullOrEmpty(base64Data))
-                return null;
+            if (string.IsNullOrEmpty(base64Data)) return null;
 
-            var newFile = await imageCacheFolder.CreateFileAsync(
-                fileName,
-                CreationCollisionOption.ReplaceExisting
-            );
+            var newFile = await imageCacheFolder.CreateFileAsync(fileName, CreationCollisionOption.ReplaceExisting);
             var bytes = Convert.FromBase64String(base64Data);
             await FileIO.WriteBytesAsync(newFile, bytes);
 
             return $"/cache/{fileName}";
         }
 
-        public static async Task<DateTime?> FetchLastUpdatedTimestampAsync(
-            string pageTitle,
-            WebView2 worker
-        )
+        public static async Task<DateTime?> FetchLastUpdatedTimestampAsync(string pageTitle, WebView2 worker)
         {
-            if (
-                string.IsNullOrEmpty(pageTitle)
-                || pageTitle.Equals("random", StringComparison.OrdinalIgnoreCase)
-            )
-                return null;
-            string url =
-                $"{ApiBaseUrl}?action=query&prop=revisions&titles={Uri.EscapeDataString(pageTitle)}&rvprop=timestamp&rvlimit=1&format=json";
+            if (string.IsNullOrEmpty(pageTitle) || pageTitle.Equals("random", StringComparison.OrdinalIgnoreCase)) return null;
+            string url = $"{ApiBaseUrl}?action=query&prop=revisions&titles={Uri.EscapeDataString(pageTitle)}&rvprop=timestamp&rvlimit=1&format=json";
             try
             {
                 string json = await ApiRequestService.GetJsonFromApiAsync(url, worker);
                 var response = JsonSerializer.Deserialize<TimestampQueryResponse>(json);
-                return response
-                    ?.query?.pages?.Values.FirstOrDefault()
-                    ?.Revisions?.FirstOrDefault()
-                    ?.Timestamp;
+                return response?.query?.pages?.Values.FirstOrDefault()?.Revisions?.FirstOrDefault()?.Timestamp;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine(
-                    $"[PROCESSOR] Failed to get timestamp for '{pageTitle}': {ex.Message}"
-                );
+                Debug.WriteLine($"[PROCESSOR] Failed to get timestamp for '{pageTitle}': {ex.Message}");
                 return null;
+            }
+        }
+
+        public static async Task<bool> PageExistsAsync(string pageTitle, WebView2 worker)
+        {
+            if (string.IsNullOrEmpty(pageTitle)) return false;
+
+            var workerToUse = worker ?? MainPage.ApiWorker;
+            var escapedTitle = Uri.EscapeDataString(pageTitle);
+            var url = $"{ApiBaseUrl}?action=query&titles={escapedTitle}&format=json";
+
+            try
+            {
+                string json = await ApiRequestService.GetJsonFromApiAsync(url, workerToUse);
+                if (string.IsNullOrEmpty(json)) return false;
+
+                using (var doc = JsonDocument.Parse(json))
+                {
+                    var pages = doc.RootElement.GetProperty("query").GetProperty("pages");
+                    var firstPage = pages.EnumerateObject().FirstOrDefault();
+                    if (firstPage.Value.TryGetProperty("missing", out _))
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[PROCESSOR] PageExistsAsync check failed for '{pageTitle}': {ex.Message}");
+                return true;
             }
         }
 
@@ -474,27 +310,28 @@ namespace _1809_UWP
         {
             string cssVariables = isDarkTheme
                 ? @":root {
---text-primary: #FFFFFF; --text-secondary: #C3C3C3; --link-color: #85B9F3; --card-shadow: rgba(0, 0, 0, 0.4);
---card-background: rgba(44, 44, 44, 0.7); --card-border: rgba(255, 255, 255, 0.1); --card-header-background: rgba(255, 255, 255, 0.08);
---item-hover-background: rgba(255, 255, 255, 0.07); --table-row-divider: rgba(255, 255, 255, 0.08);
---legend-unsupported-tint: linear-gradient(rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.15));
---legend-supported-tint: linear-gradient(rgba(234, 179, 8, 0.15), rgba(234, 179, 8, 0.15));
---legend-latest-tint: linear-gradient(rgba(34, 197, 94, 0.15), rgba(34, 197, 94, 0.15));
---legend-preview-tint: linear-gradient(rgba(249, 115, 22, 0.15), rgba(249, 115, 22, 0.15));
---legend-future-tint: linear-gradient(rgba(59, 130, 246, 0.15), rgba(59, 130, 246, 0.15));
---legend-na-tint: linear-gradient(rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.04));
+    --text-primary: #FFFFFF; --text-secondary: #C3C3C3; --link-color: #85B9F3; --card-shadow: rgba(0, 0, 0, 0.4);
+    --card-background: rgba(44, 44, 44, 0.7); --card-border: rgba(255, 255, 255, 0.1); --card-header-background: rgba(255, 255, 255, 0.08);
+    --item-hover-background: rgba(255, 255, 255, 0.07); --table-row-divider: rgba(255, 255, 255, 0.08);
+    --legend-unsupported-tint: linear-gradient(rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.15));
+    --legend-supported-tint: linear-gradient(rgba(234, 179, 8, 0.15), rgba(234, 179, 8, 0.15));
+    --legend-latest-tint: linear-gradient(rgba(34, 197, 94, 0.15), rgba(34, 197, 94, 0.15));
+    --legend-preview-tint: linear-gradient(rgba(249, 115, 22, 0.15), rgba(249, 115, 22, 0.15));
+    --legend-future-tint: linear-gradient(rgba(59, 130, 246, 0.15), rgba(59, 130, 246, 0.15));
+    --legend-na-tint: linear-gradient(rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.04));
 }"
                 : @":root {
---text-primary: #000000; --text-secondary: #505050; --link-color: #0066CC; --card-shadow: rgba(0, 0, 0, 0.13);
---card-background: rgba(249, 249, 249, 0.7); --card-border: rgba(0, 0, 0, 0.1); --card-header-background: rgba(0, 0, 0, 0.05);
---item-hover-background: rgba(0, 0, 0, 0.05); --table-row-divider: rgba(0, 0, 0, 0.08);
---legend-unsupported-tint: linear-gradient(rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.1));
---legend-supported-tint: linear-gradient(rgba(234, 179, 8, 0.1), rgba(234, 179, 8, 0.1));
---legend-latest-tint: linear-gradient(rgba(34, 197, 94, 0.1), rgba(34, 197, 94, 0.1));
---legend-preview-tint: linear-gradient(rgba(249, 115, 22, 0.1), rgba(249, 115, 22, 0.1));
---legend-future-tint: linear-gradient(rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.1));
---legend-na-tint: linear-gradient(rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.04));
+    --text-primary: #000000; --text-secondary: #505050; --link-color: #0066CC; --card-shadow: rgba(0, 0, 0, 0.13);
+    --card-background: rgba(249, 249, 249, 0.7); --card-border: rgba(0, 0, 0, 0.1); --card-header-background: rgba(0, 0, 0, 0.05);
+    --item-hover-background: rgba(0, 0, 0, 0.05); --table-row-divider: rgba(0, 0, 0, 0.08);
+    --legend-unsupported-tint: linear-gradient(rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.1));
+    --legend-supported-tint: linear-gradient(rgba(234, 179, 8, 0.1), rgba(234, 179, 8, 0.1));
+    --legend-latest-tint: linear-gradient(rgba(34, 197, 94, 0.1), rgba(34, 197, 94, 0.1));
+    --legend-preview-tint: linear-gradient(rgba(249, 115, 22, 0.1), rgba(249, 115, 22, 0.1));
+    --legend-future-tint: linear-gradient(rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.1));
+    --legend-na-tint: linear-gradient(rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.04));
 }";
+
             return $@"<style>
 {cssVariables}
 html, body {{ background-color: transparent !important; color: var(--text-primary); font-family: 'Segoe UI Variable', 'Segoe UI', sans-serif; margin: 0; padding: 0; font-size: 15px; -webkit-font-smoothing: antialiased; }}
