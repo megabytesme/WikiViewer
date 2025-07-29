@@ -58,7 +58,7 @@ namespace _1809_UWP
 
         private void SignInButton_Click(object sender, RoutedEventArgs e)
         {
-            (Window.Current.Content as Frame)?.Navigate(typeof(LoginPage));
+            this.Frame.Navigate(typeof(LoginPage));
         }
 
         private void CachingToggle_Toggled(object sender, RoutedEventArgs e)

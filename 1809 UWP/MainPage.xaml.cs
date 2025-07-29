@@ -28,7 +28,7 @@ namespace _1809_UWP
     public sealed partial class MainPage : Page
     {
         private CancellationTokenSource _suggestionCts;
-        private readonly ConcurrentQueue<WebView2> _workerPool = new ConcurrentQueue<WebView2>();
+        public static WebView2 ApiWorker { get; private set; }
 
         public MainPage()
         {
@@ -41,24 +41,16 @@ namespace _1809_UWP
             this.Loaded += MainPage_Loaded;
         }
 
-        private async Task<WebView2> GetWebViewWorkerAsync()
-        {
-            if (_workerPool.TryDequeue(out var webView)) { return webView; }
-            var newWebView = new WebView2();
-            WorkerWebViewHost.Children.Add(newWebView);
-            await newWebView.EnsureCoreWebView2Async();
-            return newWebView;
-        }
-
-        private void ReturnWebViewWorker(WebView2 worker)
-        {
-            if (worker != null) _workerPool.Enqueue(worker);
-        }
-
         private async void MainPage_Loaded(object sender, RoutedEventArgs e)
         {
+            if (ApiWorker == null)
+            {
+                ApiWorker = new WebView2();
+                WorkerWebViewHost.Children.Add(ApiWorker);
+                await ApiWorker.EnsureCoreWebView2Async();
+            }
+
             await CheckAndShowFirstRunDisclaimerAsync();
-            await InitializeApiWebViewAsync();
             bool loggedIn = await TryAutoLoginAsync();
         }
 
@@ -148,28 +140,26 @@ namespace _1809_UWP
             });
         }
 
-        private async Task InitializeApiWebViewAsync()
+        private void OnNavigationRequested(Type sourcePageType, object parameter)
         {
-            try
+            _ = Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
             {
-                await ApiFetchWebView.EnsureCoreWebView2Async();
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Failed to initialize API WebView: {ex.Message}");
-            }
+                ContentFrame.Navigate(sourcePageType, parameter);
+            });
         }
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
             SystemNavigationManager.GetForCurrentView().BackRequested += System_BackRequested;
+            App.RequestNavigation += OnNavigationRequested;
         }
 
         protected override void OnNavigatedFrom(NavigationEventArgs e)
         {
             base.OnNavigatedFrom(e);
             SystemNavigationManager.GetForCurrentView().BackRequested -= System_BackRequested;
+            App.RequestNavigation -= OnNavigationRequested;
         }
 
         private void ApplyBackdropOrAcrylic()
@@ -297,7 +287,7 @@ namespace _1809_UWP
                 await Task.Delay(300, token);
                 string url = $"https://betawiki.net/api.php?action=opensearch&format=json&limit=10&search={Uri.EscapeDataString(query)}";
 
-                string json = await ApiRequestService.GetJsonFromApiAsync(url);
+                string json = await ApiRequestService.GetJsonFromApiAsync(url, ApiWorker);
 
                 if (token.IsCancellationRequested) return;
 

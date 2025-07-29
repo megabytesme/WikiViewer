@@ -71,8 +71,6 @@
                           Click="ShareButton_Click"/>
         </CommandBar>
 
-        <Grid x:Name="WorkerWebViewHost" Visibility="Collapsed"/>
-
         <Grid x:Name="LoadingOverlay" 
               Opacity="0" 
               IsHitTestVisible="False" 

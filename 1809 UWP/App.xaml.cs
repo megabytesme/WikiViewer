@@ -24,6 +24,11 @@ namespace _1809_UWP
     sealed partial class App : Application
     {
         public static Panel UIHost { get; set; }
+        public static event Action<Type, object> RequestNavigation;
+        public static void Navigate(Type sourcePageType, object parameter)
+        {
+            RequestNavigation?.Invoke(sourcePageType, parameter);
+        }
 
         /// <summary>
         /// Initializes the singleton application object.  This is the first line of authored code

@@ -16,75 +16,51 @@ namespace _1809_UWP
 {
     public static class ApiRequestService
     {
-        private static async Task<string> GetContentFromUrlCore(string url, Func<string, string> validationLogic, WebView2 existingWorker = null)
+        private static async Task<string> GetContentFromUrlCore(string url, Func<string, string> validationLogic, WebView2 worker)
         {
-            WebView2 worker = null;
-            bool isTemporaryWorker = false;
-
             return await CoreApplication.MainView.CoreWindow.Dispatcher.RunTaskAsync(async () =>
             {
-                try
+                await worker.EnsureCoreWebView2Async();
+                if (worker.CoreWebView2 == null) throw new InvalidOperationException("CoreWebView2 could not be initialized.");
+
+                var navCompleteTcs = new TaskCompletionSource<bool>();
+                TypedEventHandler<CoreWebView2, CoreWebView2NavigationCompletedEventArgs> navHandler = null;
+                navHandler = (s, e) =>
                 {
-                    if (existingWorker != null)
-                    {
-                        worker = existingWorker;
-                    }
-                    else
-                    {
-                        if (App.UIHost == null)
-                            throw new InvalidOperationException("App.UIHost is not available.");
-                        worker = new WebView2();
-                        App.UIHost.Children.Add(worker);
-                        isTemporaryWorker = true;
-                    }
+                    s.NavigationCompleted -= navHandler;
+                    navCompleteTcs.TrySetResult(e.IsSuccess);
+                };
+                worker.CoreWebView2.NavigationCompleted += navHandler;
 
-                    await worker.EnsureCoreWebView2Async();
-                    if (worker.CoreWebView2 == null) throw new InvalidOperationException("CoreWebView2 could not be initialized.");
+                worker.CoreWebView2.Navigate(url);
 
-                    var navCompleteTcs = new TaskCompletionSource<bool>();
-                    TypedEventHandler<CoreWebView2, CoreWebView2NavigationCompletedEventArgs> navHandler = null;
-                    navHandler = (s, e) =>
-                    {
-                        s.NavigationCompleted -= navHandler;
-                        navCompleteTcs.TrySetResult(e.IsSuccess);
-                    };
-                    worker.CoreWebView2.NavigationCompleted += navHandler;
-
-                    worker.CoreWebView2.Navigate(url);
-
-                    await navCompleteTcs.Task;
-
-                    var stopwatch = Stopwatch.StartNew();
-                    while (stopwatch.Elapsed.TotalSeconds < 15)
-                    {
-                        await Task.Delay(250);
-
-                        string scriptResult = await worker.CoreWebView2.ExecuteScriptAsync("document.documentElement.outerHTML");
-                        if (string.IsNullOrEmpty(scriptResult)) continue;
-
-                        string fullHtml = JsonSerializer.Deserialize<string>(scriptResult);
-                        if (string.IsNullOrEmpty(fullHtml)) continue;
-
-                        if (fullHtml.Contains("g-recaptcha"))
-                            throw new NeedsUserVerificationException("Interactive user verification required.", url);
-                        if (fullHtml.Contains("Verifying you are human")) continue;
-
-                        string extractedContent = validationLogic(fullHtml);
-                        if (extractedContent != null)
-                        {
-                            return extractedContent;
-                        }
-                    }
-                    throw new TimeoutException($"Content validation timed out for GET URL: {url}");
+                if (!await navCompleteTcs.Task)
+                {
+                    throw new Exception($"Navigation failed for URL {url}");
                 }
-                finally
+
+                var stopwatch = Stopwatch.StartNew();
+                while (stopwatch.Elapsed.TotalSeconds < 15)
                 {
-                    if (worker != null && isTemporaryWorker)
+                    await Task.Delay(250);
+
+                    string scriptResult = await worker.CoreWebView2.ExecuteScriptAsync("document.documentElement.outerHTML");
+                    if (string.IsNullOrEmpty(scriptResult)) continue;
+
+                    string fullHtml = JsonSerializer.Deserialize<string>(scriptResult);
+                    if (string.IsNullOrEmpty(fullHtml)) continue;
+
+                    if (fullHtml.Contains("g-recaptcha"))
+                        throw new NeedsUserVerificationException("Interactive user verification required.", url);
+                    if (fullHtml.Contains("Verifying you are human")) continue;
+
+                    string extractedContent = validationLogic(fullHtml);
+                    if (extractedContent != null)
                     {
-                        App.UIHost?.Children.Remove(worker);
-                        worker.Close();
+                        return extractedContent;
                     }
                 }
+                throw new TimeoutException($"Content validation timed out for GET URL: {url}");
             });
         }
 
@@ -131,16 +107,16 @@ namespace _1809_UWP
             });
         }
 
-        public static Task<string> GetRawHtmlFromUrlAsync(string url, WebView2 existingWorker = null)
+        public static Task<string> GetRawHtmlFromUrlAsync(string url, WebView2 worker)
         {
             return GetContentFromUrlCore(
                 url,
                 (fullHtml) => !string.IsNullOrEmpty(fullHtml) ? fullHtml : null,
-                existingWorker
+                worker
             );
         }
 
-        public static Task<string> GetJsonFromApiAsync(string url, WebView2 persistentWorker = null)
+        public static Task<string> GetJsonFromApiAsync(string url, WebView2 worker)
         {
             return GetContentFromUrlCore(
                 url,
@@ -155,7 +131,7 @@ namespace _1809_UWP
                         return json.Trim();
                     return null;
                 },
-                persistentWorker
+                worker
             );
         }
     }

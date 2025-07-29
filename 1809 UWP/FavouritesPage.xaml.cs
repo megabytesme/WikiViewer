@@ -1,4 +1,5 @@
 ﻿using HtmlAgilityPack;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -35,6 +36,23 @@ namespace _1809_UWP
             base.OnNavigatedFrom(e);
             FavouritesService.FavouritesChanged -= OnFavouritesChanged;
             BackgroundCacheService.ArticleCached -= OnArticleCached;
+        }
+
+        private void ShowLoadingOverlay()
+        {
+            LoadingOverlay.IsHitTestVisible = true;
+            FadeInAnimation.Begin();
+        }
+
+        private void HideLoadingOverlay()
+        {
+            void onAnimationCompleted(object s, object e)
+            {
+                LoadingOverlay.IsHitTestVisible = false;
+                FadeOutAnimation.Completed -= onAnimationCompleted;
+            }
+            FadeOutAnimation.Completed += onAnimationCompleted;
+            FadeOutAnimation.Begin();
         }
 
         private async void OnArticleCached(object sender, ArticleCachedEventArgs e)
@@ -144,25 +162,79 @@ namespace _1809_UWP
             }
         }
 
+        private async void NavigateToArticleIfItExists(string pageTitle)
+        {
+            ShowLoadingOverlay();
+
+            try
+            {
+                var worker = MainPage.ApiWorker;
+                bool pageExists = await ArticleProcessingService.PageExistsAsync(pageTitle, worker);
+
+                if (pageExists)
+                {
+                    App.Navigate(typeof(ArticleViewerPage), pageTitle);
+                }
+                else
+                {
+                    var dialog = new ContentDialog
+                    {
+                        Title = "Page Does Not Exist",
+                        Content = $"The page \"{pageTitle.Replace('_', ' ')}\" has not been created yet. Would you like to create it?",
+                        PrimaryButtonText = "Create",
+                        CloseButtonText = "Cancel"
+                    };
+
+                    var result = await dialog.ShowAsync();
+
+                    if (result == ContentDialogResult.Primary)
+                    {
+                        if (!AuthService.IsLoggedIn)
+                        {
+                            var loginDialog = new ContentDialog
+                            {
+                                Title = "Login Required",
+                                Content = "You must be logged in to create or edit pages.",
+                                CloseButtonText = "OK"
+                            };
+                            await loginDialog.ShowAsync();
+                        }
+                        else
+                        {
+                            App.Navigate(typeof(EditPage), pageTitle);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                var errorDialog = new ContentDialog
+                {
+                    Title = "An Error Occurred",
+                    Content = $"Could not verify the page's status. Please try again.\n\nError: {ex.Message}",
+                    CloseButtonText = "OK"
+                };
+                await errorDialog.ShowAsync();
+            }
+            finally
+            {
+                HideLoadingOverlay();
+            }
+        }
+
         private void ArticleButton_Click(object sender, RoutedEventArgs e)
         {
-            if ((sender as FrameworkElement)?.Tag is FavouriteItem item)
+            if ((sender as FrameworkElement)?.Tag is FavouriteItem item && item.IsArticleAvailable)
             {
-                (Window.Current.Content as Frame)?.Navigate(
-                    typeof(ArticleViewerPage),
-                    item.ArticlePageTitle
-                );
+                NavigateToArticleIfItExists(item.ArticlePageTitle);
             }
         }
 
         private void TalkButton_Click(object sender, RoutedEventArgs e)
         {
-            if ((sender as FrameworkElement)?.Tag is FavouriteItem item)
+            if ((sender as FrameworkElement)?.Tag is FavouriteItem item && item.IsTalkAvailable)
             {
-                (Window.Current.Content as Frame)?.Navigate(
-                    typeof(ArticleViewerPage),
-                    item.TalkPageTitle
-                );
+                NavigateToArticleIfItExists(item.TalkPageTitle);
             }
         }
 

@@ -22,11 +22,13 @@ namespace _1809_UWP
         private readonly Stack<string> _articleHistory = new Stack<string>();
         private double _titleBarHeight = 0;
         public bool CanGoBackInPage => _articleHistory.Count > 1;
+        private readonly TypedEventHandler<FrameworkElement, object> _themeChangedHandler;
 
         public ArticleViewerPage()
         {
             this.InitializeComponent();
-            this.ActualThemeChanged += (s, e) => ApplyAcrylicToTitleBar();
+            _themeChangedHandler = (s, e) => ApplyAcrylicToTitleBar();
+            this.ActualThemeChanged += _themeChangedHandler;
             AuthService.AuthenticationStateChanged += OnAuthenticationStateChanged;
         }
 
@@ -71,7 +73,7 @@ namespace _1809_UWP
             try
             {
                 Environment.SetEnvironmentVariable("WEBVIEW2_DEFAULT_BACKGROUND_COLOR", "00FFFFFF");
-                await VerificationWebView.EnsureCoreWebView2Async();
+
                 await ArticleDisplayWebView.EnsureCoreWebView2Async();
 
                 var tempFolder = ApplicationData.Current.LocalFolder.Path;
@@ -105,7 +107,8 @@ namespace _1809_UWP
         {
             DataTransferManager.GetForCurrentView().DataRequested -= OnDataRequested;
             AuthService.AuthenticationStateChanged -= OnAuthenticationStateChanged;
-            this.ActualThemeChanged -= (s, ev) => ApplyAcrylicToTitleBar();
+            this.ActualThemeChanged -= _themeChangedHandler;
+
             if (ArticleDisplayWebView?.CoreWebView2 != null)
             {
                 ArticleDisplayWebView.CoreWebView2.NavigationCompleted -=
@@ -114,7 +117,13 @@ namespace _1809_UWP
                     ArticleDisplayWebView_NavigationStarting;
             }
             ArticleDisplayWebView?.Close();
-            VerificationWebView?.Close();
+
+            if (VerificationWebView?.CoreWebView2 != null)
+            {
+                VerificationWebView.Close();
+            }
+
+            this.Unloaded -= ArticleViewerPage_Unloaded;
         }
 
         private async void StartArticleFetch()
@@ -131,7 +140,10 @@ namespace _1809_UWP
 
             try
             {
-                var (processedHtml, resolvedTitle) = await ArticleProcessingService.FetchAndCacheArticleAsync(_pageTitleToFetch, fetchStopwatch);
+                // Use the authenticated worker if we are logged in, otherwise use the main one.
+                var worker = MainPage.ApiWorker;
+
+                var (processedHtml, resolvedTitle) = await ArticleProcessingService.FetchAndCacheArticleAsync(_pageTitleToFetch, fetchStopwatch, false, worker);
 
                 if (_pageTitleToFetch.Equals("random", StringComparison.OrdinalIgnoreCase))
                 {
@@ -143,9 +155,7 @@ namespace _1809_UWP
 
                 await DisplayProcessedHtml(processedHtml);
 
-                var lastUpdated = await ArticleProcessingService.FetchLastUpdatedTimestampAsync(
-                    _pageTitleToFetch
-                );
+                var lastUpdated = await ArticleProcessingService.FetchLastUpdatedTimestampAsync(_pageTitleToFetch, worker);
                 if (lastUpdated.HasValue)
                 {
                     LastUpdatedText.Text = $"Last updated: {lastUpdated.Value.ToLocalTime():g}";
@@ -371,10 +381,13 @@ namespace _1809_UWP
             }
         }
 
-        private void ShowVerificationPanelAndRetry(string url)
+        private async void ShowVerificationPanelAndRetry(string url)
         {
             HideLoadingOverlay();
             VerificationPanel.Visibility = Visibility.Visible;
+
+            await VerificationWebView.EnsureCoreWebView2Async();
+
             TypedEventHandler<
                 CoreWebView2,
                 CoreWebView2NavigationCompletedEventArgs

@@ -5,6 +5,29 @@
     xmlns:local="using:_1809_UWP"
     Background="Transparent">
 
+    <Page.Resources>
+        <AcrylicBrush x:Key="TransparentAcrylic"
+                      BackgroundSource="Backdrop"
+                      TintColor="{ThemeResource SystemAltHighColor}"
+                      TintOpacity="0.4"
+                      FallbackColor="{ThemeResource SystemAltHighColor}"/>
+
+        <Storyboard x:Name="FadeInAnimation">
+            <DoubleAnimation
+                Storyboard.TargetName="LoadingOverlay"
+                Storyboard.TargetProperty="Opacity"
+                From="0" To="1" Duration="0:0:0.250"
+                EnableDependentAnimation="True"/>
+        </Storyboard>
+        <Storyboard x:Name="FadeOutAnimation">
+            <DoubleAnimation
+                Storyboard.TargetName="LoadingOverlay"
+                Storyboard.TargetProperty="Opacity"
+                From="1" To="0" Duration="0:0:0.350"
+                EnableDependentAnimation="True"/>
+        </Storyboard>
+    </Page.Resources>
+    
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -93,5 +116,15 @@
                           Label="Delete" 
                           Click="DeleteButton_Click"/>
         </CommandBar>
+
+        <Grid x:Name="LoadingOverlay" 
+              Opacity="0" 
+              IsHitTestVisible="False" 
+              Grid.RowSpan="3"
+              Background="{StaticResource TransparentAcrylic}">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
+                <ProgressRing IsActive="True" Width="60" Height="60"/>
+            </StackPanel>
+        </Grid>
     </Grid>
 </Page>
