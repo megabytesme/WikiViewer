@@ -83,22 +83,65 @@ namespace _1809_UWP
 
         public static bool IsFavourite(string pageTitle)
         {
+            if (_Favourites == null) return false;
             return _Favourites.Contains(pageTitle.Replace('_', ' '));
+        }
+
+        private static List<string> GetAssociatedTitles(string pageTitle)
+        {
+            var titles = new HashSet<string>();
+            string normalizedTitle = pageTitle.Replace('_', ' ');
+
+            if (normalizedTitle.StartsWith("Talk:"))
+            {
+                string baseTitle = normalizedTitle.Substring("Talk:".Length);
+                titles.Add(baseTitle);
+                titles.Add(normalizedTitle);
+            }
+            else if (normalizedTitle.StartsWith("User talk:"))
+            {
+                string baseTitle = normalizedTitle.Substring("User talk:".Length);
+                titles.Add($"User:{baseTitle}");
+                titles.Add(normalizedTitle);
+            }
+            else if (normalizedTitle.StartsWith("User:"))
+            {
+                string baseTitle = normalizedTitle.Substring("User:".Length);
+                titles.Add(normalizedTitle);
+                titles.Add($"User talk:{baseTitle}");
+            }
+            else
+            {
+                titles.Add(normalizedTitle);
+                titles.Add($"Talk:{normalizedTitle}");
+            }
+            return titles.ToList();
         }
 
         public static async Task AddFavoriteAsync(string pageTitle)
         {
-            var cleanTitle = pageTitle.Replace('_', ' ');
-            if (_Favourites.Add(cleanTitle))
+            var associatedTitles = GetAssociatedTitles(pageTitle);
+            bool wasChanged = false;
+
+            foreach (var title in associatedTitles)
+            {
+                if (_Favourites.Add(title))
+                {
+                    wasChanged = true;
+                    if (!AuthService.IsLoggedIn)
+                    {
+                        _pendingDeletes.Remove(title);
+                        _pendingAdds.Add(title);
+                    }
+                }
+            }
+
+            if (wasChanged)
             {
                 if (AuthService.IsLoggedIn)
                 {
-                    await AuthService.SyncSingleFavoriteToServerAsync(cleanTitle, add: true);
-                }
-                else
-                {
-                    _pendingDeletes.Remove(cleanTitle);
-                    _pendingAdds.Add(cleanTitle);
+                    var primaryTitle = associatedTitles.First(t => !t.StartsWith("Talk:") && !t.StartsWith("User talk:"));
+                    await AuthService.SyncSingleFavoriteToServerAsync(primaryTitle, add: true);
                 }
                 await SaveAsync();
             }
@@ -106,17 +149,27 @@ namespace _1809_UWP
 
         public static async Task RemoveFavoriteAsync(string pageTitle)
         {
-            var cleanTitle = pageTitle.Replace('_', ' ');
-            if (_Favourites.Remove(cleanTitle))
+            var associatedTitles = GetAssociatedTitles(pageTitle);
+            bool wasChanged = false;
+
+            foreach (var title in associatedTitles)
+            {
+                if (_Favourites.Remove(title))
+                {
+                    wasChanged = true;
+                    if (!AuthService.IsLoggedIn)
+                    {
+                        _pendingAdds.Remove(title);
+                        _pendingDeletes.Add(title);
+                    }
+                }
+            }
+
+            if (wasChanged)
             {
                 if (AuthService.IsLoggedIn)
                 {
-                    await AuthService.SyncSingleFavoriteToServerAsync(cleanTitle, add: false);
-                }
-                else
-                {
-                    _pendingAdds.Remove(cleanTitle);
-                    _pendingDeletes.Add(cleanTitle);
+                    await AuthService.SyncMultipleFavouritesToServerAsync(associatedTitles, add: false);
                 }
                 await SaveAsync();
             }

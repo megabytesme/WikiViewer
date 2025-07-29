@@ -1,12 +1,18 @@
 ﻿using Microsoft.UI.Xaml.Controls;
+using Microsoft.Web.WebView2.Core;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Net.Http;
+using System.Runtime.InteropServices.WindowsRuntime;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Windows.ApplicationModel.Core;
+using Windows.Foundation;
+using Windows.Storage.Streams;
 using Windows.UI;
 using Windows.UI.Core;
 using Windows.UI.ViewManagement;
@@ -22,55 +28,68 @@ namespace _1809_UWP
     public sealed partial class MainPage : Page
     {
         private CancellationTokenSource _suggestionCts;
-        public WebView2 PublicApiWebView => ApiFetchWebView;
+        private readonly ConcurrentQueue<WebView2> _workerPool = new ConcurrentQueue<WebView2>();
 
         public MainPage()
         {
             this.InitializeComponent();
+            App.UIHost = this.WorkerWebViewHost;
             ApplyBackdropOrAcrylic();
             SetupTitleBar();
-            _ = InitializeApiWebViewAsync();
             AuthService.AuthenticationStateChanged += AuthService_AuthenticationStateChanged;
             this.Unloaded += (s, e) => { AuthService.AuthenticationStateChanged -= AuthService_AuthenticationStateChanged; };
             this.Loaded += MainPage_Loaded;
         }
 
+        private async Task<WebView2> GetWebViewWorkerAsync()
+        {
+            if (_workerPool.TryDequeue(out var webView)) { return webView; }
+            var newWebView = new WebView2();
+            WorkerWebViewHost.Children.Add(newWebView);
+            await newWebView.EnsureCoreWebView2Async();
+            return newWebView;
+        }
+
+        private void ReturnWebViewWorker(WebView2 worker)
+        {
+            if (worker != null) _workerPool.Enqueue(worker);
+        }
+
         private async void MainPage_Loaded(object sender, RoutedEventArgs e)
         {
             await CheckAndShowFirstRunDisclaimerAsync();
-            while (!WebViewApiService.IsInitialized)
-            {
-                await Task.Delay(100);
-            }
-            await TryAutoLoginAsync();
+            await InitializeApiWebViewAsync();
+            bool loggedIn = await TryAutoLoginAsync();
         }
 
-        private async Task TryAutoLoginAsync()
+        private async Task<bool> TryAutoLoginAsync()
         {
             Debug.WriteLine("[MainPage] Attempting to auto-login...");
             var savedCreds = CredentialService.LoadCredentials();
-
             if (savedCreds != null)
             {
                 Debug.WriteLine($"[MainPage] Found saved credentials for user: {savedCreds.Username}.");
                 LoginNavItem.Content = "Signing in...";
-
                 try
                 {
                     await AuthService.PerformLoginAsync(savedCreds.Username, savedCreds.Password);
                     Debug.WriteLine("[MainPage] Auto-login successful.");
+
+                    return true;
                 }
                 catch (Exception ex)
                 {
                     Debug.WriteLine($"[MainPage] Auto-login failed: {ex.Message}");
                     CredentialService.ClearCredentials();
                     AuthService_AuthenticationStateChanged(null, null);
+                    return false;
                 }
             }
             else
             {
                 Debug.WriteLine("[MainPage] No saved credentials found.");
             }
+            return false;
         }
 
         private async Task CheckAndShowFirstRunDisclaimerAsync()
@@ -134,11 +153,10 @@ namespace _1809_UWP
             try
             {
                 await ApiFetchWebView.EnsureCoreWebView2Async();
-                WebViewApiService.Initialize(ApiFetchWebView);
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Failed to initialize API WebView: {ex.Message}");
+                Debug.WriteLine($"Failed to initialize API WebView: {ex.Message}");
             }
         }
 
@@ -279,45 +297,14 @@ namespace _1809_UWP
                 await Task.Delay(300, token);
                 string url = $"https://betawiki.net/api.php?action=opensearch&format=json&limit=10&search={Uri.EscapeDataString(query)}";
 
-                await WebViewApiService.NavigateAsync(url);
-                var webView = WebViewApiService.GetWebView();
-                string json = null;
+                string json = await ApiRequestService.GetJsonFromApiAsync(url);
 
-                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-                while (stopwatch.Elapsed.TotalSeconds < 10)
-                {
-                    if (token.IsCancellationRequested) throw new TaskCanceledException();
+                if (token.IsCancellationRequested) return;
 
-                    string html = await webView.ExecuteScriptAsync("document.documentElement.outerHTML");
-                    string fullHtml = JsonSerializer.Deserialize<string>(html ?? "null");
-
-                    if (!string.IsNullOrEmpty(fullHtml))
-                    {
-                        if (fullHtml.Contains("Verifying you are human") || fullHtml.Contains("checking your browser"))
-                        {
-                            await Task.Delay(500, token);
-                            continue;
-                        }
-
-                        var doc = new HtmlAgilityPack.HtmlDocument();
-                        doc.LoadHtml(fullHtml);
-                        string text = doc.DocumentNode.SelectSingleNode("//body/pre")?.InnerText ?? doc.DocumentNode.InnerText;
-
-                        if (!string.IsNullOrEmpty(text) && text.Trim().StartsWith("["))
-                        {
-                            json = text.Trim();
-                            break;
-                        }
-                    }
-                    await Task.Delay(500, token);
-                }
-
-                if (json == null)
+                if (string.IsNullOrEmpty(json))
                 {
                     throw new Exception("Failed to retrieve valid search suggestions.");
                 }
-
-                if (token.IsCancellationRequested) return;
 
                 using (JsonDocument doc = JsonDocument.Parse(json))
                 {
@@ -333,8 +320,10 @@ namespace _1809_UWP
                     }
                 }
             }
-            catch (TaskCanceledException)
+            catch (TaskCanceledException) { }
+            catch (NeedsUserVerificationException)
             {
+                sender.ItemsSource = null;
             }
             catch (Exception ex)
             {

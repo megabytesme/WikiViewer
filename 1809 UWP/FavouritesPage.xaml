@@ -41,8 +41,12 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
-                        <Rectangle Fill="{ThemeResource SubtleFillColorTransparentBrush}" Grid.Row="0"/>
-
+                        <Rectangle Grid.Row="0">
+                            <Rectangle.Fill>
+                                <ImageBrush ImageSource="{x:Bind ImageUrl, Mode=OneWay, Converter={StaticResource GlobalUrlToImageConverter}}" Stretch="UniformToFill"/>
+                            </Rectangle.Fill>
+                        </Rectangle>
+                        
                         <StackPanel Grid.Row="1" Padding="12" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}">
                             <TextBlock Text="{x:Bind DisplayTitle}" 
                                        Style="{ThemeResource SubtitleTextBlockStyle}" 

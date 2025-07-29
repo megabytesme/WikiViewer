@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
 
 namespace _1809_UWP
@@ -144,7 +146,14 @@ namespace _1809_UWP
 
     public class WatchlistQueryResponse
     {
-        public WatchlistResult query { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("query")]
+        public WatchlistQuery query { get; set; }
+    }
+
+    public class WatchlistQuery
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("watchlistraw")]
+        public List<WatchlistItem> watchlistraw { get; set; }
     }
 
     public class WatchlistResult
@@ -206,8 +215,26 @@ namespace _1809_UWP
         public string WatchToken { get; set; }
     }
 
-    public class FavouriteItem
+    public class FavouriteItem : INotifyPropertyChanged
     {
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        private void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        private string _imageUrl;
+        public string ImageUrl
+        {
+            get => _imageUrl;
+            set
+            {
+                _imageUrl = value;
+                OnPropertyChanged();
+            }
+        }
+
         public string DisplayTitle { get; set; }
 
         public string ArticlePageTitle { get; set; }
@@ -215,13 +242,22 @@ namespace _1809_UWP
         public string TalkPageTitle { get; set; }
 
         public bool IsArticleAvailable => !string.IsNullOrEmpty(ArticlePageTitle);
-        public bool IsTalkAvailable => !string.IsNullOrEmpty(TalkPageTitle);
 
-        public string ImageUrl { get; set; }
+        public bool IsTalkAvailable => !string.IsNullOrEmpty(TalkPageTitle);
 
         public FavouriteItem(string baseTitle)
         {
             DisplayTitle = baseTitle;
+        }
+    }
+
+    public class ArticleCachedEventArgs : EventArgs
+    {
+        public string PageTitle { get; }
+
+        public ArticleCachedEventArgs(string pageTitle)
+        {
+            PageTitle = pageTitle;
         }
     }
 }

@@ -9,6 +9,7 @@
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
                 <ResourceDictionary>
                     <local:BooleanToVisibilityConverter x:Key="GlobalBoolToVisibility" />
+                    <local:StringUrlToImageSourceConverter x:Key="GlobalUrlToImageConverter" />
                 </ResourceDictionary>
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>

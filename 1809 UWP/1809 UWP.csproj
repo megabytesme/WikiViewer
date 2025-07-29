@@ -125,14 +125,18 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="ApiModels.cs" />
+    <Compile Include="ApiRequestService.cs" />
     <Compile Include="App.xaml.cs">
       <DependentUpon>App.xaml</DependentUpon>
     </Compile>
     <Compile Include="AppSettings.cs" />
+    <Compile Include="ArticleCacheManager.cs" />
+    <Compile Include="ArticleProcessingService.cs" />
     <Compile Include="ArticleViewerPage.xaml.cs">
       <DependentUpon>ArticleViewerPage.xaml</DependentUpon>
     </Compile>
     <Compile Include="AuthService.cs" />
+    <Compile Include="BackgroundCacheService.cs" />
     <Compile Include="BooleanToVisibilityConverter.cs" />
     <Compile Include="CredentialService.cs" />
     <Compile Include="EditPage.xaml.cs">
@@ -152,7 +156,7 @@
       <DependentUpon>MainPage.xaml</DependentUpon>
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="WebViewApiService.cs" />
+    <Compile Include="StringUrlToImageSourceConverter.cs" />
   </ItemGroup>
   <ItemGroup>
     <AppxManifest Include="Package.appxmanifest">

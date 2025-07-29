@@ -9,14 +9,7 @@ namespace _1809_UWP
         public LoginPage()
         {
             this.InitializeComponent();
-            this.Loaded += (s, e) =>
-            {
-                if (!WebViewApiService.IsInitialized)
-                {
-                    ErrorTextBlock.Text = "Critical Error: API Service could not be initialized.";
-                    LoginButton.IsEnabled = false;
-                }
-            };
+            this.Loaded += (s, e) => { };
         }
 
         private async void LoginButton_Click(object sender, RoutedEventArgs e)
@@ -30,19 +23,31 @@ namespace _1809_UWP
             if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
             {
                 ErrorTextBlock.Text = "Username and password are required.";
-                LoadingRing.IsActive = false; LoginButton.IsEnabled = true; return;
+                LoadingRing.IsActive = false;
+                LoginButton.IsEnabled = true;
+                return;
             }
 
             try
             {
                 await AuthService.PerformLoginAsync(username, password);
-                if (RememberMeCheckBox.IsChecked == true) { CredentialService.SaveCredentials(username, password); }
-                else { CredentialService.ClearCredentials(); }
-                if (this.Frame.CanGoBack) { this.Frame.GoBack(); }
+                if (RememberMeCheckBox.IsChecked == true)
+                {
+                    CredentialService.SaveCredentials(username, password);
+                }
+                else
+                {
+                    CredentialService.ClearCredentials();
+                }
+                if (this.Frame.CanGoBack)
+                {
+                    this.Frame.GoBack();
+                }
             }
             catch (NeedsUserVerificationException)
             {
-                ErrorTextBlock.Text = "Verification needed. Please go back and try another action first to solve the security check.";
+                ErrorTextBlock.Text =
+                    "Verification needed. Please go back and try another action first to solve the security check.";
             }
             catch (Exception ex)
             {
