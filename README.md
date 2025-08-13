@@ -4,6 +4,8 @@
 
 WikiBeta is an unofficial, third-party client for browsing the BetaWiki (not affiliated) without your web browser, online and offline (after caching).
 
+**Disclaimer:** This is an unofficial, third-party client for browsing BetaWiki. This app was created by [MegaBytesMe](https://github.com/megabytesme) and is not affiliated with, endorsed, or sponsored by the official BetaWiki team. All article data, content, and trademarks are the property of BetaWiki and its respective contributors. This app simply provides a native viewing experience for publicly available content. You can view the official BetaWiki here: [BetaWiki](https://betawiki.net/). For upmost clarity, this disclaimer is also presented within the app.
+
 ## Features
 
 - **Clean & Native Interface:** Enjoy a fast, fluid, and ad-free reading experience designed for Windows, free from the clutter of a standard web browser.
