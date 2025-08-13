@@ -125,6 +125,9 @@ namespace _1809_UWP
             SemaphoreSlim semaphore = null
         )
         {
+            long startTime = stopwatch.ElapsedMilliseconds;
+            Debug.WriteLine($"[PROCESSOR] Starting HTML processing at {startTime}ms.");
+
             var doc = new HtmlDocument();
             doc.LoadHtml(rawHtml);
             var contentNode =
@@ -147,9 +150,14 @@ namespace _1809_UWP
 
             string styleBlock = GetCssForTheme();
 
+            long endTime = stopwatch.ElapsedMilliseconds;
+            Debug.WriteLine(
+                $"[PROCESSOR] Finished HTML processing at {endTime}ms. Duration: {endTime - startTime}ms."
+            );
+
             return $@"
-            <!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>{styleBlock}</head>
-            <body><div class='mw-parser-output'>{contentNode.InnerHtml}</div></body></html>";
+    <!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>{styleBlock}</head>
+    <body><div class='mw-parser-output'>{contentNode.InnerHtml}</div></body></html>";
         }
 
         private static async Task ProcessImagesInDocument(
@@ -334,7 +342,10 @@ namespace _1809_UWP
                         else
                         {
                             var navTcs = new TaskCompletionSource<bool>();
-                            void navHandler(CoreWebView2 s, CoreWebView2NavigationCompletedEventArgs e)
+                            void navHandler(
+                                CoreWebView2 s,
+                                CoreWebView2NavigationCompletedEventArgs e
+                            )
                             {
                                 s.NavigationCompleted -= navHandler;
                                 navTcs.TrySetResult(e.IsSuccess);
