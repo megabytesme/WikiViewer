@@ -3,9 +3,9 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Text.Json;
 using System.Threading.Tasks;
 using Windows.Storage;
+using Newtonsoft.Json;
 
 public class ArticleCacheItem
 {
@@ -111,7 +111,7 @@ public static class ArticleCacheManager
             try
             {
                 string json = await FileIO.ReadTextAsync(file);
-                return JsonSerializer.Deserialize<ArticleCacheItem>(json);
+                return JsonConvert.DeserializeObject<ArticleCacheItem>(json);
             }
             catch
             {
@@ -143,7 +143,7 @@ public static class ArticleCacheManager
         string baseFileName = GetHashedFileName(pageTitle);
 
         var metadata = new ArticleCacheItem { Title = pageTitle, LastUpdated = lastUpdated };
-        string json = JsonSerializer.Serialize(metadata);
+        string json = JsonConvert.SerializeObject(metadata);
         StorageFile metadataFile = await _cacheFolder.CreateFileAsync(
             baseFileName + ".json",
             CreationCollisionOption.ReplaceExisting

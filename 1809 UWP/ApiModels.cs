@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using System.Text.Json.Serialization;
+using Newtonsoft.Json;
 
 namespace _1809_UWP
 {
@@ -45,7 +45,7 @@ namespace _1809_UWP
 
     public class TextContent
     {
-        [JsonPropertyName("*")]
+        [JsonProperty("*")]
         public string Content { get; set; }
     }
 
@@ -82,13 +82,13 @@ namespace _1809_UWP
 
     public class TimestampPage
     {
-        [JsonPropertyName("revisions")]
+        [JsonProperty("revisions")]
         public List<RevisionInfo> Revisions { get; set; }
     }
 
     public class RevisionInfo
     {
-        [JsonPropertyName("timestamp")]
+        [JsonProperty("timestamp")]
         public DateTime Timestamp { get; set; }
     }
 
@@ -146,13 +146,13 @@ namespace _1809_UWP
 
     public class WatchlistQueryResponse
     {
-        [System.Text.Json.Serialization.JsonPropertyName("query")]
+        [JsonProperty("query")]
         public WatchlistQuery query { get; set; }
     }
 
     public class WatchlistQuery
     {
-        [System.Text.Json.Serialization.JsonPropertyName("watchlistraw")]
+        [JsonProperty("watchlistraw")]
         public List<WatchlistItem> watchlistraw { get; set; }
     }
 
@@ -163,55 +163,55 @@ namespace _1809_UWP
 
     public class WatchlistItem
     {
-        [System.Text.Json.Serialization.JsonPropertyName("ns")]
+        [JsonProperty("ns")]
         public int Ns { get; set; }
 
-        [System.Text.Json.Serialization.JsonPropertyName("title")]
+        [JsonProperty("title")]
         public string Title { get; set; }
     }
 
     public class WatchlistApiResponse
     {
-        [System.Text.Json.Serialization.JsonPropertyName("watchlistraw")]
+        [JsonProperty("watchlistraw")]
         public List<WatchlistItem> WatchlistRaw { get; set; }
     }
 
     public class WatchActionResponse
     {
-        [System.Text.Json.Serialization.JsonPropertyName("watch")]
+        [JsonProperty("watch")]
         public List<WatchResult> Watch { get; set; }
 
-        [System.Text.Json.Serialization.JsonPropertyName("unwatch")]
+        [JsonProperty("unwatch")]
         public List<WatchResult> Unwatch { get; set; }
     }
 
     public class WatchResult
     {
-        [System.Text.Json.Serialization.JsonPropertyName("title")]
+        [JsonProperty("title")]
         public string Title { get; set; }
 
-        [System.Text.Json.Serialization.JsonPropertyName("watched")]
+        [JsonProperty("watched")]
         public string Watched { get; set; }
 
-        [System.Text.Json.Serialization.JsonPropertyName("unwatched")]
+        [JsonProperty("unwatched")]
         public string Unwatched { get; set; }
     }
 
     public class WatchTokenResponse
     {
-        [System.Text.Json.Serialization.JsonPropertyName("query")]
+        [JsonProperty("query")]
         public WatchQueryResponse Query { get; set; }
     }
 
     public class WatchQueryResponse
     {
-        [System.Text.Json.Serialization.JsonPropertyName("tokens")]
+        [JsonProperty("tokens")]
         public WatchTokens Tokens { get; set; }
     }
 
     public class WatchTokens
     {
-        [System.Text.Json.Serialization.JsonPropertyName("watchtoken")]
+        [JsonProperty("watchtoken")]
         public string WatchToken { get; set; }
     }
 

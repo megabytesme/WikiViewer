@@ -1,11 +1,11 @@
-﻿using System;
+﻿using Microsoft.UI.Xaml.Controls;
+using Newtonsoft.Json.Linq;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.UI.Xaml.Controls;
 using Windows.ApplicationModel.Core;
 using Windows.UI;
 using Windows.UI.Core;
@@ -420,21 +420,20 @@ namespace _1809_UWP
 
                 if (string.IsNullOrEmpty(json))
                 {
-                    throw new Exception("Failed to retrieve valid search suggestions.");
+                    sender.ItemsSource = null;
+                    return;
                 }
 
-                using (JsonDocument doc = JsonDocument.Parse(json))
+                JArray root = JArray.Parse(json);
+
+                if (root.Count > 1 && root[1] is JArray suggestionsArray)
                 {
-                    JsonElement root = doc.RootElement;
-                    if (root.GetArrayLength() > 1)
-                    {
-                        var suggestions = new List<string>();
-                        foreach (JsonElement suggestionElement in root[1].EnumerateArray())
-                        {
-                            suggestions.Add(suggestionElement.GetString());
-                        }
-                        sender.ItemsSource = suggestions;
-                    }
+                    var suggestions = suggestionsArray.ToObject<List<string>>();
+                    sender.ItemsSource = suggestions;
+                }
+                else
+                {
+                    sender.ItemsSource = null;
                 }
             }
             catch (TaskCanceledException) { }

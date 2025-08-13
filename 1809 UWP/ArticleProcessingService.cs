@@ -4,20 +4,16 @@ using System.IO;
 using System.Linq;
 using System.Net.NetworkInformation;
 using System.Text;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using HtmlAgilityPack;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Web.WebView2.Core;
 using Windows.ApplicationModel.Core;
-using Windows.Foundation;
 using Windows.Storage;
-using Windows.UI;
 using Windows.UI.Core;
-using Windows.UI.Xaml;
-using Windows.UI.Xaml.Controls;
-using static System.Net.Mime.MediaTypeNames;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace _1809_UWP
 {
@@ -56,8 +52,7 @@ namespace _1809_UWP
                     throw new Exception(
                         "Failed to retrieve a response for a random page from the API."
                     );
-
-                var randomResponse = JsonSerializer.Deserialize<RandomQueryResponse>(
+                var randomResponse = JsonConvert.DeserializeObject<RandomQueryResponse>(
                     randomTitleJson
                 );
                 resolvedTitle = randomResponse?.query?.random?.FirstOrDefault()?.title;
@@ -211,7 +206,7 @@ namespace _1809_UWP
                     );
                     if (!string.IsNullOrEmpty(imageJsonResponse))
                     {
-                        var imageInfoResponse = JsonSerializer.Deserialize<ImageQueryResponse>(
+                        var imageInfoResponse = JsonConvert.DeserializeObject<ImageQueryResponse>(
                             imageJsonResponse
                         );
                         if (imageInfoResponse?.query?.pages != null)
@@ -392,8 +387,7 @@ namespace _1809_UWP
 
                             if (string.IsNullOrEmpty(scriptResult) || scriptResult == "null")
                                 throw new Exception("Failed to get Base64 data from script.");
-
-                            var base64Data = JsonSerializer.Deserialize<string>(scriptResult);
+                            var base64Data = JsonConvert.DeserializeObject<string>(scriptResult);
                             var bytes = Convert.FromBase64String(base64Data);
 
                             var newFile = await imageCacheFolder.CreateFileAsync(
@@ -442,7 +436,7 @@ namespace _1809_UWP
             try
             {
                 string json = await ApiRequestService.GetJsonFromApiAsync(url, worker);
-                var response = JsonSerializer.Deserialize<TimestampQueryResponse>(json);
+                var response = JsonConvert.DeserializeObject<TimestampQueryResponse>(json);
                 return response
                     ?.query?.pages?.Values.FirstOrDefault()
                     ?.Revisions?.FirstOrDefault()
@@ -472,14 +466,14 @@ namespace _1809_UWP
                 if (string.IsNullOrEmpty(json))
                     return false;
 
-                using (var doc = JsonDocument.Parse(json))
+                JObject root = JObject.Parse(json);
+                var pages = root?["query"]?["pages"];
+                if (pages == null) return false;
+
+                var firstPage = pages.First as JProperty;
+                if (firstPage?.Value?["missing"] != null)
                 {
-                    var pages = doc.RootElement.GetProperty("query").GetProperty("pages");
-                    var firstPage = pages.EnumerateObject().FirstOrDefault();
-                    if (firstPage.Value.TryGetProperty("missing", out _))
-                    {
-                        return false;
-                    }
+                    return false;
                 }
                 return true;
             }

@@ -1,17 +1,12 @@
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.Web.WebView2.Core;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Net.Http;
-using System.Runtime.InteropServices.WindowsRuntime;
-using System.Text.Json;
 using System.Threading.Tasks;
 using Windows.ApplicationModel.Core;
-using Windows.Foundation;
-using Windows.Storage.Streams;
 using Windows.UI.Core;
+using Newtonsoft.Json;
 
 namespace _1809_UWP
 {
@@ -48,7 +43,8 @@ namespace _1809_UWP
             );
 
             if (string.IsNullOrEmpty(tokenJson)) throw new Exception("Could not get a valid response for login token.");
-            var tokenResponse = JsonSerializer.Deserialize<LoginApiTokenResponse>(tokenJson);
+
+            var tokenResponse = JsonConvert.DeserializeObject<LoginApiTokenResponse>(tokenJson);
             string loginToken = tokenResponse?.query?.tokens?.logintoken;
             if (string.IsNullOrEmpty(loginToken)) throw new Exception("Failed to retrieve a login token from the JSON response.");
 
@@ -59,7 +55,7 @@ namespace _1809_UWP
 
             string resultJson = await ApiRequestService.PostAndGetJsonFromApiAsync(_authenticatedWorker, ApiUrl, loginPostData);
 
-            var resultResponse = JsonSerializer.Deserialize<ClientLoginResponse>(resultJson);
+            var resultResponse = JsonConvert.DeserializeObject<ClientLoginResponse>(resultJson);
             if (resultResponse?.clientlogin?.status != "PASS")
             {
                 _authenticatedWorker?.Close();
@@ -170,7 +166,7 @@ namespace _1809_UWP
             try
             {
                 string responseJson = await ApiRequestService.PostAndGetJsonFromApiAsync(worker, ApiUrl, postData);
-                var response = JsonSerializer.Deserialize<WatchActionResponse>(responseJson);
+                var response = JsonConvert.DeserializeObject<WatchActionResponse>(responseJson);
                 if (add && (response?.Watch == null || !response.Watch.Any())) throw new Exception("Server did not confirm watch action.");
                 else if (!add && (response?.Unwatch == null || !response.Unwatch.Any())) throw new Exception("Server did not confirm unwatch action.");
             }
@@ -191,8 +187,7 @@ namespace _1809_UWP
                 return new HashSet<string>();
             }
 
-            var serializerOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            var watchlistResponse = JsonSerializer.Deserialize<WatchlistApiResponse>(watchlistJson, serializerOptions);
+            var watchlistResponse = JsonConvert.DeserializeObject<WatchlistApiResponse>(watchlistJson);
 
             var serverFavourites = new HashSet<string>();
             if (watchlistResponse?.WatchlistRaw != null)
@@ -216,7 +211,7 @@ namespace _1809_UWP
             string responseJson = await ApiRequestService.GetJsonFromApiAsync(url, worker);
             if (string.IsNullOrEmpty(responseJson)) throw new Exception("Failed to retrieve valid JSON for token.");
 
-            var tokenResponse = JsonSerializer.Deserialize<WatchTokenResponse>(responseJson);
+            var tokenResponse = JsonConvert.DeserializeObject<WatchTokenResponse>(responseJson);
             string rawToken = tokenResponse?.Query?.Tokens?.WatchToken;
             if (string.IsNullOrEmpty(rawToken)) throw new Exception("Failed to parse a watch token from the server response.");
 

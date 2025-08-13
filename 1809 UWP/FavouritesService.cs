@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Text.Json;
+using Newtonsoft.Json;
 using System.Threading.Tasks;
 using Windows.Storage;
 
@@ -42,7 +42,7 @@ namespace _1809_UWP
                 if (file != null)
                 {
                     string json = await FileIO.ReadTextAsync(file);
-                    return JsonSerializer.Deserialize<HashSet<string>>(json) ?? new HashSet<string>();
+                    return JsonConvert.DeserializeObject<HashSet<string>>(json) ?? new HashSet<string>();
                 }
             }
             catch (Exception ex)
@@ -57,7 +57,7 @@ namespace _1809_UWP
             try
             {
                 StorageFile file = await ApplicationData.Current.LocalFolder.CreateFileAsync(fileName, CreationCollisionOption.ReplaceExisting);
-                string json = JsonSerializer.Serialize(data);
+                string json = JsonConvert.SerializeObject(data);
                 await FileIO.WriteTextAsync(file, json);
             }
             catch (Exception ex)

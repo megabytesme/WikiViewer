@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net.Http;
 using System.Runtime.InteropServices.WindowsRuntime;
-using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Web.WebView2.Core;
@@ -11,6 +10,7 @@ using Windows.ApplicationModel.Core;
 using Windows.Foundation;
 using Windows.Storage.Streams;
 using Windows.UI.Core;
+using Newtonsoft.Json;
 
 namespace _1809_UWP
 {
@@ -64,7 +64,7 @@ namespace _1809_UWP
                     string scriptResult = await worker.CoreWebView2.ExecuteScriptAsync("document.documentElement.outerHTML");
                     if (string.IsNullOrEmpty(scriptResult)) continue;
 
-                    string fullHtml = JsonSerializer.Deserialize<string>(scriptResult);
+                    string fullHtml = JsonConvert.DeserializeObject<string>(scriptResult);
                     if (string.IsNullOrEmpty(fullHtml)) continue;
 
                     if (fullHtml.Contains("g-recaptcha") || fullHtml.Contains("Verifying you are human"))
@@ -107,7 +107,7 @@ namespace _1809_UWP
                     string scriptResult = await worker.CoreWebView2.ExecuteScriptAsync("document.documentElement.outerHTML");
                     if (string.IsNullOrEmpty(scriptResult)) continue;
 
-                    string fullHtml = JsonSerializer.Deserialize<string>(scriptResult);
+                    string fullHtml = JsonConvert.DeserializeObject<string>(scriptResult);
                     if (string.IsNullOrEmpty(fullHtml)) continue;
 
                     var doc = new HtmlAgilityPack.HtmlDocument();
