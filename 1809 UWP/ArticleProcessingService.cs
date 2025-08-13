@@ -33,6 +33,11 @@ namespace _1809_UWP
             SemaphoreSlim semaphore = null
         )
         {
+            long startTime = stopwatch.ElapsedMilliseconds;
+            Debug.WriteLine(
+                $"[FETCHER] Starting fetch process for '{pageTitle}' at {startTime}ms."
+            );
+
             var workerToUse = worker ?? MainPage.ApiWorker;
 
             string resolvedTitle = pageTitle;
@@ -84,6 +89,10 @@ namespace _1809_UWP
                     );
                     if (!string.IsNullOrEmpty(cachedHtml))
                     {
+                        long cacheHitTime = stopwatch.ElapsedMilliseconds;
+                        Debug.WriteLine(
+                            $"[FETCHER] Cache hit for '{resolvedTitle}' at {cacheHitTime}ms. Duration: {cacheHitTime - startTime}ms."
+                        );
                         return (cachedHtml, resolvedTitle);
                     }
                 }
@@ -97,7 +106,19 @@ namespace _1809_UWP
             }
 
             string pageUrl = $"https://betawiki.net/wiki/{Uri.EscapeDataString(resolvedTitle)}";
+
+            long downloadStartTime = stopwatch.ElapsedMilliseconds;
+            Debug.WriteLine(
+                $"[FETCHER] Starting raw HTML download for '{resolvedTitle}' at {downloadStartTime}ms."
+            );
+
             var freshHtml = await ApiRequestService.GetRawHtmlFromUrlAsync(pageUrl, workerToUse);
+
+            long downloadEndTime = stopwatch.ElapsedMilliseconds;
+            Debug.WriteLine(
+                $"[FETCHER] Finished raw HTML download. Duration: {downloadEndTime - downloadStartTime}ms."
+            );
+
             var processedHtml = await ProcessHtmlAsync(
                 freshHtml,
                 stopwatch,
@@ -114,6 +135,11 @@ namespace _1809_UWP
                     lastUpdated.Value
                 );
             }
+
+            long endTime = stopwatch.ElapsedMilliseconds;
+            Debug.WriteLine(
+                $"[FETCHER] Finished fetch process for '{resolvedTitle}' at {endTime}ms. Total Duration: {endTime - startTime}ms."
+            );
 
             return (processedHtml, resolvedTitle);
         }
