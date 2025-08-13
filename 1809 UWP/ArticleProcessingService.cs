@@ -155,18 +155,6 @@ namespace _1809_UWP
 
             await ProcessImagesInDocument(doc, worker, semaphore);
 
-            foreach (
-                var link in doc.DocumentNode.SelectNodes("//a[@href]")
-                    ?? Enumerable.Empty<HtmlNode>()
-            )
-            {
-                string href = link.GetAttributeValue("href", "");
-                if (href.StartsWith($"/{AppSettings.ArticlePath}") || href.StartsWith($"/{AppSettings.ScriptPath}index.php?"))
-                {
-                    link.SetAttributeValue("href", AppSettings.BaseUrl.TrimEnd('/') + href);
-                }
-            }
-
             string styleBlock = GetCssForTheme();
 
             long endTime = stopwatch.ElapsedMilliseconds;
@@ -178,6 +166,7 @@ namespace _1809_UWP
     <!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>{styleBlock}</head>
     <body><div class='mw-parser-output'>{contentNode.InnerHtml}</div></body></html>";
         }
+
 
         private static async Task ProcessImagesInDocument(
             HtmlDocument doc,
@@ -497,18 +486,6 @@ namespace _1809_UWP
                 ?? doc.DocumentNode;
 
             await ProcessImagesInDocument(doc, worker);
-
-            foreach (
-                var link in doc.DocumentNode.SelectNodes("//a[@href]")
-                    ?? Enumerable.Empty<HtmlNode>()
-            )
-            {
-                string href = link.GetAttributeValue("href", "");
-                if (href.StartsWith($"/{AppSettings.ArticlePath}") || href.StartsWith($"/{AppSettings.ScriptPath}index.php?"))
-                {
-                    link.SetAttributeValue("href", AppSettings.BaseUrl.TrimEnd('/') + href);
-                }
-            }
 
             return contentNode.OuterHtml;
         }

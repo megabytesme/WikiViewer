@@ -222,47 +222,68 @@ namespace _1809_UWP
         )
         {
             Uri uri;
-            try
+            try { uri = new Uri(args.Uri); }
+            catch { args.Cancel = true; return; }
+
+            Debug.WriteLine($"[NAV START] Intercepted navigation to: {uri}");
+            Debug.WriteLine($"[NAV CONF] ArticlePath='{AppSettings.ArticlePath}', ScriptPath='{AppSettings.ScriptPath}'");
+
+            args.Cancel = true;
+
+            if (uri.Host.Equals(GetVirtualHostName(), StringComparison.OrdinalIgnoreCase) && uri.AbsolutePath.EndsWith("/article.html"))
             {
-                uri = new Uri(args.Uri);
-            }
-            catch
-            {
-                args.Cancel = true;
+                args.Cancel = false;
                 return;
             }
 
             if (uri.Host.Equals(GetVirtualHostName(), StringComparison.OrdinalIgnoreCase))
             {
-                return;
-            }
-
-            args.Cancel = true;
-
-            if (uri.Host.Equals(AppSettings.Host, StringComparison.OrdinalIgnoreCase))
-            {
+                string clickedPath = uri.AbsolutePath;
                 string newTitle = null;
-                string wikiPathSegment = $"/{AppSettings.ArticlePath}";
-                string indexPathSegment = $"/{AppSettings.ScriptPath}index.php";
+                string articlePathPrefix = $"/{AppSettings.ArticlePath}";
+                string scriptPathPrefix = $"/{AppSettings.ScriptPath}";
+                string indexPathPrefix = $"/{AppSettings.ScriptPath}index.php";
+                const string commonWikiPath = "/wiki/";
+                const string commonWPath = "/w/";
 
-                if (uri.AbsolutePath.StartsWith(wikiPathSegment))
-                {
-                    newTitle = uri.AbsolutePath.Substring(wikiPathSegment.Length);
-                }
-                else if (uri.AbsolutePath.StartsWith(indexPathSegment) && uri.Query.Contains("title="))
+                if (clickedPath.StartsWith(indexPathPrefix))
                 {
                     var queryParams = System.Web.HttpUtility.ParseQueryString(uri.Query);
                     newTitle = queryParams["title"];
+                    Debug.WriteLine($"[NAV PARSE] Matched Index path. Extracted title: '{newTitle}'");
+                }
+                else if (!string.IsNullOrEmpty(AppSettings.ArticlePath) && clickedPath.StartsWith(articlePathPrefix))
+                {
+                    newTitle = clickedPath.Substring(articlePathPrefix.Length);
+                    Debug.WriteLine($"[NAV PARSE] Matched configured ArticlePath. Extracted title: '{newTitle}'");
+                }
+                else if (clickedPath.StartsWith(commonWPath))
+                {
+                    newTitle = clickedPath.Substring(commonWPath.Length);
+                    Debug.WriteLine($"[NAV PARSE] Matched common '/w/' path. Extracted title: '{newTitle}'");
+                }
+                else if (clickedPath.StartsWith(commonWikiPath))
+                {
+                    newTitle = clickedPath.Substring(commonWikiPath.Length);
+                    Debug.WriteLine($"[NAV PARSE] Matched common '/wiki/' path. Extracted title: '{newTitle}'");
+                }
+                else
+                {
+                    newTitle = clickedPath.TrimStart('/');
+                    Debug.WriteLine($"[NAV PARSE] No prefix matched. Using full path as title: '{newTitle}'");
                 }
 
                 if (!string.IsNullOrEmpty(newTitle))
                 {
                     _pageTitleToFetch = Uri.UnescapeDataString(newTitle);
+                    Debug.WriteLine($"[NAV SUCCESS] Final page title to fetch: '{_pageTitleToFetch}'");
                     _articleHistory.Push(_pageTitleToFetch);
                     StartArticleFetch();
                     return;
                 }
             }
+
+            Debug.WriteLine($"[NAV EXTERNAL] Unhandled or external link. Launching in browser: {uri}");
             await Windows.System.Launcher.LaunchUriAsync(uri);
         }
 

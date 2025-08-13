@@ -40,8 +40,12 @@ namespace _1809_UWP
         {
             get
             {
-                string url = (_localSettings.Values[MediaWikiUrlKey] as string) ?? DefaultMediaWikiUrl;
-                return url.EndsWith("/") ? url : url + "/";
+                if (_localSettings.Values.ContainsKey(MediaWikiUrlKey))
+                {
+                    string url = _localSettings.Values[MediaWikiUrlKey] as string;
+                    return url.EndsWith("/") ? url : url + "/";
+                }
+                return DefaultMediaWikiUrl;
             }
             set
             {
@@ -55,13 +59,27 @@ namespace _1809_UWP
 
         public static string ScriptPath
         {
-            get => (_localSettings.Values[ScriptPathKey] as string) ?? DefaultScriptPath;
+            get
+            {
+                if (_localSettings.Values.ContainsKey(ScriptPathKey))
+                {
+                    return _localSettings.Values[ScriptPathKey] as string;
+                }
+                return DefaultScriptPath;
+            }
             set => _localSettings.Values[ScriptPathKey] = value;
         }
 
         public static string ArticlePath
         {
-            get => (_localSettings.Values[ArticlePathKey] as string) ?? DefaultArticlePath;
+            get
+            {
+                if (_localSettings.Values.ContainsKey(ArticlePathKey))
+                {
+                    return _localSettings.Values[ArticlePathKey] as string;
+                }
+                return DefaultArticlePath;
+            }
             set => _localSettings.Values[ArticlePathKey] = value;
         }
 

@@ -56,8 +56,8 @@
                             </Button>
                         </Grid>
 
-                        <TextBox x:Name="ScriptPathTextBox" Header="Script Path (if any)" PlaceholderText="w/"/>
-                        <TextBox x:Name="ArticlePathTextBox" Header="Article Path (if any)" PlaceholderText="wiki/"/>
+                        <TextBox x:Name="ScriptPathTextBox" Header="Script Path (if any)"/>
+                        <TextBox x:Name="ArticlePathTextBox" Header="Article Path (if any)"/>
 
                         <TextBlock x:Name="DetectionStatusText" Visibility="Collapsed" TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}"/>
 
