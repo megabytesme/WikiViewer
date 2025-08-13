@@ -1,5 +1,7 @@
 # Wikibeta
 
+<img width="3839" height="2159" alt="image" src="https://github.com/user-attachments/assets/eade7b04-bd2c-4749-886f-23be46a27d12" />
+
 WikiBeta is an unofficial, third-party client for browsing the BetaWiki (not affiliated) without your web browser, online and offline (after caching).
 
 ## Features
