@@ -30,6 +30,10 @@
                       SelectionMode="Multiple"
                       SelectionChanged="FavouritesGridView_SelectionChanged"
                       HorizontalAlignment="Center">
+                <GridView.Resources>
+                    <SolidColorBrush x:Key="ListViewItemCheckBrush" Color="{ThemeResource SystemAccentColor}"/>
+                    <SolidColorBrush x:Key="ListViewItemCheckPressedBrush" Color="{ThemeResource SystemAccentColor}"/>
+                </GridView.Resources>
                 <GridView.ItemContainerStyle>
                     <Style TargetType="GridViewItem">
                         <Setter Property="Margin" Value="8"/>
@@ -37,7 +41,7 @@
                 </GridView.ItemContainerStyle>
                 <GridView.ItemTemplate>
                     <DataTemplate x:DataType="local:FavouriteItem">
-                        <Grid Width="280" 
+                        <Grid Width="300" 
                               MinHeight="200"
                               BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                               BorderThickness="1"
