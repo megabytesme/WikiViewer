@@ -1,8 +1,6 @@
 using HtmlAgilityPack;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Web.WebView2.Core;
-using SkiaSharp;
-using SkiaSharp.Extended.Svg;
 using System;
 using System.Diagnostics;
 using System.IO;
