@@ -1,7 +1,10 @@
 ﻿using Microsoft.UI.Xaml.Controls;
+using Microsoft.Web.WebView2.Core;
 using System;
 using System.Threading.Tasks;
+using Windows.Foundation;
 using Windows.UI;
+using Windows.UI.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Controls.Primitives;
@@ -78,21 +81,22 @@ namespace _1809_UWP
                     DetectionStatusText.Text = "Could not automatically detect paths. Please enter them manually.";
                     DetectionStatusText.Foreground = new SolidColorBrush(Colors.Red);
                 }
+                DetectionStatusText.Visibility = Visibility.Visible;
             }
-            catch (NeedsUserVerificationException)
+            catch (NeedsUserVerificationException ex)
             {
-                DetectionStatusText.Text = "Could not detect paths. A security check is required. Please navigate to an article on the desired wiki first to solve it, then try again.";
-                DetectionStatusText.Foreground = new SolidColorBrush(Colors.OrangeRed);
+                LoadingOverlay.Visibility = Visibility.Collapsed;
+                ShowVerificationPanelAndRetryDetection(ex.Url);
             }
             catch (Exception ex)
             {
                 DetectionStatusText.Text = $"An error occurred during detection: {ex.Message}";
                 DetectionStatusText.Foreground = new SolidColorBrush(Colors.Red);
+                DetectionStatusText.Visibility = Visibility.Visible;
             }
             finally
             {
                 LoadingOverlay.Visibility = Visibility.Collapsed;
-                DetectionStatusText.Visibility = Visibility.Visible;
 
                 if (tempWorker != null)
                 {
@@ -100,6 +104,30 @@ namespace _1809_UWP
                     tempWorker.Close();
                 }
             }
+        }
+
+        private async void ShowVerificationPanelAndRetryDetection(string url)
+        {
+            VerificationPanel.Visibility = Visibility.Visible;
+            await VerificationWebView.EnsureCoreWebView2Async();
+
+            TypedEventHandler<CoreWebView2, CoreWebView2NavigationCompletedEventArgs> successHandler = null;
+            successHandler = async (sender, args) =>
+            {
+                if (args.IsSuccess && !sender.Source.Contains("challenges.cloudflare.com"))
+                {
+                    VerificationWebView.CoreWebView2.NavigationCompleted -= successHandler;
+
+                    await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+                    {
+                        VerificationPanel.Visibility = Visibility.Collapsed;
+                        DetectButton_Click(null, null);
+                    });
+                }
+            };
+
+            VerificationWebView.CoreWebView2.NavigationCompleted += successHandler;
+            VerificationWebView.CoreWebView2.Navigate(url);
         }
 
         private async void ApplyUrlButton_Click(object sender, RoutedEventArgs e)

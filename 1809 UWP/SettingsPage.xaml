@@ -148,5 +148,17 @@
                 <TextBlock x:Name="LoadingOverlayText" Text="Please wait..."/>
             </StackPanel>
         </Grid>
+
+        <Grid x:Name="VerificationPanel" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Visibility="Collapsed">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <StackPanel Margin="12" Spacing="8">
+                <TextBlock Text="Please complete the security check" Style="{ThemeResource TitleTextBlockStyle}"/>
+                <TextBlock Text="Detection will continue automatically once you finish." Style="{ThemeResource BodyTextBlockStyle}" TextWrapping="Wrap"/>
+            </StackPanel>
+            <muxc:WebView2 x:Name="VerificationWebView" Grid.Row="1" />
+        </Grid>
     </Grid>
 </Page>
