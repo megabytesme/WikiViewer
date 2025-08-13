@@ -215,7 +215,7 @@ namespace _1809_UWP
                         {
                             new Run() { Text = "WikiBeta" },
                             new LineBreak(),
-                            new Run() { Text = "Version 2.0.0.0 (1809_UWP)" },
+                            new Run() { Text = "Version 2.0.1.0 (1809_UWP)" },
                             new LineBreak(),
                             new Run() { Text = "Copyright © 2025 MegaBytesMe" },
                             new LineBreak(), new LineBreak(),
