@@ -390,25 +390,26 @@ namespace _1809_UWP
             VerificationPanel.Visibility = Visibility.Visible;
             await VerificationWebView.EnsureCoreWebView2Async();
 
-            async void successHandler(CoreWebView2 sender, CoreWebView2NavigationCompletedEventArgs args)
+            TypedEventHandler<CoreWebView2, CoreWebView2NavigationCompletedEventArgs> successHandler = null;
+            successHandler = async (sender, args) =>
             {
                 if (args.IsSuccess && !sender.Source.Contains("challenges.cloudflare.com"))
                 {
+                    VerificationWebView.CoreWebView2.NavigationCompleted -= successHandler;
+
                     await Dispatcher.RunAsync(
                         Windows.UI.Core.CoreDispatcherPriority.Normal,
                         () =>
                         {
-                            VerificationWebView.CoreWebView2.NavigationCompleted -= successHandler;
+                            Debug.WriteLine("[Captcha] Verification successful. Resuming original page load.");
+
                             VerificationPanel.Visibility = Visibility.Collapsed;
 
-                            Debug.WriteLine(
-                                "[Captcha] Verification successful. Navigating to Main Page."
-                            );
-                            Frame.Navigate(typeof(ArticleViewerPage), "Main Page");
+                            StartArticleFetch();
                         }
                     );
                 }
-            }
+            };
 
             VerificationWebView.CoreWebView2.NavigationCompleted += successHandler;
             VerificationWebView.CoreWebView2.Navigate(url);
