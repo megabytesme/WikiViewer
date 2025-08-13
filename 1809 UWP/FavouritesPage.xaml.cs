@@ -203,40 +203,58 @@ namespace _1809_UWP
         {
             item.ImageUrl = "ms-appx:///Assets/Square150x150Logo.png";
 
-            if (!string.IsNullOrEmpty(item.ArticlePageTitle))
+            if (string.IsNullOrEmpty(item.ArticlePageTitle))
             {
-                string cachedHtml = await ArticleCacheManager.GetCachedArticleHtmlAsync(item.ArticlePageTitle);
+                return;
+            }
 
-                if (!string.IsNullOrEmpty(cachedHtml))
+            string cachedHtml = await ArticleCacheManager.GetCachedArticleHtmlAsync(item.ArticlePageTitle);
+
+            if (string.IsNullOrEmpty(cachedHtml))
+            {
+                return;
+            }
+
+            var doc = new HtmlDocument();
+            doc.LoadHtml(cachedHtml);
+
+            var allCachedImageNodes = doc.DocumentNode.SelectNodes($"//img[contains(@src, '{ArticleViewerPage.VirtualHostName}')]");
+
+            if (allCachedImageNodes == null || !allCachedImageNodes.Any())
+            {
+                return;
+            }
+
+            string chosenImageUrl = null;
+
+            var nonSvgNode = allCachedImageNodes.FirstOrDefault(node =>
+                !node.GetAttributeValue("src", "").EndsWith(".svg", StringComparison.OrdinalIgnoreCase));
+
+            if (nonSvgNode != null)
+            {
+                chosenImageUrl = nonSvgNode.GetAttributeValue("src", null);
+            }
+            else
+            {
+                var svgNode = allCachedImageNodes.FirstOrDefault(node =>
+                    node.GetAttributeValue("src", "").EndsWith(".svg", StringComparison.OrdinalIgnoreCase));
+
+                if (svgNode != null)
                 {
-                    var doc = new HtmlDocument();
-                    doc.LoadHtml(cachedHtml);
-
-                    HtmlNode imageNode = null;
-                    imageNode = doc.DocumentNode.SelectSingleNode($"//table[contains(@class, 'infobox')]//img[contains(@src, '{ArticleViewerPage.VirtualHostName}')]");
-                    if (imageNode == null)
-                    {
-                        imageNode = doc.DocumentNode.SelectSingleNode($"//img[contains(@src, '{ArticleViewerPage.VirtualHostName}')]");
-                    }
-
-                    if (imageNode != null)
-                    {
-                        string virtualHostUrl = imageNode.GetAttributeValue("src", null);
-                        if (!string.IsNullOrEmpty(virtualHostUrl))
-                        {
-                            string uwpImageUrl = virtualHostUrl.Replace(
-                                $"https://{ArticleViewerPage.VirtualHostName}",
-                                "ms-appdata:///local"
-                            );
-                            item.ImageUrl = uwpImageUrl;
-                        }
-                    }
+                    chosenImageUrl = svgNode.GetAttributeValue("src", null);
                 }
             }
 
-            Debug.WriteLine(
-                $"[FAV PAGE] Set image for '{item.DisplayTitle}': {item.ImageUrl}"
-            );
+            if (!string.IsNullOrEmpty(chosenImageUrl))
+            {
+                string uwpImageUrl = chosenImageUrl.Replace(
+                    $"https://{ArticleViewerPage.VirtualHostName}",
+                    "ms-appdata:///local"
+                );
+                item.ImageUrl = uwpImageUrl;
+            }
+
+            Debug.WriteLine($"[FAV PAGE] Set image for '{item.DisplayTitle}': {item.ImageUrl}");
         }
 
         private async void NavigateToArticleIfItExists(string pageTitle)
