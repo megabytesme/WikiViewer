@@ -360,22 +360,15 @@ namespace _1809_UWP
 
             var cacheFolder = await ApplicationData.Current.LocalFolder.CreateFolderAsync("cache", CreationCollisionOption.OpenIfExists);
 
-            if (await cacheFolder.TryGetItemAsync(finalFileName) is StorageFile cachedFile)
+            if (await cacheFolder.TryGetItemAsync(finalFileName) is StorageFile)
             {
-                Debug.WriteLine($"[BinaryDownloader] Cache hit for {mediaUrl.AbsoluteUri}. Path: /cache/{finalFileName}");
                 return $"/cache/{finalFileName}";
             }
 
-            Debug.WriteLine($"[BinaryDownloader] No cache for {mediaUrl.AbsoluteUri}. Starting download process.");
             var tcs = new TaskCompletionSource<string>();
             _ = CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
             {
-                if (App.UIHost == null)
-                {
-                    Debug.WriteLine("[BinaryDownloader] App.UIHost is null. Aborting.");
-                    tcs.TrySetResult(null);
-                    return;
-                }
+                if (App.UIHost == null) { tcs.TrySetResult(null); return; }
                 var tempWorker = new WebView2();
                 try
                 {
@@ -386,48 +379,75 @@ namespace _1809_UWP
 
                     var downloadTcs = new TaskCompletionSource<bool>();
                     TypedEventHandler<CoreWebView2, CoreWebView2DownloadStartingEventArgs> downloadHandler = null;
-                    downloadHandler = async (s, e) =>
+                    downloadHandler = (s, e) =>
                     {
                         s.DownloadStarting -= downloadHandler;
-                        Debug.WriteLine("[BinaryDownloader] DownloadStarting event fired.");
-                        try
-                        {
-                            var deferral = e.GetDeferral();
-                            var destinationPath = Path.Combine(cacheFolder.Path, finalFileName);
-                            e.ResultFilePath = destinationPath;
-                            e.Handled = true;
-                            Debug.WriteLine($"[BinaryDownloader] Set download destination to: {destinationPath}");
-                            deferral.Complete();
+                        var deferral = e.GetDeferral();
+                        e.ResultFilePath = Path.Combine(cacheFolder.Path, finalFileName);
+                        e.Handled = true;
+                        deferral.Complete();
 
-                            TypedEventHandler<CoreWebView2DownloadOperation, object> downloadFinishedHandler = null;
-                            downloadFinishedHandler = (op, _) =>
-                            {
-                                op.StateChanged -= downloadFinishedHandler;
-                                Debug.WriteLine($"[BinaryDownloader] DownloadOperation state changed to: {op.State}");
-                                if (op.State == CoreWebView2DownloadState.Completed)
-                                {
-                                    downloadTcs.TrySetResult(true);
-                                }
-                                else
-                                {
-                                    downloadTcs.TrySetResult(false);
-                                }
-                            };
-                            e.DownloadOperation.StateChanged += downloadFinishedHandler;
-                        }
-                        catch (Exception ex)
+                        TypedEventHandler<CoreWebView2DownloadOperation, object> stateChangedHandler = null;
+                        stateChangedHandler = (op, _) =>
                         {
-                            Debug.WriteLine($"[BinaryDownloader] Exception inside DownloadStarting event handler: {ex.Message}");
-                            downloadTcs.TrySetResult(false);
-                        }
+                            if (op.State != CoreWebView2DownloadState.InProgress)
+                            {
+                                op.StateChanged -= stateChangedHandler;
+                                downloadTcs.TrySetResult(op.State == CoreWebView2DownloadState.Completed);
+                            }
+                        };
+                        e.DownloadOperation.StateChanged += stateChangedHandler;
                     };
                     tempWorker.CoreWebView2.DownloadStarting += downloadHandler;
 
-                    Debug.WriteLine($"[BinaryDownloader] Navigating temporary worker to: {mediaUrl.AbsoluteUri}");
-                    tempWorker.CoreWebView2.Navigate(mediaUrl.AbsoluteUri);
+                    var navTcs = new TaskCompletionSource<bool>();
+                    TypedEventHandler<CoreWebView2, CoreWebView2NavigationCompletedEventArgs> navHandler = null;
+                    navHandler = (s, e) => {
+                        s.NavigationCompleted -= navHandler;
+                        navTcs.TrySetResult(e.IsSuccess);
+                    };
+                    tempWorker.CoreWebView2.NavigationCompleted += navHandler;
+                    tempWorker.CoreWebView2.Navigate(AppSettings.BaseUrl);
 
-                    bool success = await downloadTcs.Task;
-                    if (success)
+                    if (!await navTcs.Task)
+                    {
+                        throw new Exception($"Navigation to base URL '{AppSettings.BaseUrl}' failed.");
+                    }
+
+                    string script = $@"
+                        (async () => {{
+                            try {{
+                                const response = await fetch('{mediaUrl.AbsoluteUri}');
+                                if (!response.ok) {{
+                                    return `Error: ${{response.status}} ${{response.statusText}}`;
+                                }}
+                                const blob = await response.blob();
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = '{finalFileName}';
+                                document.body.appendChild(a);
+                                a.click();
+                                a.remove();
+                                URL.revokeObjectURL(url);
+                                return 'Download initiated';
+                            }} catch (e) {{
+                                return `Error: ${{e.message}}`;
+                            }}
+                        }})();";
+
+                    var scriptResult = await tempWorker.CoreWebView2.ExecuteScriptAsync(script);
+                    Debug.WriteLine($"[BinaryDownloader] Fetch script executed for {mediaUrl.AbsoluteUri}, result: {scriptResult}");
+
+                    var timeoutTask = Task.Delay(TimeSpan.FromSeconds(30));
+                    var completedTask = await Task.WhenAny(downloadTcs.Task, timeoutTask);
+
+                    if (completedTask == timeoutTask)
+                    {
+                        throw new TimeoutException("The download was not initiated by the script within 30 seconds.");
+                    }
+
+                    if (await downloadTcs.Task)
                     {
                         Debug.WriteLine($"[BinaryDownloader] Successfully cached media from {mediaUrl} as {finalFileName}");
                         tcs.TrySetResult($"/cache/{finalFileName}");
@@ -444,7 +464,6 @@ namespace _1809_UWP
                 }
                 finally
                 {
-                    Debug.WriteLine("[BinaryDownloader] Cleaning up temporary worker.");
                     App.UIHost.Children.Remove(tempWorker);
                     tempWorker.Close();
                 }
