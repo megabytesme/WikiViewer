@@ -25,11 +25,74 @@ namespace _1809_UWP
             AuthService.AuthenticationStateChanged += AuthService_AuthenticationStateChanged;
 
             UpdateUserUI();
-            WikiUrlTextBox.Text = AppSettings.BaseUrl;
+            LoadWikiSettings();
             CachingToggle.IsOn = AppSettings.IsCachingEnabled;
             SetupConcurrencySlider();
 
             await UpdateCacheSizeDisplayAsync();
+        }
+
+        private void LoadWikiSettings()
+        {
+            WikiUrlTextBox.Text = AppSettings.BaseUrl;
+            ScriptPathTextBox.Text = AppSettings.ScriptPath;
+            ArticlePathTextBox.Text = AppSettings.ArticlePath;
+        }
+
+        private async void ApplyUrlButton_Click(object sender, RoutedEventArgs e)
+        {
+            string newUrl = WikiUrlTextBox.Text.Trim();
+            if (!string.IsNullOrEmpty(newUrl) && !newUrl.EndsWith("/")) newUrl += "/";
+
+            string newScriptPath = ScriptPathTextBox.Text.Trim();
+            string newArticlePath = ArticlePathTextBox.Text.Trim();
+
+            if (!Uri.TryCreate(newUrl, UriKind.Absolute, out var uriResult) ||
+                (uriResult.Scheme != Uri.UriSchemeHttp && uriResult.Scheme != Uri.UriSchemeHttps))
+            {
+                var invalidDialog = new ContentDialog
+                {
+                    Title = "Invalid URL",
+                    Content = "Please ensure the Base URL is a valid absolute URL (e.g., 'https://en.wikipedia.org/').",
+                    CloseButtonText = "OK"
+                };
+                await invalidDialog.ShowAsync();
+                return;
+            }
+
+            bool hasChanged = !newUrl.Equals(AppSettings.BaseUrl, StringComparison.OrdinalIgnoreCase) ||
+                              !newScriptPath.Equals(AppSettings.ScriptPath, StringComparison.OrdinalIgnoreCase) ||
+                              !newArticlePath.Equals(AppSettings.ArticlePath, StringComparison.OrdinalIgnoreCase);
+
+            if (!hasChanged)
+            {
+                return;
+            }
+
+            var dialog = new ContentDialog
+            {
+                Title = "Apply New Wiki Settings?",
+                Content = "This will clear all local cache, favourites, and log you out. This action cannot be undone. The app will restart its main view after applying the changes.",
+                PrimaryButtonText = "Apply and Clear Data",
+                CloseButtonText = "Cancel"
+            };
+
+            var result = await dialog.ShowAsync();
+
+            if (result == ContentDialogResult.Primary)
+            {
+                LoadingOverlay.Visibility = Visibility.Visible;
+
+                AuthService.Logout();
+                await FavouritesService.ClearAllLocalFavouritesAsync();
+                await ArticleCacheManager.ClearCacheAsync();
+
+                AppSettings.BaseUrl = newUrl;
+                AppSettings.ScriptPath = newScriptPath;
+                AppSettings.ArticlePath = newArticlePath;
+
+                App.ResetRootFrame();
+            }
         }
 
         private void SetupConcurrencySlider()
@@ -158,62 +221,6 @@ namespace _1809_UWP
         private void SignInButton_Click(object sender, RoutedEventArgs e)
         {
             this.Frame.Navigate(typeof(LoginPage));
-        }
-
-        private async void ApplyUrlButton_Click(object sender, RoutedEventArgs e)
-        {
-            string newUrl = WikiUrlTextBox.Text.Trim();
-            if (!newUrl.EndsWith("/"))
-            {
-                newUrl += "/";
-            }
-
-            if (!Uri.TryCreate(newUrl, UriKind.Absolute, out var uriResult) ||
-                (uriResult.Scheme != Uri.UriSchemeHttp && uriResult.Scheme != Uri.UriSchemeHttps))
-            {
-                var invalidDialog = new ContentDialog
-                {
-                    Title = "Invalid URL",
-                    Content = "Please enter a valid, absolute URL starting with http:// or https://",
-                    CloseButtonText = "OK"
-                };
-                await invalidDialog.ShowAsync();
-                return;
-            }
-
-            if (newUrl.Equals(AppSettings.BaseUrl, StringComparison.OrdinalIgnoreCase))
-            {
-                return;
-            }
-
-            var dialog = new ContentDialog
-            {
-                Title = "Apply New Wiki URL?",
-                Content = "This will clear all local cache, favourites, and log you out. This action cannot be undone. The app will navigate home after applying the changes.",
-                PrimaryButtonText = "Apply and Clear Data",
-                CloseButtonText = "Cancel"
-            };
-
-            var result = await dialog.ShowAsync();
-
-            if (result == ContentDialogResult.Primary)
-            {
-                LoadingOverlay.Visibility = Visibility.Visible;
-
-                AuthService.Logout();
-                await FavouritesService.ClearAllLocalFavouritesAsync();
-                await ArticleCacheManager.ClearCacheAsync();
-
-                AppSettings.BaseUrl = newUrl;
-                WikiUrlTextBox.Text = newUrl;
-
-                await UpdateCacheSizeDisplayAsync();
-                UpdateUserUI();
-
-                LoadingOverlay.Visibility = Visibility.Collapsed;
-
-                App.Navigate(typeof(MainPage), null);
-            }
         }
 
         private void CachingToggle_Toggled(object sender, RoutedEventArgs e)

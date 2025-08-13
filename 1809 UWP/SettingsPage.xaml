@@ -41,8 +41,10 @@
                     Padding="16">
                     <StackPanel Spacing="12">
                         <TextBlock Text="Wiki Instance" Style="{ThemeResource SubtitleTextBlockStyle}" HorizontalAlignment="Center"/>
-                        <TextBox x:Name="WikiUrlTextBox" Header="MediaWiki Base URL (e.g., https://en.wikipedia.org/)"/>
-                        <TextBlock Text="Changing the URL will clear all local data (cache, favourites) and log you out." 
+                        <TextBox x:Name="WikiUrlTextBox" Header="MediaWiki Base URL" PlaceholderText="https://en.wikipedia.org/"/>
+                        <TextBox x:Name="ScriptPathTextBox" Header="Script Path" PlaceholderText="w/"/>
+                        <TextBox x:Name="ArticlePathTextBox" Header="Article Path" PlaceholderText="wiki/"/>
+                        <TextBlock Text="Changing these values will clear all local data (cache, favourites) and log you out." 
                                    TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}"/>
                         <Button x:Name="ApplyUrlButton" Content="Apply and Clear Data" Click="ApplyUrlButton_Click" HorizontalAlignment="Stretch"/>
                     </StackPanel>
