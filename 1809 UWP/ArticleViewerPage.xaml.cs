@@ -16,7 +16,7 @@ namespace _1809_UWP
     {
         private string _pageTitleToFetch = "";
         private string _verificationUrl = null;
-        public const string VirtualHostName = "local.betawiki-app.net";
+        public static string GetVirtualHostName() => $"local-content.{AppSettings.Host}";
         private bool _isInitialized = false;
         private readonly Stack<string> _articleHistory = new Stack<string>();
         private readonly double _titleBarHeight = 0;
@@ -80,7 +80,7 @@ namespace _1809_UWP
 
                 var tempFolder = ApplicationData.Current.LocalFolder.Path;
                 ArticleDisplayWebView.CoreWebView2.SetVirtualHostNameToFolderMapping(
-                    VirtualHostName,
+                    GetVirtualHostName(),
                     tempFolder,
                     CoreWebView2HostResourceAccessKind.Allow
                 );
@@ -213,7 +213,7 @@ namespace _1809_UWP
             );
             await FileIO.WriteTextAsync(articleFile, html);
 
-            ArticleDisplayWebView.CoreWebView2.Navigate($"https://{VirtualHostName}/article.html");
+            ArticleDisplayWebView.CoreWebView2.Navigate($"https://{GetVirtualHostName()}/article.html");
         }
 
         private async void ArticleDisplayWebView_NavigationStarting(
@@ -232,21 +232,24 @@ namespace _1809_UWP
                 return;
             }
 
-            if (uri.Host.Equals(VirtualHostName, StringComparison.OrdinalIgnoreCase))
+            if (uri.Host.Equals(GetVirtualHostName(), StringComparison.OrdinalIgnoreCase))
             {
                 return;
             }
 
             args.Cancel = true;
 
-            if (uri.Host.Equals("betawiki.net", StringComparison.OrdinalIgnoreCase))
+            if (uri.Host.Equals(AppSettings.Host, StringComparison.OrdinalIgnoreCase))
             {
                 string newTitle = null;
-                if (uri.AbsolutePath.StartsWith("/wiki/"))
+                string wikiPathSegment = $"/{AppSettings.ArticlePath}";
+                string indexPathSegment = $"/{AppSettings.ScriptPath}index.php";
+
+                if (uri.AbsolutePath.StartsWith(wikiPathSegment))
                 {
-                    newTitle = uri.AbsolutePath.Substring("/wiki/".Length);
+                    newTitle = uri.AbsolutePath.Substring(wikiPathSegment.Length);
                 }
-                else if (uri.AbsolutePath.StartsWith("/index.php") && uri.Query.Contains("title="))
+                else if (uri.AbsolutePath.StartsWith(indexPathSegment) && uri.Query.Contains("title="))
                 {
                     var queryParams = System.Web.HttpUtility.ParseQueryString(uri.Query);
                     newTitle = queryParams["title"];
@@ -354,8 +357,8 @@ namespace _1809_UWP
             )
             {
                 request.Data.Properties.Title = ArticleTitle.Text;
-                request.Data.Properties.Description = "Check out this article on BetaWiki.";
-                request.Data.SetWebLink(new Uri($"https://betawiki.net/wiki/{_pageTitleToFetch}"));
+                request.Data.Properties.Description = $"Check out this article on {AppSettings.Host}.";
+                request.Data.SetWebLink(new Uri(AppSettings.GetWikiPageUrl(_pageTitleToFetch)));
             }
             else
             {

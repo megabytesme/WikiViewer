@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using HtmlAgilityPack;
@@ -218,7 +217,7 @@ namespace _1809_UWP
             var doc = new HtmlDocument();
             doc.LoadHtml(cachedHtml);
 
-            var allCachedImageNodes = doc.DocumentNode.SelectNodes($"//img[contains(@src, '{ArticleViewerPage.VirtualHostName}')]");
+            var allCachedImageNodes = doc.DocumentNode.SelectNodes($"//img[contains(@src, '{ArticleViewerPage.GetVirtualHostName()}')]");
 
             if (allCachedImageNodes == null || !allCachedImageNodes.Any())
             {
@@ -248,7 +247,7 @@ namespace _1809_UWP
             if (!string.IsNullOrEmpty(chosenImageUrl))
             {
                 string uwpImageUrl = chosenImageUrl.Replace(
-                    $"https://{ArticleViewerPage.VirtualHostName}",
+                    $"https://{ArticleViewerPage.GetVirtualHostName()}",
                     "ms-appdata:///local"
                 );
                 item.ImageUrl = uwpImageUrl;

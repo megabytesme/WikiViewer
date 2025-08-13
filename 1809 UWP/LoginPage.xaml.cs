@@ -1,6 +1,7 @@
 ﻿using System;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Navigation;
 
 namespace _1809_UWP
 {
@@ -9,7 +10,12 @@ namespace _1809_UWP
         public LoginPage()
         {
             this.InitializeComponent();
-            this.Loaded += (s, e) => { };
+        }
+
+        protected override void OnNavigatedTo(NavigationEventArgs e)
+        {
+            base.OnNavigatedTo(e);
+            LoginTitle.Text = $"Log In to {AppSettings.Host}";
         }
 
         private async void LoginButton_Click(object sender, RoutedEventArgs e)

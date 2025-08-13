@@ -32,7 +32,7 @@ namespace _1809_UWP
                 EditWebView.CoreWebView2.NavigationCompleted += EditWebView_NavigationCompleted;
                 EditWebView.CoreWebView2.NavigationStarting += EditWebView_NavigationStarting;
 
-                _initialUrl = $"https://betawiki.net/index.php?title={Uri.EscapeDataString(_pageTitle)}&action=edit";
+                _initialUrl = AppSettings.GetEditPageUrl(_pageTitle);
                 EditWebView.CoreWebView2.Navigate(_initialUrl);
             };
         }

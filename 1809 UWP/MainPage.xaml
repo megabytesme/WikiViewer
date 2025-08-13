@@ -34,7 +34,7 @@
                 <ColumnDefinition/>
                 <ColumnDefinition x:Name="RightPaddingColumn" Width="0"/>
             </Grid.ColumnDefinitions>
-            <TextBlock Text="WikiViewer"
+            <TextBlock Text="Wiki Viewer"
                        VerticalAlignment="Center"
                        HorizontalAlignment="Left"
                        Margin="16,0,0,0"
@@ -63,7 +63,7 @@
             <muxc:NavigationView.AutoSuggestBox>
                 <AutoSuggestBox x:Name="SearchBox"
                                 QueryIcon="Find"
-                                PlaceholderText="Search BetaWiki..."
+                                PlaceholderText="Search..."
                                 QuerySubmitted="SearchBox_QuerySubmitted"
                                 TextChanged="SearchBox_TextChanged"/>
             </muxc:NavigationView.AutoSuggestBox>

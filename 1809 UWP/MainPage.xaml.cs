@@ -46,10 +46,11 @@ namespace _1809_UWP
                 await ApiWorker.EnsureCoreWebView2Async();
             }
 
+            SearchBox.PlaceholderText = $"Search {AppSettings.Host}...";
             if (ContentFrame.Content == null)
             {
                 NavView.SelectedItem = NavView.MenuItems.OfType<muxc.NavigationViewItem>().FirstOrDefault();
-                ContentFrame.Navigate(typeof(ArticleViewerPage), "Main Page");
+                ContentFrame.Navigate(typeof(ArticleViewerPage), AppSettings.MainPageName);
             }
 
             await CheckAndShowFirstRunDisclaimerAsync();
@@ -64,7 +65,7 @@ namespace _1809_UWP
             try
             {
                 Debug.WriteLine("[MainPage] Performing non-blocking pre-flight check...");
-                await ArticleProcessingService.PageExistsAsync("Main Page", ApiWorker);
+                await ArticleProcessingService.PageExistsAsync(AppSettings.MainPageName, ApiWorker);
                 Debug.WriteLine("[MainPage] Pre-flight check successful. Connection is clear.");
             }
             catch (NeedsUserVerificationException ex)
@@ -81,7 +82,7 @@ namespace _1809_UWP
                     var dialog = new ContentDialog
                     {
                         Title = "Connection Required for First Launch",
-                        Content = "WikiViewer needs to connect to the internet for its first use to set things up. Please check your connection and restart the app.",
+                        Content = "This app needs to connect to the internet for its first use to set things up. Please check your connection and restart the app.",
                         CloseButtonText = "Close App"
                     };
                     await dialog.ShowAsync();
@@ -90,7 +91,7 @@ namespace _1809_UWP
                 else
                 {
                     ConnectionInfoBar.Title = "Offline Mode";
-                    ConnectionInfoBar.Message = "Could not connect to BetaWiki. Only cached articles and favourites are available.";
+                    ConnectionInfoBar.Message = $"Could not connect to {AppSettings.Host}. Only cached articles and favourites are available.";
                     InfoBarButton.Visibility = Visibility.Collapsed;
                     ConnectionInfoBar.Severity = muxc.InfoBarSeverity.Error;
                     ConnectionInfoBar.IsOpen = true;
@@ -155,7 +156,7 @@ namespace _1809_UWP
                                 new Run()
                                 {
                                     Text =
-                                        "This is an unofficial, third-party client for browsing BetaWiki. This app was created by ",
+                                        "This is an unofficial, third-party client for browsing MediaWiki sites. This app was created by ",
                                 },
                                 new Hyperlink()
                                 {
@@ -165,14 +166,14 @@ namespace _1809_UWP
                                 new Run()
                                 {
                                     Text =
-                                        " and is not affiliated with, endorsed, or sponsored by the official BetaWiki team.",
+                                        " and is not affiliated with, endorsed, or sponsored by the operators of any specific wiki.",
                                 },
                                 new LineBreak(),
                                 new LineBreak(),
                                 new Run()
                                 {
                                     Text =
-                                        "All article data, content, and trademarks are the property of BetaWiki and its respective contributors.",
+                                        "All article data, content, and trademarks are the property of their respective owners and contributors.",
                                 },
                                 new LineBreak(),
                                 new LineBreak(),
@@ -180,15 +181,7 @@ namespace _1809_UWP
                                 {
                                     Text =
                                         "This disclaimer is available to view again in the settings.",
-                                },
-                                new LineBreak(),
-                                new LineBreak(),
-                                new Run() { Text = "You can view the official BetaWiki here: " },
-                                new Hyperlink()
-                                {
-                                    NavigateUri = new Uri("https://betawiki.net/"),
-                                    Inlines = { new Run() { Text = "BetaWiki" } },
-                                },
+                                }
                             },
                             TextWrapping = TextWrapping.Wrap,
                         },
@@ -215,7 +208,7 @@ namespace _1809_UWP
                         LoginNavItem.Icon = new FontIcon
                         {
                             FontFamily = new FontFamily("Segoe MDL2 Assets"),
-                            Glyph = "",
+                            Glyph = "\uE77B",
                         };
                         LoginNavItem.Tag = "userpage";
                     }
@@ -225,7 +218,7 @@ namespace _1809_UWP
                         LoginNavItem.Icon = new FontIcon
                         {
                             FontFamily = new FontFamily("Segoe MDL2 Assets"),
-                            Glyph = "",
+                            Glyph = "\uE77B",
                         };
                         LoginNavItem.Tag = "login";
                     }
@@ -317,7 +310,7 @@ namespace _1809_UWP
                 NavView.SelectedItem = NavView
                     .MenuItems.OfType<muxc.NavigationViewItem>()
                     .FirstOrDefault();
-                ContentFrame.Navigate(typeof(ArticleViewerPage), "Main Page");
+                ContentFrame.Navigate(typeof(ArticleViewerPage), AppSettings.MainPageName);
             }
         }
 
@@ -339,7 +332,7 @@ namespace _1809_UWP
                 {
                     case "home":
                         targetPage = typeof(ArticleViewerPage);
-                        pageParameter = "Main Page";
+                        pageParameter = AppSettings.MainPageName;
                         break;
                     case "random":
                         targetPage = typeof(ArticleViewerPage);
@@ -411,7 +404,7 @@ namespace _1809_UWP
             {
                 await Task.Delay(300, token);
                 string url =
-                    $"https://betawiki.net/api.php?action=opensearch&format=json&limit=10&search={Uri.EscapeDataString(query)}";
+                    $"{AppSettings.ApiEndpoint}?action=opensearch&format=json&limit=10&search={Uri.EscapeDataString(query)}";
 
                 string json = await ApiRequestService.GetJsonFromApiAsync(url, ApiWorker);
 
@@ -478,7 +471,7 @@ namespace _1809_UWP
                 && e.Parameter is string pageParameter
             )
             {
-                if (pageParameter.Equals("Main Page", StringComparison.OrdinalIgnoreCase))
+                if (pageParameter.Equals(AppSettings.MainPageName, StringComparison.OrdinalIgnoreCase))
                 {
                     targetTag = "home";
                 }

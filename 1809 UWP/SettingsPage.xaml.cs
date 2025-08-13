@@ -25,6 +25,7 @@ namespace _1809_UWP
             AuthService.AuthenticationStateChanged += AuthService_AuthenticationStateChanged;
 
             UpdateUserUI();
+            WikiUrlTextBox.Text = AppSettings.BaseUrl;
             CachingToggle.IsOn = AppSettings.IsCachingEnabled;
             SetupConcurrencySlider();
 
@@ -144,6 +145,8 @@ namespace _1809_UWP
             {
                 LoggedInState.Visibility = Visibility.Collapsed;
                 LoggedOutState.Visibility = Visibility.Visible;
+                LoggedOutStateTextBlock.Text = $"You are not signed in. Sign in to make edits and synchronise favourites on {AppSettings.Host}.";
+                SignInLink.Content = $"Sign in to {AppSettings.Host}";
             }
         }
 
@@ -155,6 +158,62 @@ namespace _1809_UWP
         private void SignInButton_Click(object sender, RoutedEventArgs e)
         {
             this.Frame.Navigate(typeof(LoginPage));
+        }
+
+        private async void ApplyUrlButton_Click(object sender, RoutedEventArgs e)
+        {
+            string newUrl = WikiUrlTextBox.Text.Trim();
+            if (!newUrl.EndsWith("/"))
+            {
+                newUrl += "/";
+            }
+
+            if (!Uri.TryCreate(newUrl, UriKind.Absolute, out var uriResult) ||
+                (uriResult.Scheme != Uri.UriSchemeHttp && uriResult.Scheme != Uri.UriSchemeHttps))
+            {
+                var invalidDialog = new ContentDialog
+                {
+                    Title = "Invalid URL",
+                    Content = "Please enter a valid, absolute URL starting with http:// or https://",
+                    CloseButtonText = "OK"
+                };
+                await invalidDialog.ShowAsync();
+                return;
+            }
+
+            if (newUrl.Equals(AppSettings.BaseUrl, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            var dialog = new ContentDialog
+            {
+                Title = "Apply New Wiki URL?",
+                Content = "This will clear all local cache, favourites, and log you out. This action cannot be undone. The app will navigate home after applying the changes.",
+                PrimaryButtonText = "Apply and Clear Data",
+                CloseButtonText = "Cancel"
+            };
+
+            var result = await dialog.ShowAsync();
+
+            if (result == ContentDialogResult.Primary)
+            {
+                LoadingOverlay.Visibility = Visibility.Visible;
+
+                AuthService.Logout();
+                await FavouritesService.ClearAllLocalFavouritesAsync();
+                await ArticleCacheManager.ClearCacheAsync();
+
+                AppSettings.BaseUrl = newUrl;
+                WikiUrlTextBox.Text = newUrl;
+
+                await UpdateCacheSizeDisplayAsync();
+                UpdateUserUI();
+
+                LoadingOverlay.Visibility = Visibility.Collapsed;
+
+                App.Navigate(typeof(MainPage), null);
+            }
         }
 
         private void CachingToggle_Toggled(object sender, RoutedEventArgs e)
@@ -206,14 +265,14 @@ namespace _1809_UWP
         {
             var dialog = new ContentDialog
             {
-                Title = "About WikiViewer",
+                Title = "About Wiki Viewer",
                 Content = new ScrollViewer()
                 {
                     Content = new TextBlock()
                     {
                         Inlines =
                         {
-                            new Run() { Text = "WikiViewer" },
+                            new Run() { Text = "Wiki Viewer" },
                             new LineBreak(),
                             new Run() { Text = "Version 2.0.1.0 (1809_UWP)" },
                             new LineBreak(),
@@ -256,15 +315,11 @@ namespace _1809_UWP
                     {
                         Inlines =
                         {
-                            new Run() { Text = "This is an unofficial, third-party client for browsing BetaWiki. This app was created by " },
+                            new Run() { Text = "This is an unofficial, third-party client for browsing MediaWiki sites. This app was created by " },
                             new Hyperlink() { NavigateUri = new Uri("https://github.com/megabytesme"), Inlines = { new Run() { Text = "MegaBytesMe" } }, },
-                            new Run() { Text = " and is not affiliated with, endorsed, or sponsored by the official BetaWiki team." },
+                            new Run() { Text = " and is not affiliated with, endorsed, or sponsored by the operators of any wiki." },
                             new LineBreak(), new LineBreak(),
-                            new Run() { Text = "All article data, content, and trademarks are the property of BetaWiki and its respective contributors. This app simply provides a native viewing experience for publicly available content." },
-                            new LineBreak(), new LineBreak(),
-                            new Run() { Text = "You can view the official BetaWiki here: " },
-                            new Hyperlink() { NavigateUri = new Uri("https://betawiki.net/"), Inlines = { new Run() { Text = "BetaWiki" } }, },
-                            new LineBreak(),
+                            new Run() { Text = $"All article data, content, and trademarks presented from {AppSettings.Host} are the property of that site and its respective contributors. This app simply provides a native viewing experience for publicly available content." },
                         },
                         TextWrapping = TextWrapping.Wrap,
                     },

@@ -19,8 +19,6 @@ namespace _1809_UWP
 {
     public static class ArticleProcessingService
     {
-        private const string ApiBaseUrl = "https://betawiki.net/api.php";
-
         public static async Task<(string Html, string ResolvedTitle)> FetchAndCacheArticleAsync(
             string pageTitle,
             Stopwatch stopwatch,
@@ -45,7 +43,7 @@ namespace _1809_UWP
             if (pageTitle.Equals("random", StringComparison.OrdinalIgnoreCase))
             {
                 string randomTitleJson = await ApiRequestService.GetJsonFromApiAsync(
-                    $"{ApiBaseUrl}?action=query&list=random&rnnamespace=0&rnlimit=1&format=json",
+                    $"{AppSettings.ApiEndpoint}?action=query&list=random&rnnamespace=0&rnlimit=1&format=json",
                     workerToUse
                 );
                 if (string.IsNullOrEmpty(randomTitleJson))
@@ -100,7 +98,7 @@ namespace _1809_UWP
                 );
             }
 
-            string pageUrl = $"https://betawiki.net/wiki/{Uri.EscapeDataString(resolvedTitle)}";
+            string pageUrl = AppSettings.GetWikiPageUrl(resolvedTitle);
 
             long downloadStartTime = stopwatch.ElapsedMilliseconds;
             Debug.WriteLine(
@@ -163,9 +161,9 @@ namespace _1809_UWP
             )
             {
                 string href = link.GetAttributeValue("href", "");
-                if (href.StartsWith("/wiki/") || href.StartsWith("/index.php?"))
+                if (href.StartsWith($"/{AppSettings.ArticlePath}") || href.StartsWith($"/{AppSettings.ScriptPath}index.php?"))
                 {
-                    link.SetAttributeValue("href", "https://betawiki.net" + href);
+                    link.SetAttributeValue("href", AppSettings.BaseUrl.TrimEnd('/') + href);
                 }
             }
 
@@ -187,16 +185,16 @@ namespace _1809_UWP
             SemaphoreSlim semaphore = null
         )
         {
-            var imageLinks = doc.DocumentNode.SelectNodes("//a[starts-with(@href, '/wiki/File:')]");
+            var imageLinks = doc.DocumentNode.SelectNodes($"//a[starts-with(@href, '/{AppSettings.ArticlePath}File:')]");
             if (imageLinks != null && imageLinks.Any())
             {
                 var imageFileNames = imageLinks
-                    .Select(link => link.GetAttributeValue("href", "").Substring(6))
+                    .Select(link => link.GetAttributeValue("href", "").Substring(AppSettings.ArticlePath.Length + 1))
                     .Distinct()
                     .ToList();
                 var titles = string.Join("|", imageFileNames.Select(Uri.EscapeDataString));
                 var imageUrlApi =
-                    $"{ApiBaseUrl}?action=query&prop=imageinfo&iiprop=url&format=json&titles={titles}";
+                    $"{AppSettings.ApiEndpoint}?action=query&prop=imageinfo&iiprop=url&format=json&titles={titles}";
 
                 try
                 {
@@ -222,7 +220,7 @@ namespace _1809_UWP
                                 foreach (var link in imageLinks)
                                 {
                                     string lookupKey = Uri.UnescapeDataString(
-                                            link.GetAttributeValue("href", "").Substring(6)
+                                            link.GetAttributeValue("href", "").Substring(AppSettings.ArticlePath.Length + 1)
                                         )
                                         .Replace('_', ' ');
                                     if (imageUrlMap.TryGetValue(lookupKey, out string fullImageUrl))
@@ -292,7 +290,7 @@ namespace _1809_UWP
                 {
                     img.SetAttributeValue(
                         "src",
-                        $"https://{ArticleViewerPage.VirtualHostName}{localImagePath}"
+                        $"https://{ArticleViewerPage.GetVirtualHostName()}{localImagePath}"
                     );
                     img.Attributes.Remove("srcset");
                 }
@@ -301,7 +299,7 @@ namespace _1809_UWP
 
         private static async Task<string> DownloadAndCacheImageAsync(string originalUrl)
         {
-            if (!Uri.TryCreate(new Uri("https://betawiki.net"), originalUrl, out Uri imageUrl))
+            if (!Uri.TryCreate(new Uri(AppSettings.BaseUrl), originalUrl, out Uri imageUrl))
                 return null;
 
             var extension = Path.GetExtension(imageUrl.LocalPath).ToLowerInvariant();
@@ -432,7 +430,7 @@ namespace _1809_UWP
             )
                 return null;
             string url =
-                $"{ApiBaseUrl}?action=query&prop=revisions&titles={Uri.EscapeDataString(pageTitle)}&rvprop=timestamp&rvlimit=1&format=json";
+                $"{AppSettings.ApiEndpoint}?action=query&prop=revisions&titles={Uri.EscapeDataString(pageTitle)}&rvprop=timestamp&rvlimit=1&format=json";
             try
             {
                 string json = await ApiRequestService.GetJsonFromApiAsync(url, worker);
@@ -458,7 +456,7 @@ namespace _1809_UWP
 
             var workerToUse = worker ?? MainPage.ApiWorker;
             var escapedTitle = Uri.EscapeDataString(pageTitle);
-            var url = $"{ApiBaseUrl}?action=query&titles={escapedTitle}&format=json";
+            var url = $"{AppSettings.ApiEndpoint}?action=query&titles={escapedTitle}&format=json";
 
             try
             {
@@ -471,7 +469,7 @@ namespace _1809_UWP
                 if (pages == null) return false;
 
                 var firstPage = pages.First as JProperty;
-                if (firstPage?.Value?["missing"] != null)
+                if (firstPage?.Value?["missing"] != null || firstPage?.Name == "-1")
                 {
                     return false;
                 }
@@ -506,9 +504,9 @@ namespace _1809_UWP
             )
             {
                 string href = link.GetAttributeValue("href", "");
-                if (href.StartsWith("/wiki/") || href.StartsWith("/index.php?"))
+                if (href.StartsWith($"/{AppSettings.ArticlePath}") || href.StartsWith($"/{AppSettings.ScriptPath}index.php?"))
                 {
-                    link.SetAttributeValue("href", "https://betawiki.net" + href);
+                    link.SetAttributeValue("href", AppSettings.BaseUrl.TrimEnd('/') + href);
                 }
             }
 

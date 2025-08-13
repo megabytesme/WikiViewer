@@ -10,14 +10,13 @@
 
     <Grid>
         <ScrollViewer>
-            <StackPanel Spacing="16" Padding="16,64,16,12" HorizontalAlignment="Center">
+            <StackPanel Spacing="16" Padding="16,64,16,12" HorizontalAlignment="Center" MaxWidth="500">
                 <Border
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                     BorderThickness="1"
                     CornerRadius="8"
-                    Padding="16"
-                    MaxWidth="500">
+                    Padding="16">
                     <StackPanel Spacing="12">
                         <TextBlock Text="Account" Style="{ThemeResource SubtitleTextBlockStyle}" HorizontalAlignment="Center"/>
                         <StackPanel x:Name="LoggedInState" Spacing="16" Orientation="Horizontal" Visibility="Collapsed">
@@ -28,18 +27,33 @@
                             </StackPanel>
                         </StackPanel>
                         <StackPanel x:Name="LoggedOutState" Spacing="8" Visibility="Collapsed">
-                            <TextBlock Text="You are not signed in. Sign in to make edits and synchronise favourites!" Style="{ThemeResource BodyTextBlockStyle}"/>
-                            <HyperlinkButton Content="Sign in to BetaWiki" Click="SignInButton_Click" Padding="0"/>
+                            <TextBlock x:Name="LoggedOutStateTextBlock" Text="You are not signed in. Sign in to make edits and synchronise favourites!" Style="{ThemeResource BodyTextBlockStyle}" TextWrapping="Wrap"/>
+                            <HyperlinkButton x:Name="SignInLink" Content="Sign in" Click="SignInButton_Click" Padding="0"/>
                         </StackPanel>
                     </StackPanel>
                 </Border>
+
                 <Border
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                     BorderThickness="1"
                     CornerRadius="8"
-                    Padding="16"
-                    MaxWidth="500">
+                    Padding="16">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="Wiki Instance" Style="{ThemeResource SubtitleTextBlockStyle}" HorizontalAlignment="Center"/>
+                        <TextBox x:Name="WikiUrlTextBox" Header="MediaWiki Base URL (e.g., https://en.wikipedia.org/)"/>
+                        <TextBlock Text="Changing the URL will clear all local data (cache, favourites) and log you out." 
+                                   TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}"/>
+                        <Button x:Name="ApplyUrlButton" Content="Apply and Clear Data" Click="ApplyUrlButton_Click" HorizontalAlignment="Stretch"/>
+                    </StackPanel>
+                </Border>
+
+                <Border
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="16">
                     <StackPanel Spacing="12">
                         <TextBlock Text="Storage" Style="{ThemeResource SubtitleTextBlockStyle}" HorizontalAlignment="Center"/>
                         <Grid VerticalAlignment="Center">
@@ -94,12 +108,11 @@
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                     BorderThickness="1"
                     CornerRadius="8"
-                    Padding="16"
-                    MaxWidth="500">
+                    Padding="16">
                     <StackPanel Spacing="12">
                         <TextBlock Text="About" Style="{ThemeResource SubtitleTextBlockStyle}" HorizontalAlignment="Center"/>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="12">
-                            <Button Content="About WikiViewer" Click="AboutButton_Click" VerticalAlignment="Center"/>
+                            <Button Content="About This App" Click="AboutButton_Click" VerticalAlignment="Center"/>
                             <Button Content="Disclaimer" Click="DisclaimerButton_Click" VerticalAlignment="Center"/>
                         </StackPanel>
                     </StackPanel>
@@ -109,6 +122,10 @@
 
         <Grid Style="{StaticResource PageTitleBarGridStyle}" VerticalAlignment="Top" Margin="0,0,7,0">
             <TextBlock Text="Settings" Style="{StaticResource PageTitleBarTextStyle}"/>
+        </Grid>
+
+        <Grid x:Name="LoadingOverlay" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Visibility="Collapsed">
+            <ProgressRing IsActive="True" Width="60" Height="60"/>
         </Grid>
     </Grid>
 </Page>

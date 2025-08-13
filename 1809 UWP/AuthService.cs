@@ -17,7 +17,6 @@ namespace _1809_UWP
         public static string Username { get; private set; }
         private static string _csrfToken;
         private static WebView2 _authenticatedWorker;
-        private const string ApiUrl = "https://betawiki.net/api.php";
 
         private static async Task<WebView2> CreateAndInitWebView2()
         {
@@ -38,7 +37,7 @@ namespace _1809_UWP
             _authenticatedWorker = await CreateAndInitWebView2();
 
             string tokenJson = await ApiRequestService.GetJsonFromApiAsync(
-                $"{ApiUrl}?action=query&meta=tokens&type=login&format=json&_={DateTime.Now.Ticks}",
+                $"{AppSettings.ApiEndpoint}?action=query&meta=tokens&type=login&format=json&_={DateTime.Now.Ticks}",
                 _authenticatedWorker
             );
 
@@ -50,10 +49,10 @@ namespace _1809_UWP
 
             var loginPostData = new Dictionary<string, string>
             {
-                { "action", "clientlogin" }, { "format", "json" }, { "username", username }, { "password", password }, { "logintoken", loginToken }, { "loginreturnurl", "https://betawiki.net" }
+                { "action", "clientlogin" }, { "format", "json" }, { "username", username }, { "password", password }, { "logintoken", loginToken }, { "loginreturnurl", AppSettings.BaseUrl }
             };
 
-            string resultJson = await ApiRequestService.PostAndGetJsonFromApiAsync(_authenticatedWorker, ApiUrl, loginPostData);
+            string resultJson = await ApiRequestService.PostAndGetJsonFromApiAsync(_authenticatedWorker, AppSettings.ApiEndpoint, loginPostData);
 
             var resultResponse = JsonConvert.DeserializeObject<ClientLoginResponse>(resultJson);
             if (resultResponse?.clientlogin?.status != "PASS")
@@ -84,7 +83,7 @@ namespace _1809_UWP
                 };
                 try
                 {
-                    await ApiRequestService.PostAndGetJsonFromApiAsync(_authenticatedWorker, ApiUrl, logoutPostData);
+                    await ApiRequestService.PostAndGetJsonFromApiAsync(_authenticatedWorker, AppSettings.ApiEndpoint, logoutPostData);
                 }
                 catch (Exception ex)
                 {
@@ -165,7 +164,7 @@ namespace _1809_UWP
 
             try
             {
-                string responseJson = await ApiRequestService.PostAndGetJsonFromApiAsync(worker, ApiUrl, postData);
+                string responseJson = await ApiRequestService.PostAndGetJsonFromApiAsync(worker, AppSettings.ApiEndpoint, postData);
                 var response = JsonConvert.DeserializeObject<WatchActionResponse>(responseJson);
                 if (add && (response?.Watch == null || !response.Watch.Any())) throw new Exception("Server did not confirm watch action.");
                 else if (!add && (response?.Unwatch == null || !response.Unwatch.Any())) throw new Exception("Server did not confirm unwatch action.");
@@ -178,7 +177,7 @@ namespace _1809_UWP
 
         private static async Task<HashSet<string>> FetchWatchlistAsync(WebView2 worker)
         {
-            string url = $"{ApiUrl}?action=query&list=watchlistraw&wrlimit=max&format=json&_={DateTime.Now.Ticks}";
+            string url = $"{AppSettings.ApiEndpoint}?action=query&list=watchlistraw&wrlimit=max&format=json&_={DateTime.Now.Ticks}";
             string watchlistJson = await ApiRequestService.GetJsonFromApiAsync(url, worker);
 
             if (string.IsNullOrEmpty(watchlistJson))
@@ -207,7 +206,7 @@ namespace _1809_UWP
 
         private static async Task FetchCsrfTokenAsync(WebView2 worker)
         {
-            string url = $"{ApiUrl}?action=query&meta=tokens&type=watch&format=json&_={DateTime.Now.Ticks}";
+            string url = $"{AppSettings.ApiEndpoint}?action=query&meta=tokens&type=watch&format=json&_={DateTime.Now.Ticks}";
             string responseJson = await ApiRequestService.GetJsonFromApiAsync(url, worker);
             if (string.IsNullOrEmpty(responseJson)) throw new Exception("Failed to retrieve valid JSON for token.");
 

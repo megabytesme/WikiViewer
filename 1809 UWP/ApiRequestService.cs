@@ -18,7 +18,7 @@ namespace _1809_UWP
     {
         public static async Task CopyApiCookiesAsync(CoreWebView2 source, CoreWebView2 destination)
         {
-            var sourceCookies = await source.CookieManager.GetCookiesAsync("https://betawiki.net");
+            var sourceCookies = await source.CookieManager.GetCookiesAsync(AppSettings.BaseUrl);
             if (sourceCookies == null) return;
 
             foreach (var cookie in sourceCookies)

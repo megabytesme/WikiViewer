@@ -8,46 +8,69 @@ namespace _1809_UWP
         private const string CachingEnabledKey = "IsCachingEnabled";
         private const string DisclaimerShownKey = "HasShownDisclaimer";
         private const string MaxConcurrentDownloadsKey = "MaxConcurrentDownloads";
+        private const string MediaWikiUrlKey = "MediaWikiUrl";
+        private const string DefaultMediaWikiUrl = "https://en.wikipedia.org/";
+        private const string DefaultMainPageName = "Main Page";
 
-        private static readonly ApplicationDataContainer _localSettings = ApplicationData.Current.LocalSettings;
+        private static readonly ApplicationDataContainer _localSettings = ApplicationData
+            .Current
+            .LocalSettings;
 
         public static bool IsCachingEnabled
         {
-            get
-            {
-                object value = _localSettings.Values[CachingEnabledKey];
-                return (value == null) || (bool)value;
-            }
-            set
-            {
-                _localSettings.Values[CachingEnabledKey] = value;
-            }
+            get => _localSettings.Values[CachingEnabledKey] as bool? ?? true;
+            set => _localSettings.Values[CachingEnabledKey] = value;
         }
 
         public static bool HasShownDisclaimer
         {
-            get
-            {
-                object value = _localSettings.Values[DisclaimerShownKey];
-                return value != null && (bool)value;
-            }
-            set
-            {
-                _localSettings.Values[DisclaimerShownKey] = value;
-            }
+            get => _localSettings.Values[DisclaimerShownKey] as bool? ?? false;
+            set => _localSettings.Values[DisclaimerShownKey] = value;
         }
 
         public static int MaxConcurrentDownloads
         {
+            get =>
+                _localSettings.Values[MaxConcurrentDownloadsKey] as int?
+                ?? Environment.ProcessorCount;
+            set => _localSettings.Values[MaxConcurrentDownloadsKey] = value;
+        }
+
+        public static string BaseUrl
+        {
             get
             {
-                object value = _localSettings.Values[MaxConcurrentDownloadsKey];
-                return (value == null) ? Environment.ProcessorCount : (int)value;
+                string url =
+                    (_localSettings.Values[MediaWikiUrlKey] as string) ?? DefaultMediaWikiUrl;
+                return url.EndsWith("/") ? url : url + "/";
             }
             set
             {
-                _localSettings.Values[MaxConcurrentDownloadsKey] = value;
+                if (
+                    Uri.TryCreate(value, UriKind.Absolute, out var uriResult)
+                    && (
+                        uriResult.Scheme == Uri.UriSchemeHttp
+                        || uriResult.Scheme == Uri.UriSchemeHttps
+                    )
+                )
+                {
+                    _localSettings.Values[MediaWikiUrlKey] = value;
+                }
             }
         }
+
+        public static string Host => new Uri(BaseUrl).Host;
+        public static string ScriptPath => "w/";
+        public static string ArticlePath => "wiki/";
+
+        public static string ApiEndpoint => $"{BaseUrl}{ScriptPath}api.php";
+        public static string IndexEndpoint => $"{BaseUrl}{ScriptPath}index.php";
+        public static string MainPageName => DefaultMainPageName;
+
+        public static string GetWikiPageUrl(string pageTitle) =>
+            $"{BaseUrl}{ArticlePath}{Uri.EscapeDataString(pageTitle)}";
+
+        public static string GetEditPageUrl(string pageTitle) =>
+            $"{IndexEndpoint}?title={Uri.EscapeDataString(pageTitle)}&action=edit";
     }
 }
