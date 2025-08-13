@@ -7,14 +7,14 @@
   IgnorableNamespaces="uap mp">
 
   <Identity
-    Name="MegaBytesMe.252250E020BF5"
+    Name="MegaBytesMe.WikiViewer"
     Publisher="CN=F0BC24FD-E28E-4D47-BEEA-3B6CF444653E"
     Version="2.0.1.0" />
 
-  <mp:PhoneIdentity PhoneProductId="8c714168-9a58-4c46-8dfc-016b564168a6" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
+  <mp:PhoneIdentity PhoneProductId="44de6106-36b5-4d4f-b3f6-df77b768126a" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
   <Properties>
-    <DisplayName>WikiBeta</DisplayName>
+    <DisplayName>Wiki Viewer</DisplayName>
     <PublisherDisplayName>MegaBytesMe</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
@@ -32,10 +32,10 @@
       Executable="$targetnametoken$.exe"
       EntryPoint="_1809_UWP.App">
       <uap:VisualElements
-        DisplayName="WikiBeta"
+        DisplayName="Wiki Viewer"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png"
-        Description="WikiBeta is an unofficial, third-party client for browsing the BetaWiki without your web browser, online and offline (after caching)."
+        Description="WikiViewer is a client for browsing MediaWiki-based wikis without your web browser, online and offline (after caching)."
         BackgroundColor="transparent">
         <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" Square71x71Logo="Assets\SmallTile.png" Square310x310Logo="Assets\LargeTile.png"/>
         <uap:SplashScreen Image="Assets\SplashScreen.png" />

@@ -12,7 +12,7 @@ namespace _1809_UWP
 
     public static class CredentialService
     {
-        private const string ResourceName = "WikiBetaAppCredentials";
+        private const string ResourceName = "WikiViewerAppCredentials";
 
         public static void SaveCredentials(string username, string password)
         {

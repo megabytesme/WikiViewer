@@ -34,7 +34,7 @@
                 <ColumnDefinition/>
                 <ColumnDefinition x:Name="RightPaddingColumn" Width="0"/>
             </Grid.ColumnDefinitions>
-            <TextBlock Text="WikiBeta"
+            <TextBlock Text="WikiViewer"
                        VerticalAlignment="Center"
                        HorizontalAlignment="Left"
                        Margin="16,0,0,0"

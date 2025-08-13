@@ -206,27 +206,27 @@ namespace _1809_UWP
         {
             var dialog = new ContentDialog
             {
-                Title = "About WikiBeta",
+                Title = "About WikiViewer",
                 Content = new ScrollViewer()
                 {
                     Content = new TextBlock()
                     {
                         Inlines =
                         {
-                            new Run() { Text = "WikiBeta" },
+                            new Run() { Text = "WikiViewer" },
                             new LineBreak(),
                             new Run() { Text = "Version 2.0.1.0 (1809_UWP)" },
                             new LineBreak(),
                             new Run() { Text = "Copyright © 2025 MegaBytesMe" },
                             new LineBreak(), new LineBreak(),
                             new Run() { Text = "Source code available on " },
-                            new Hyperlink() { NavigateUri = new Uri("https://github.com/megabytesme/WikiBeta"), Inlines = { new Run() { Text = "GitHub" } }, },
+                            new Hyperlink() { NavigateUri = new Uri("https://github.com/megabytesme/WikiViewer"), Inlines = { new Run() { Text = "GitHub" } }, },
                             new LineBreak(),
                             new Run() { Text = "Anything wrong? Let me know: " },
-                            new Hyperlink() { NavigateUri = new Uri("https://github.com/megabytesme/WikiBeta/issues"), Inlines = { new Run() { Text = "Support" } }, },
+                            new Hyperlink() { NavigateUri = new Uri("https://github.com/megabytesme/WikiViewer/issues"), Inlines = { new Run() { Text = "Support" } }, },
                             new LineBreak(),
                             new Run() { Text = "Privacy Policy: " },
-                            new Hyperlink() { NavigateUri = new Uri("https://github.com/megabytesme/WikiBeta/blob/master/PRIVACYPOLICY.md"), Inlines = { new Run() { Text = "Privacy Policy" } }, },
+                            new Hyperlink() { NavigateUri = new Uri("https://github.com/megabytesme/WikiViewer/blob/master/PRIVACYPOLICY.md"), Inlines = { new Run() { Text = "Privacy Policy" } }, },
                             new LineBreak(), new LineBreak(),
                             new Run() { Text = "Like what you see? View my " },
                             new Hyperlink() { NavigateUri = new Uri("https://github.com/megabytesme"), Inlines = { new Run() { Text = "GitHub" } }, },
@@ -235,7 +235,7 @@ namespace _1809_UWP
                             new Run() { Text = " or consider buying me a coffee (supporting me) on " },
                             new Hyperlink() { NavigateUri = new Uri("https://ko-fi.com/megabytesme"), Inlines = { new Run() { Text = "Ko-fi! :-)" } }, },
                             new LineBreak(), new LineBreak(),
-                            new Run() { Text = "WikiBeta is an unofficial, third-party client for browsing the BetaWiki (not affiliated) without your web browser, online and offline (after caching).", },
+                            new Run() { Text = "WikiViewer is a client for browsing MediaWiki-based wikis without your web browser, online and offline (after caching).", },
                         },
                         TextWrapping = TextWrapping.Wrap,
                     },

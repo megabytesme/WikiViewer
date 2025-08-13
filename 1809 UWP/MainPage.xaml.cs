@@ -81,7 +81,7 @@ namespace _1809_UWP
                     var dialog = new ContentDialog
                     {
                         Title = "Connection Required for First Launch",
-                        Content = "WikiBeta needs to connect to the internet for its first use to set things up. Please check your connection and restart the app.",
+                        Content = "WikiViewer needs to connect to the internet for its first use to set things up. Please check your connection and restart the app.",
                         CloseButtonText = "Close App"
                     };
                     await dialog.ShowAsync();

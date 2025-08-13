@@ -99,7 +99,7 @@
                     <StackPanel Spacing="12">
                         <TextBlock Text="About" Style="{ThemeResource SubtitleTextBlockStyle}" HorizontalAlignment="Center"/>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="12">
-                            <Button Content="About WikiBeta" Click="AboutButton_Click" VerticalAlignment="Center"/>
+                            <Button Content="About WikiViewer" Click="AboutButton_Click" VerticalAlignment="Center"/>
                             <Button Content="Disclaimer" Click="DisclaimerButton_Click" VerticalAlignment="Center"/>
                         </StackPanel>
                     </StackPanel>
