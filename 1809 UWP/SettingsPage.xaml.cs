@@ -2,6 +2,7 @@
 using System.Threading.Tasks;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Controls.Primitives;
 using Windows.UI.Xaml.Documents;
 using Windows.UI.Xaml.Navigation;
 
@@ -9,6 +10,10 @@ namespace _1809_UWP
 {
     public sealed partial class SettingsPage : Page
     {
+        private const int BaseRamMb = 400;
+        private const int EstimatedRamPerTaskMb = 122;
+        private const int highPerformanceMultiplier = 2;
+
         public SettingsPage()
         {
             this.InitializeComponent();
@@ -21,7 +26,98 @@ namespace _1809_UWP
 
             UpdateUserUI();
             CachingToggle.IsOn = AppSettings.IsCachingEnabled;
+            SetupConcurrencySlider();
+
             await UpdateCacheSizeDisplayAsync();
+        }
+
+        private void SetupConcurrencySlider()
+        {
+            ConcurrentDownloadsSlider.ValueChanged -= ConcurrentDownloadsSlider_ValueChanged;
+
+            int processorCount = Environment.ProcessorCount;
+            int highPerfStep = processorCount + 1;
+            int unlimitedStep = processorCount + 2;
+            ConcurrentDownloadsSlider.Maximum = unlimitedStep;
+
+            int currentSetting = AppSettings.MaxConcurrentDownloads;
+
+            if (currentSetting == int.MaxValue)
+            {
+                ConcurrentDownloadsSlider.Value = unlimitedStep;
+            }
+            else if (currentSetting == processorCount * highPerformanceMultiplier)
+            {
+                ConcurrentDownloadsSlider.Value = highPerfStep;
+            }
+            else
+            {
+                ConcurrentDownloadsSlider.Value = Math.Min(currentSetting, processorCount);
+            }
+
+            UpdateSliderDisplayTextAndEstimate();
+
+            ConcurrentDownloadsSlider.ValueChanged += ConcurrentDownloadsSlider_ValueChanged;
+        }
+
+        private void ConcurrentDownloadsSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+        {
+            if (e.NewValue == e.OldValue) return;
+
+            UpdateSliderDisplayTextAndEstimate();
+        }
+
+        private void UpdateSliderDisplayTextAndEstimate()
+        {
+            if (ConcurrentDownloadsValueText == null || RamEstimateText == null) return;
+
+            int sliderValue = (int)ConcurrentDownloadsSlider.Value;
+            int processorCount = Environment.ProcessorCount;
+            int highPerfStep = processorCount + 1;
+            int unlimitedStep = processorCount + 2;
+
+            int actualTaskCount;
+            string displayText;
+
+            if (sliderValue == unlimitedStep)
+            {
+                displayText = "Unlimited";
+                actualTaskCount = 256;
+                AppSettings.MaxConcurrentDownloads = int.MaxValue;
+            }
+            else if (sliderValue == highPerfStep)
+            {
+                actualTaskCount = processorCount * highPerformanceMultiplier;
+                displayText = $"High ({actualTaskCount})";
+                AppSettings.MaxConcurrentDownloads = actualTaskCount;
+            }
+            else
+            {
+                actualTaskCount = sliderValue;
+                displayText = actualTaskCount.ToString();
+                AppSettings.MaxConcurrentDownloads = actualTaskCount;
+            }
+
+            ConcurrentDownloadsValueText.Text = displayText;
+
+            long estimatedPeakRamMb = BaseRamMb + ((long)actualTaskCount * EstimatedRamPerTaskMb);
+            string formattedRam;
+            if (estimatedPeakRamMb >= 1024)
+            {
+                double totalRamGb = estimatedPeakRamMb / 1024.0;
+                formattedRam = $"{totalRamGb:F1} GB";
+            }
+            else
+            {
+                formattedRam = $"{estimatedPeakRamMb} MB";
+            }
+
+            string estimateText = $"Estimated peak background RAM usage: ~{formattedRam}";
+            if (sliderValue == unlimitedStep)
+            {
+                estimateText += " (or more)";
+            }
+            RamEstimateText.Text = estimateText;
         }
 
         protected override void OnNavigatedFrom(NavigationEventArgs e)

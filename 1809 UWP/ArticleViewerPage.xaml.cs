@@ -198,12 +198,18 @@ namespace _1809_UWP
 
         private async Task DisplayProcessedHtml(string html)
         {
+            if (ArticleDisplayWebView.CoreWebView2 == null)
+            {
+                await ArticleDisplayWebView.EnsureCoreWebView2Async();
+            }
+
             StorageFolder localFolder = ApplicationData.Current.LocalFolder;
             StorageFile articleFile = await localFolder.CreateFileAsync(
                 "article.html",
                 CreationCollisionOption.ReplaceExisting
             );
             await FileIO.WriteTextAsync(articleFile, html);
+
             ArticleDisplayWebView.CoreWebView2.Navigate($"https://{VirtualHostName}/article.html");
         }
 

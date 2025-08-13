@@ -23,9 +23,11 @@ namespace _1809_UWP
                 return;
             }
 
-            Debug.WriteLine($"[BG CACHE] Starting PARALLEL caching for {titlesToCache.Count} favourites with a concurrency of {Environment.ProcessorCount}.");
+            int maxConcurrency = AppSettings.MaxConcurrentDownloads;
 
-            var semaphore = new SemaphoreSlim(Environment.ProcessorCount);
+            Debug.WriteLine($"[BG CACHE] Starting PARALLEL caching for {titlesToCache.Count} favourites with a concurrency of {maxConcurrency}.");
+
+            var semaphore = new SemaphoreSlim(maxConcurrency);
 
             var cachingTasks = titlesToCache.Select(async title =>
             {
@@ -47,7 +49,7 @@ namespace _1809_UWP
                             }
 
                             var stopwatch = Stopwatch.StartNew();
-                            await ArticleProcessingService.FetchAndCacheArticleAsync(title, stopwatch, false, tempWorker);
+                            await ArticleProcessingService.FetchAndCacheArticleAsync(title, stopwatch, false, tempWorker, semaphore);
 
                             ArticleCached?.Invoke(null, new ArticleCachedEventArgs(title));
                         }

@@ -50,6 +50,32 @@
                             <TextBlock Text="Enable Article Caching" VerticalAlignment="Center" Style="{ThemeResource BodyStrongTextBlockStyle}"/>
                             <ToggleSwitch x:Name="CachingToggle" Toggled="CachingToggle_Toggled" VerticalAlignment="Center" HorizontalAlignment="Right" OffContent="" OnContent="" Margin="300,0,-110,0"/>
                         </Grid>
+                        <Grid Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Slider x:Name="ConcurrentDownloadsSlider"
+                                    Header="Maximum concurrent downloads per page"
+                                    StepFrequency="1"
+                                    ValueChanged="ConcurrentDownloadsSlider_ValueChanged"
+                                    VerticalAlignment="Center">
+                                <Slider.Minimum>
+                                    <x:Double>1</x:Double>
+                                </Slider.Minimum>
+                            </Slider>
+                            <TextBlock x:Name="ConcurrentDownloadsValueText"
+                                       Grid.Column="1"
+                                       Text="4"
+                                       Margin="12,0,0,0"
+                                       VerticalAlignment="Center"
+                                       Style="{ThemeResource BodyStrongTextBlockStyle}"/>
+                        </Grid>
+                        <TextBlock x:Name="RamEstimateText"
+                                   Style="{ThemeResource CaptionTextBlockStyle}"
+                                   Opacity="0.8"
+                                   Margin="0,4,0,0"
+                                   Text="Estimated peak background RAM usage: ~500 MB"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>

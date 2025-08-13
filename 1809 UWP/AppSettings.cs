@@ -1,3 +1,4 @@
+using System;
 using Windows.Storage;
 
 namespace _1809_UWP
@@ -6,6 +7,7 @@ namespace _1809_UWP
     {
         private const string CachingEnabledKey = "IsCachingEnabled";
         private const string DisclaimerShownKey = "HasShownDisclaimer";
+        private const string MaxConcurrentDownloadsKey = "MaxConcurrentDownloads";
 
         private static ApplicationDataContainer _localSettings = ApplicationData.Current.LocalSettings;
 
@@ -32,6 +34,19 @@ namespace _1809_UWP
             set
             {
                 _localSettings.Values[DisclaimerShownKey] = value;
+            }
+        }
+
+        public static int MaxConcurrentDownloads
+        {
+            get
+            {
+                object value = _localSettings.Values[MaxConcurrentDownloadsKey];
+                return (value == null) ? Environment.ProcessorCount : (int)value;
+            }
+            set
+            {
+                _localSettings.Values[MaxConcurrentDownloadsKey] = value;
             }
         }
     }
