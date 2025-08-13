@@ -158,6 +158,7 @@
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="StringUrlToImageSourceConverter.cs" />
+    <Compile Include="WikiPathDetectorService.cs" />
   </ItemGroup>
   <ItemGroup>
     <AppxManifest Include="Package.appxmanifest">

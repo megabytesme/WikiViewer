@@ -41,15 +41,31 @@
                     Padding="16">
                     <StackPanel Spacing="12">
                         <TextBlock Text="Wiki Instance" Style="{ThemeResource SubtitleTextBlockStyle}" HorizontalAlignment="Center"/>
-                        <TextBox x:Name="WikiUrlTextBox" Header="MediaWiki Base URL" PlaceholderText="https://en.wikipedia.org/"/>
-                        <TextBox x:Name="ScriptPathTextBox" Header="Script Path" PlaceholderText="w/"/>
-                        <TextBox x:Name="ArticlePathTextBox" Header="Article Path" PlaceholderText="wiki/"/>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="WikiUrlTextBox" Header="MediaWiki Base URL" PlaceholderText="https://en.wikipedia.org/"/>
+                            <Button x:Name="DetectButton" Grid.Column="1" VerticalAlignment="Bottom" Margin="8,0,0,0" Click="DetectButton_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <SymbolIcon Symbol="Find"/>
+                                    <TextBlock Text="Detect"/>
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+
+                        <TextBox x:Name="ScriptPathTextBox" Header="Script Path (if any)" PlaceholderText="w/"/>
+                        <TextBox x:Name="ArticlePathTextBox" Header="Article Path (if any)" PlaceholderText="wiki/"/>
+
+                        <TextBlock x:Name="DetectionStatusText" Visibility="Collapsed" TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}"/>
+
                         <TextBlock Text="Changing these values will clear all local data (cache, favourites) and log you out." 
                                    TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}"/>
                         <Button x:Name="ApplyUrlButton" Content="Apply and Clear Data" Click="ApplyUrlButton_Click" HorizontalAlignment="Stretch"/>
                     </StackPanel>
                 </Border>
-
                 <Border
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
@@ -127,7 +143,10 @@
         </Grid>
 
         <Grid x:Name="LoadingOverlay" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Visibility="Collapsed">
-            <ProgressRing IsActive="True" Width="60" Height="60"/>
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
+                <ProgressRing IsActive="True" Width="60" Height="60"/>
+                <TextBlock x:Name="LoadingOverlayText" Text="Please wait..."/>
+            </StackPanel>
         </Grid>
     </Grid>
 </Page>

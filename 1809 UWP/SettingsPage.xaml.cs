@@ -1,9 +1,12 @@
-﻿using System;
+﻿using Microsoft.UI.Xaml.Controls;
+using System;
 using System.Threading.Tasks;
+using Windows.UI;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Controls.Primitives;
 using Windows.UI.Xaml.Documents;
+using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Navigation;
 
 namespace _1809_UWP
@@ -37,6 +40,66 @@ namespace _1809_UWP
             WikiUrlTextBox.Text = AppSettings.BaseUrl;
             ScriptPathTextBox.Text = AppSettings.ScriptPath;
             ArticlePathTextBox.Text = AppSettings.ArticlePath;
+        }
+
+        private async void DetectButton_Click(object sender, RoutedEventArgs e)
+        {
+            string urlToDetect = WikiUrlTextBox.Text.Trim();
+            if (string.IsNullOrEmpty(urlToDetect))
+            {
+                DetectionStatusText.Text = "Please enter a Base URL first.";
+                DetectionStatusText.Foreground = new SolidColorBrush(Colors.Red);
+                DetectionStatusText.Visibility = Visibility.Visible;
+                return;
+            }
+
+            LoadingOverlay.Visibility = Visibility.Visible;
+            LoadingOverlayText.Text = "Detecting paths...";
+            DetectionStatusText.Visibility = Visibility.Collapsed;
+
+            WebView2 tempWorker = null;
+            try
+            {
+                tempWorker = new WebView2();
+                App.UIHost.Children.Add(tempWorker);
+                await tempWorker.EnsureCoreWebView2Async();
+
+                var detectedPaths = await WikiPathDetectorService.DetectPathsAsync(urlToDetect, tempWorker);
+
+                if (detectedPaths.WasDetectedSuccessfully)
+                {
+                    ScriptPathTextBox.Text = detectedPaths.ScriptPath;
+                    ArticlePathTextBox.Text = detectedPaths.ArticlePath;
+                    DetectionStatusText.Text = "Detection successful! Review the paths and click Apply.";
+                    DetectionStatusText.Foreground = new SolidColorBrush(Colors.Green);
+                }
+                else
+                {
+                    DetectionStatusText.Text = "Could not automatically detect paths. Please enter them manually.";
+                    DetectionStatusText.Foreground = new SolidColorBrush(Colors.Red);
+                }
+            }
+            catch (NeedsUserVerificationException)
+            {
+                DetectionStatusText.Text = "Could not detect paths. A security check is required. Please navigate to an article on the desired wiki first to solve it, then try again.";
+                DetectionStatusText.Foreground = new SolidColorBrush(Colors.OrangeRed);
+            }
+            catch (Exception ex)
+            {
+                DetectionStatusText.Text = $"An error occurred during detection: {ex.Message}";
+                DetectionStatusText.Foreground = new SolidColorBrush(Colors.Red);
+            }
+            finally
+            {
+                LoadingOverlay.Visibility = Visibility.Collapsed;
+                DetectionStatusText.Visibility = Visibility.Visible;
+
+                if (tempWorker != null)
+                {
+                    App.UIHost.Children.Remove(tempWorker);
+                    tempWorker.Close();
+                }
+            }
         }
 
         private async void ApplyUrlButton_Click(object sender, RoutedEventArgs e)
@@ -82,6 +145,7 @@ namespace _1809_UWP
             if (result == ContentDialogResult.Primary)
             {
                 LoadingOverlay.Visibility = Visibility.Visible;
+                LoadingOverlayText.Text = "Applying settings...";
 
                 AuthService.Logout();
                 await FavouritesService.ClearAllLocalFavouritesAsync();
