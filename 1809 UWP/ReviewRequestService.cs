@@ -8,13 +8,13 @@ using Windows.System;
 public static class ReviewRequestService
 {
     private static StoreContext _storeContext;
-    private static ApplicationDataContainer _localSettings = ApplicationData.Current.LocalSettings;
+    private static readonly ApplicationDataContainer _localSettings = ApplicationData.Current.LocalSettings;
 
     private const string LaunchCountKey = "AppLaunchCount";
     private const string PageLoadCountKey = "PageLoadCount";
     private const string ReviewRequestShownKey = "ReviewRequestShown";
 
-    public static async Task InitializeAsync()
+    public static void Initialize()
     {
         if (User.GetDefault() != null)
         {

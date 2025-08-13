@@ -19,7 +19,7 @@ namespace _1809_UWP
         public const string VirtualHostName = "local.betawiki-app.net";
         private bool _isInitialized = false;
         private readonly Stack<string> _articleHistory = new Stack<string>();
-        private double _titleBarHeight = 0;
+        private readonly double _titleBarHeight = 0;
         public bool CanGoBackInPage => _articleHistory.Count > 1;
 
         public ArticleViewerPage()
@@ -363,12 +363,6 @@ namespace _1809_UWP
             }
         }
 
-        private void TitleBar_SizeChanged(object sender, SizeChangedEventArgs e)
-        {
-            _titleBarHeight = e.NewSize.Height;
-            UpdateWebViewPadding();
-        }
-
         private void ArticleDisplayWebView_ContentNavigationCompleted(
             CoreWebView2 sender,
             CoreWebView2NavigationCompletedEventArgs args
@@ -396,11 +390,7 @@ namespace _1809_UWP
             VerificationPanel.Visibility = Visibility.Visible;
             await VerificationWebView.EnsureCoreWebView2Async();
 
-            TypedEventHandler<
-                CoreWebView2,
-                CoreWebView2NavigationCompletedEventArgs
-            > successHandler = null;
-            successHandler = async (sender, args) =>
+            async void successHandler(CoreWebView2 sender, CoreWebView2NavigationCompletedEventArgs args)
             {
                 if (args.IsSuccess && !sender.Source.Contains("challenges.cloudflare.com"))
                 {
@@ -418,7 +408,8 @@ namespace _1809_UWP
                         }
                     );
                 }
-            };
+            }
+
             VerificationWebView.CoreWebView2.NavigationCompleted += successHandler;
             VerificationWebView.CoreWebView2.Navigate(url);
         }

@@ -9,14 +9,14 @@ namespace _1809_UWP
         private const string DisclaimerShownKey = "HasShownDisclaimer";
         private const string MaxConcurrentDownloadsKey = "MaxConcurrentDownloads";
 
-        private static ApplicationDataContainer _localSettings = ApplicationData.Current.LocalSettings;
+        private static readonly ApplicationDataContainer _localSettings = ApplicationData.Current.LocalSettings;
 
         public static bool IsCachingEnabled
         {
             get
             {
                 object value = _localSettings.Values[CachingEnabledKey];
-                return (value == null) ? true : (bool)value;
+                return (value == null) || (bool)value;
             }
             set
             {
@@ -29,7 +29,7 @@ namespace _1809_UWP
             get
             {
                 object value = _localSettings.Values[DisclaimerShownKey];
-                return (value == null) ? false : (bool)value;
+                return value != null && (bool)value;
             }
             set
             {

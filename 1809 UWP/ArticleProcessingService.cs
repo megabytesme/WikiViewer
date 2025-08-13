@@ -145,7 +145,6 @@ namespace _1809_UWP
                 }
             }
 
-            var isDarkTheme = App.Current.RequestedTheme == ApplicationTheme.Dark;
             string styleBlock = GetCssForTheme();
 
             return $@"
@@ -200,8 +199,7 @@ namespace _1809_UWP
                                     if (imageUrlMap.TryGetValue(lookupKey, out string fullImageUrl))
                                     {
                                         var img = link.SelectSingleNode(".//img");
-                                        if (img != null)
-                                            img.SetAttributeValue("src", fullImageUrl);
+                                        img?.SetAttributeValue("src", fullImageUrl);
                                     }
                                 }
                             }
@@ -289,8 +287,7 @@ namespace _1809_UWP
                 CreationCollisionOption.OpenIfExists
             );
 
-            var cachedFile = await imageCacheFolder.TryGetItemAsync(finalFileName) as StorageFile;
-            if (cachedFile != null)
+            if (await imageCacheFolder.TryGetItemAsync(finalFileName) is StorageFile cachedFile)
                 return $"/cache/{finalFileName}";
 
             var tcs = new TaskCompletionSource<bool>();
@@ -337,15 +334,12 @@ namespace _1809_UWP
                         else
                         {
                             var navTcs = new TaskCompletionSource<bool>();
-                            TypedEventHandler<
-                                CoreWebView2,
-                                CoreWebView2NavigationCompletedEventArgs
-                            > navHandler = null;
-                            navHandler = (s, e) =>
+                            void navHandler(CoreWebView2 s, CoreWebView2NavigationCompletedEventArgs e)
                             {
                                 s.NavigationCompleted -= navHandler;
                                 navTcs.TrySetResult(e.IsSuccess);
-                            };
+                            }
+
                             tempWorker.CoreWebView2.NavigationCompleted += navHandler;
                             tempWorker.CoreWebView2.Navigate(imageUrl.AbsoluteUri);
                             if (!await navTcs.Task)
