@@ -87,28 +87,47 @@ namespace _1809_UWP
                 var href = canonicalNode.GetAttributeValue("href", "");
                 if (!string.IsNullOrEmpty(href))
                 {
-                    var canonicalUri = new Uri(baseUri, href);
-                    var canonicalPath = canonicalUri.AbsolutePath;
+                    var canonicalUri = new Uri(href);
+                    string canonicalPath = canonicalUri.AbsolutePath;
+                    string pageTitle = canonicalUri.Segments.LastOrDefault()?.Trim('/');
 
-                    var pageName = canonicalUri.Segments.LastOrDefault()?.TrimEnd('/');
-
-                    if (string.IsNullOrEmpty(pageName))
+                    if (string.IsNullOrEmpty(pageTitle))
                     {
-                        Debug.WriteLine("[PathDetector] Could not determine page name from canonical URL. Article path detection failed.");
-                        return null;
+                        Debug.WriteLine("[PathDetector] Found article path '' (root) via canonical link (root URL).");
+                        return "";
                     }
 
-                    int pageNameIndex = canonicalPath.LastIndexOf(pageName, StringComparison.OrdinalIgnoreCase);
-
-                    if (pageNameIndex != -1)
+                    int pageTitleIndex = canonicalPath.LastIndexOf(pageTitle);
+                    if (pageTitleIndex > 0)
                     {
-                        string path = canonicalPath.Substring(0, pageNameIndex).TrimStart('/');
-                        return path;
+                        string articlePath = canonicalPath.Substring(0, pageTitleIndex);
+                        Debug.WriteLine($"[PathDetector] Found article path '{articlePath}' via canonical link.");
+                        return articlePath.TrimStart('/');
+                    }
+                    else if (pageTitleIndex == 0 || (pageTitleIndex == 1 && canonicalPath.StartsWith("/")))
+                    {
+                        Debug.WriteLine("[PathDetector] Found article path '' (root) via canonical link (root article).");
+                        return "";
                     }
                 }
             }
-            Debug.WriteLine("[PathDetector] Could not find Canonical link. Article path detection failed.");
-            return null;
+
+            Debug.WriteLine("[PathDetector] Canonical link failed or missing. Falling back to analyzing internal links.");
+            var linkNodes = doc.DocumentNode.SelectNodes("//a[@href]");
+            if (linkNodes == null)
+            {
+                Debug.WriteLine("[PathDetector] Fallback failed: No <a> tags found.");
+                return null;
+            }
+
+            if (linkNodes.Any(n => n.GetAttributeValue("href", "").StartsWith("/wiki/")))
+            {
+                Debug.WriteLine("[PathDetector] Found article path 'wiki/' via link analysis.");
+                return "wiki/";
+            }
+
+            Debug.WriteLine("[PathDetector] No '/wiki/' links found. Assuming empty article path as final fallback.");
+            return "";
         }
     }
 }
