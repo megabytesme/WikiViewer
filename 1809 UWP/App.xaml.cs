@@ -47,6 +47,8 @@ namespace _1809_UWP
         /// <param name="e">Details about the launch request and process.</param>
         protected override async void OnLaunched(LaunchActivatedEventArgs e)
         {
+            ReviewRequestService.IncrementLaunchCount();
+            await ReviewRequestService.InitializeAsync();
             await FavouritesService.InitializeAsync();
             await ArticleCacheManager.InitializeAsync();
 

@@ -140,6 +140,9 @@ namespace _1809_UWP
             if (!_isInitialized || VerificationPanel.Visibility == Visibility.Visible)
                 return;
 
+            ReviewRequestService.IncrementPageLoadCount();
+            ReviewRequestService.TryRequestReview();
+
             var fetchStopwatch = Stopwatch.StartNew();
 
             ShowLoadingOverlay();
