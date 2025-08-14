@@ -260,4 +260,70 @@ namespace _1809_UWP
             PageTitle = pageTitle;
         }
     }
+
+    public class CreateAccountResponse
+    {
+        [JsonProperty("createaccount")]
+        public CreateAccountResult CreateAccount { get; set; }
+    }
+
+    public class CreateAccountResult
+    {
+        [JsonProperty("status")]
+        public string Status { get; set; }
+
+        [JsonProperty("message")]
+        public string Message { get; set; }
+
+        [JsonProperty("username")]
+        public string Username { get; set; }
+    }
+
+    public class AuthManagerInfoResponse
+    {
+        [JsonProperty("query")]
+        public AuthManagerInfoQuery Query { get; set; }
+    }
+
+    public class AuthManagerInfoQuery
+    {
+        [JsonProperty("authmanagerinfo")]
+        public AuthManagerInfo AuthManagerInfo { get; set; }
+    }
+
+    public class AuthManagerInfo
+    {
+        [JsonProperty("requests")]
+        public List<AuthRequest> Requests { get; set; }
+    }
+
+    public class AuthRequest
+    {
+        [JsonProperty("id")]
+        public string Id { get; set; }
+
+        [JsonProperty("required")]
+        public string Required { get; set; }
+
+        [JsonProperty("fields")]
+        public Dictionary<string, AuthField> Fields { get; set; }
+    }
+
+    public class AuthField
+    {
+        [JsonProperty("type")]
+        public string Type { get; set; }
+
+        [JsonProperty("label")]
+        public string Label { get; set; }
+
+        [JsonProperty("help")]
+        public string Help { get; set; }
+
+        [JsonProperty("optional")]
+        public bool? Optional { get; set; }
+
+        [JsonProperty("value")]
+        public string Value { get; set; }
+    }
 }

@@ -10,6 +10,10 @@
             <PasswordBox x:Name="PasswordBox" Header="Password" AutomationProperties.Name="Password"/>
             <CheckBox x:Name="RememberMeCheckBox" Content="Remember me" IsChecked="True" Margin="0,12"/>
             <Button x:Name="LoginButton" Content="Log In" HorizontalAlignment="Stretch" Click="LoginButton_Click"/>
+            <HyperlinkButton Content="Don't have an account? Create one." 
+                             HorizontalAlignment="Center" 
+                             Click="CreateAccountButton_Click"
+                             Margin="0,8,0,0"/>
             <ProgressRing x:Name="LoadingRing" IsActive="False"/>
             <TextBlock x:Name="ErrorTextBlock" Foreground="Red" TextWrapping="Wrap"/>
         </StackPanel>

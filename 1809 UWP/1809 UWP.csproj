@@ -124,6 +124,9 @@
     <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="CreateAccountPage.xaml.cs">
+      <DependentUpon>CreateAccountPage.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Models\ApiModels.cs" />
     <Compile Include="Services\ApiRequestService.cs" />
     <Compile Include="App.xaml.cs">
@@ -253,6 +256,9 @@
       <SubType>Designer</SubType>
     </Page>
     <Page Include="FavouritesPage.xaml">
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="CreateAccountPage.xaml">
       <SubType>Designer</SubType>
     </Page>
     <Page Include="LoginPage.xaml">

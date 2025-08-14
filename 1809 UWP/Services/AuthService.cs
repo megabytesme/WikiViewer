@@ -1,4 +1,6 @@
 using Microsoft.UI.Xaml.Controls;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -6,7 +8,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Windows.ApplicationModel.Core;
 using Windows.UI.Core;
-using Newtonsoft.Json;
 
 namespace _1809_UWP
 {
@@ -216,6 +217,95 @@ namespace _1809_UWP
 
             _csrfToken = rawToken;
             Debug.WriteLine($"[AuthService] Storing complete raw watch token. Value is: [{_csrfToken}]");
+        }
+
+        public static async Task<List<AuthRequest>> GetCreateAccountFieldsAsync()
+        {
+            WebView2 tempWorker = null;
+            try
+            {
+                tempWorker = await CreateAndInitWebView2();
+                {
+                    try
+                    {
+                        string url = $"{AppSettings.ApiEndpoint}?action=query&meta=authmanagerinfo&amirequestsfor=create&format=json";
+                        string json = await ApiRequestService.GetJsonFromApiAsync(url, tempWorker);
+                        var response = JsonConvert.DeserializeObject<AuthManagerInfoResponse>(json);
+
+                        if (response?.Query?.AuthManagerInfo?.Requests == null)
+                        {
+                            throw new Exception("Could not retrieve required fields for account creation.");
+                        }
+                        return response.Query.AuthManagerInfo.Requests;
+                    }
+                    finally
+                    {
+                        if (tempWorker != null)
+                        {
+                            App.UIHost?.Children.Remove(tempWorker);
+                            tempWorker.Close();
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[AuthService] GetCreateAccountFieldsAsync failed: {ex.Message}");
+                throw;
+            }
+        }
+
+        public static async Task<CreateAccountResult> PerformCreateAccountAsync(Dictionary<string, string> fieldData)
+        {
+            WebView2 tempWorker = null;
+            try
+            {
+                tempWorker = await CreateAndInitWebView2();
+                {
+                    try
+                    {
+                        string tokenUrl = $"{AppSettings.ApiEndpoint}?action=query&meta=tokens&type=createaccount&format=json";
+                        string tokenJson = await ApiRequestService.GetJsonFromApiAsync(tokenUrl, tempWorker);
+                        var tokenResponse = JObject.Parse(tokenJson);
+                        string createToken = tokenResponse?["query"]?["tokens"]?["createaccounttoken"]?.ToString();
+                        if (string.IsNullOrEmpty(createToken))
+                        {
+                            throw new Exception("Failed to retrieve a createaccount token.");
+                        }
+
+                        var postData = new Dictionary<string, string>(fieldData)
+                    {
+                        { "action", "createaccount" },
+                        { "createtoken", createToken },
+                        { "format", "json" },
+                        { "createreturnurl", AppSettings.BaseUrl }
+                    };
+
+                        string resultJson = await ApiRequestService.PostAndGetJsonFromApiAsync(tempWorker, AppSettings.ApiEndpoint, postData);
+                        var result = JsonConvert.DeserializeObject<CreateAccountResponse>(resultJson);
+
+                        if (result?.CreateAccount == null)
+                        {
+                            throw new Exception("Received an invalid response from the server.");
+                        }
+
+                        return result.CreateAccount;
+                    }
+                    finally
+                    {
+                        if (tempWorker != null)
+                        {
+                            App.UIHost?.Children.Remove(tempWorker);
+                            tempWorker.Close();
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[AuthService] PerformCreateAccountAsync failed: {ex.Message}");
+                throw;
+            }
         }
     }
 }

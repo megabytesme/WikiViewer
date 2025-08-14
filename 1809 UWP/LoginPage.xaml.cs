@@ -65,5 +65,10 @@ namespace _1809_UWP
                 LoginButton.IsEnabled = true;
             }
         }
+
+        private void CreateAccountButton_Click(object sender, RoutedEventArgs e)
+        {
+            Frame.Navigate(typeof(CreateAccountPage));
+        }
     }
 }
