@@ -2,7 +2,7 @@ using System;
 using Windows.UI.Xaml.Data;
 using Windows.UI.Xaml.Media.Imaging;
 
-namespace _1809_UWP
+namespace Shared_Code
 {
     public class StringUrlToImageSourceConverter : IValueConverter
     {

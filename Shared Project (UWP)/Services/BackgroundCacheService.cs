@@ -7,8 +7,9 @@ using System.Threading.Tasks;
 using Windows.ApplicationModel.Core;
 using Windows.UI.Core;
 using Microsoft.UI.Xaml.Controls;
+using _1809_UWP;
 
-namespace _1809_UWP
+namespace Shared_Code
 {
     public static class BackgroundCacheService
     {

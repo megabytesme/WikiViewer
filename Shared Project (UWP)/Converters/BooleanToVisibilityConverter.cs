@@ -2,7 +2,7 @@ using System;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Data;
 
-namespace _1809_UWP
+namespace Shared_Code
 {
     public class BooleanToVisibilityConverter : IValueConverter
     {

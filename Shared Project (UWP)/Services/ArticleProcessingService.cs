@@ -1,3 +1,4 @@
+using _1809_UWP;
 using HtmlAgilityPack;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Web.WebView2.Core;
@@ -16,7 +17,7 @@ using Windows.Foundation;
 using Windows.Storage;
 using Windows.UI.Core;
 
-namespace _1809_UWP
+namespace Shared_Code
 {
     public static class ArticleProcessingService
     {

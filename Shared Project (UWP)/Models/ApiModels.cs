@@ -4,7 +4,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using Newtonsoft.Json;
 
-namespace _1809_UWP
+namespace Shared_Code
 {
     public class NeedsUserVerificationException : Exception
     {

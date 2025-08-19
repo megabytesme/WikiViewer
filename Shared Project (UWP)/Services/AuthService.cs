@@ -1,3 +1,4 @@
+using _1809_UWP;
 using Microsoft.UI.Xaml.Controls;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -9,7 +10,7 @@ using System.Threading.Tasks;
 using Windows.ApplicationModel.Core;
 using Windows.UI.Core;
 
-namespace _1809_UWP
+namespace Shared_Code
 {
     public static class AuthService
     {

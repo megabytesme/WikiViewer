@@ -6,7 +6,7 @@ using Newtonsoft.Json;
 using System.Threading.Tasks;
 using Windows.Storage;
 
-namespace _1809_UWP
+namespace Shared_Code
 {
     public static class FavouritesService
     {

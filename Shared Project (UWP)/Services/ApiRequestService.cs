@@ -12,7 +12,7 @@ using Windows.Storage.Streams;
 using Windows.UI.Core;
 using Newtonsoft.Json;
 
-namespace _1809_UWP
+namespace Shared_Code
 {
     public static class ApiRequestService
     {

@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using HtmlAgilityPack;
 using Microsoft.UI.Xaml.Controls;
 
-namespace _1809_UWP
+namespace Shared_Code
 {
     public class WikiPaths
     {

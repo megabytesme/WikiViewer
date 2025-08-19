@@ -2,7 +2,7 @@ using System;
 using System.Linq;
 using Windows.Security.Credentials;
 
-namespace _1809_UWP
+namespace Shared_Code
 {
     public class UserCredentials
     {
