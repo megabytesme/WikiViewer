@@ -1,0 +1,26 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <MSBuildAllProjects Condition="'$(MSBuildVersion)' == '' Or '$(MSBuildVersion)' &lt; '16.0'">$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <SharedGUID>17eaf20e-8428-4e29-8369-4b30025ee5de</SharedGUID>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration">
+    <Import_RootNamespace>Shared_Project__UWP_</Import_RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)Converters\BooleanToVisibilityConverter.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Converters\StringUrlToImageSourceConverter.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Managers\ArticleCacheManager.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Models\ApiModels.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Repositories\AppSettings.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Services\ApiRequestService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Services\ArticleProcessingService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Services\AuthService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Services\BackgroundCacheService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Services\CredentialService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Services\FavouritesService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Services\ReviewRequestService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Services\WikiPathDetectorService.cs" />
+  </ItemGroup>
+</Project>

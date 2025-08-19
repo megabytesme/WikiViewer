@@ -5,6 +5,8 @@ VisualStudioVersion = 17.14.36301.6
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "1809 UWP", "1809 UWP\1809 UWP.csproj", "{6CA051F2-9F14-4663-B817-1E9E4BCFF853}"
 EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Shared Project (UWP)", "Shared Project (UWP)\Shared Project (UWP).shproj", "{17EAF20E-8428-4E29-8369-4B30025EE5DE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|arm64 = Debug|arm64
@@ -39,5 +41,9 @@ Global
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {777CB651-4BFD-4A62-94F6-9C65905D2FC4}
+	EndGlobalSection
+	GlobalSection(SharedMSBuildProjectFiles) = preSolution
+		Shared Project (UWP)\Shared Project (UWP).projitems*{17eaf20e-8428-4e29-8369-4b30025ee5de}*SharedItemsImports = 13
+		Shared Project (UWP)\Shared Project (UWP).projitems*{6ca051f2-9f14-4663-b817-1e9e4bcff853}*SharedItemsImports = 4
 	EndGlobalSection
 EndGlobal
