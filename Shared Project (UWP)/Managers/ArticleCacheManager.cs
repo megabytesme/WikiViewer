@@ -158,4 +158,24 @@ public static class ArticleCacheManager
 
         Debug.WriteLine($"[CACHE] Saved '{pageTitle}' to cache.");
     }
+
+    public static async Task ClearCacheForItemAsync(string pageTitle)
+    {
+        await InitializeAsync();
+        string baseFileName = GetHashedFileName(pageTitle);
+        try
+        {
+            var metaFile = await _cacheFolder.TryGetItemAsync(baseFileName + ".json") as StorageFile;
+            if (metaFile != null) await metaFile.DeleteAsync();
+
+            var htmlFile = await _cacheFolder.TryGetItemAsync(baseFileName + ".html") as StorageFile;
+            if (htmlFile != null) await htmlFile.DeleteAsync();
+
+            Debug.WriteLine($"[CACHE] Invalidated cache for '{pageTitle}'.");
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[CACHE] Failed to invalidate cache for '{pageTitle}': {ex.Message}");
+        }
+    }
 }

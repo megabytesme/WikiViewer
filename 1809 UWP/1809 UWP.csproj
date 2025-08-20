@@ -234,6 +234,9 @@
     <PackageReference Include="Newtonsoft.Json">
       <Version>13.0.3</Version>
     </PackageReference>
+    <PackageReference Include="WikitextParser">
+      <Version>0.0.1</Version>
+    </PackageReference>
   </ItemGroup>
   <ItemGroup>
     <Page Include="ArticleViewerPage.xaml">

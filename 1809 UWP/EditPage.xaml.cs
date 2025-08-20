@@ -1,9 +1,12 @@
-﻿using Microsoft.Web.WebView2.Core;
+﻿using Newtonsoft.Json.Linq;
 using Shared_Code;
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
+using Windows.UI.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Input;
 using Windows.UI.Xaml.Navigation;
 
 namespace _1809_UWP
@@ -11,213 +14,200 @@ namespace _1809_UWP
     public sealed partial class EditPage : Page
     {
         private string _pageTitle;
-        private string _initialUrl;
+        private string _originalWikitext;
+        private IApiWorker _apiWorker;
 
         public EditPage()
         {
             this.InitializeComponent();
             Environment.SetEnvironmentVariable("WEBVIEW2_DEFAULT_BACKGROUND_COLOR", "00FFFFFF");
-            _ = EditWebView.EnsureCoreWebView2Async();
         }
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
             _pageTitle = e.Parameter as string;
-            if (string.IsNullOrEmpty(_pageTitle)) return;
-
-            PageTitle.Text = $"Editing: {_pageTitle.Replace('_', ' ')}";
-
-            EditWebView.CoreWebView2Initialized += (s, args) =>
+            if (string.IsNullOrEmpty(_pageTitle))
             {
-                EditWebView.CoreWebView2.NavigationCompleted += EditWebView_NavigationCompleted;
-                EditWebView.CoreWebView2.NavigationStarting += EditWebView_NavigationStarting;
-
-                _initialUrl = AppSettings.GetEditPageUrl(_pageTitle);
-                EditWebView.CoreWebView2.Navigate(_initialUrl);
-            };
-        }
-
-        private void EditWebView_NavigationStarting(CoreWebView2 sender, CoreWebView2NavigationStartingEventArgs args)
-        {
-            if (!args.Uri.Equals(_initialUrl, StringComparison.OrdinalIgnoreCase))
-            {
-                args.Cancel = true;
-                if (Frame.CanGoBack)
-                {
-                    Frame.GoBack();
-                }
-            }
-        }
-
-        private async void EditWebView_NavigationCompleted(CoreWebView2 sender, CoreWebView2NavigationCompletedEventArgs args)
-        {
-            if (!args.IsSuccess)
-            {
-                LoadingOverlay.Visibility = Visibility.Collapsed;
-                PageTitle.Text = "Failed to load editor";
+                Frame.GoBack();
                 return;
             }
 
-            var isDarkTheme = Application.Current.RequestedTheme == ApplicationTheme.Dark;
-            string css = GetThemeCss(isDarkTheme);
-            string script = $"var style = document.createElement('style'); style.innerHTML = `{css}`; document.head.appendChild(style);";
-            await sender.ExecuteScriptAsync(script);
+            PageTitle.Text = $"Editing: {_pageTitle.Replace('_', ' ')}";
 
-            await Task.Delay(250);
+            if (AppSettings.ConnectionBackend == ConnectionMethod.HttpClientProxy)
+                _apiWorker = new HttpClientApiWorker();
+            else
+                _apiWorker = new WebView2ApiWorker();
 
-            FadeOutOverlay.Begin();
-            FadeInWebView.Begin();
-            FadeOutOverlay.Completed += (s, e) => LoadingOverlay.IsHitTestVisible = false;
+            _ = LoadContentAsync();
         }
 
-        private void Cancel_Click(object sender, RoutedEventArgs e)
+        bool isDragging = false;
+        double initialX;
+        GridLength leftColInitialWidth;
+
+        private void Splitter_PointerPressed(object sender, PointerRoutedEventArgs e)
         {
+            isDragging = true;
+            initialX = e.GetCurrentPoint(this).Position.X;
+            leftColInitialWidth = SplitGrid.ColumnDefinitions[0].Width;
+            (sender as UIElement)?.CapturePointer(e.Pointer);
+        }
+
+        private void Splitter_PointerMoved(object sender, PointerRoutedEventArgs e)
+        {
+            if (!isDragging) return;
+
+            var currentX = e.GetCurrentPoint(this).Position.X;
+            var delta = currentX - initialX;
+
+            var newWidth = Math.Max(300, leftColInitialWidth.Value + delta);
+            SplitGrid.ColumnDefinitions[0].Width = new GridLength(newWidth, GridUnitType.Pixel);
+        }
+
+        private void Splitter_PointerReleased(object sender, PointerRoutedEventArgs e)
+        {
+            isDragging = false;
+            (sender as UIElement)?.ReleasePointerCapture(e.Pointer);
+        }
+
+        private void Splitter_PointerEntered(object sender, PointerRoutedEventArgs e)
+        {
+            Window.Current.CoreWindow.PointerCursor =
+                new CoreCursor(CoreCursorType.SizeWestEast, 0);
+        }
+
+        private void Splitter_PointerExited(object sender, PointerRoutedEventArgs e)
+        {
+            Window.Current.CoreWindow.PointerCursor =
+                new CoreCursor(CoreCursorType.Arrow, 0);
+        }
+
+        private async Task LoadContentAsync()
+        {
+            try
+            {
+                await _apiWorker.InitializeAsync();
+                string url = $"{AppSettings.ApiEndpoint}?action=query&prop=revisions&titles={Uri.EscapeDataString(_pageTitle)}&rvprop=content&format=json";
+                string json = await _apiWorker.GetJsonFromApiAsync(url);
+
+                var root = JObject.Parse(json);
+                var page = root["query"]["pages"].First.First;
+                var content = page["revisions"][0]["*"].ToString();
+
+                _originalWikitext = content;
+                WikitextEditor.Text = content;
+            }
+            catch (Exception ex)
+            {
+                LoadingText.Text = $"Error: {ex.Message}";
+                WikitextEditor.Text = $"Failed to load page content. Please go back and try again.\n\nError: {ex.Message}";
+                WikitextEditor.IsReadOnly = true;
+                SaveButton.IsEnabled = false;
+                PreviewButton.IsEnabled = false;
+            }
+            finally
+            {
+                LoadingOverlay.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private async void PreviewButton_Click(object sender, RoutedEventArgs e)
+        {
+            PreviewButton.IsEnabled = false;
+            PreviewPlaceholder.Text = "Generating preview...";
+            PreviewWebView.Visibility = Visibility.Collapsed;
+
+            try
+            {
+                var postData = new Dictionary<string, string>
+                {
+                    { "action", "parse" },
+                    { "format", "json" },
+                    { "title", _pageTitle },
+                    { "text", WikitextEditor.Text },
+                    { "prop", "text" },
+                    { "disablelimitreport", "true" }
+                };
+
+                string json = await _apiWorker.PostAndGetJsonFromApiAsync(AppSettings.ApiEndpoint, postData);
+                var root = JObject.Parse(json);
+                string html = root["parse"]["text"]["*"].ToString();
+
+                string fullHtml = $"<html><head><style>{ArticleProcessingService.GetCssForTheme()}</style></head><body>{html}</body></html>";
+                await PreviewWebView.EnsureCoreWebView2Async();
+                PreviewWebView.NavigateToString(fullHtml);
+
+                PreviewPlaceholder.Visibility = Visibility.Collapsed;
+                PreviewWebView.Visibility = Visibility.Visible;
+            }
+            catch (Exception ex)
+            {
+                PreviewPlaceholder.Text = $"Failed to generate preview: {ex.Message}";
+                PreviewPlaceholder.Visibility = Visibility.Visible;
+            }
+            finally
+            {
+                PreviewButton.IsEnabled = true;
+            }
+        }
+
+        private async void SaveButton_Click(object sender, RoutedEventArgs e)
+        {
+            LoadingOverlay.Visibility = Visibility.Visible;
+            LoadingText.Text = "Saving...";
+
+            try
+            {
+                bool success = await AuthService.SavePageAsync(_pageTitle, WikitextEditor.Text, SummaryTextBox.Text);
+                if (success)
+                {
+                    _originalWikitext = WikitextEditor.Text;
+                    Frame.GoBack();
+                }
+            }
+            catch (Exception ex)
+            {
+                LoadingOverlay.Visibility = Visibility.Collapsed;
+                var dialog = new ContentDialog
+                {
+                    Title = "Save Failed",
+                    Content = $"The page could not be saved. The server reported the following error:\n\n{ex.Message}",
+                    CloseButtonText = "OK"
+                };
+                await dialog.ShowAsync();
+            }
+        }
+
+        private async void CancelButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (WikitextEditor.Text != _originalWikitext)
+            {
+                var dialog = new ContentDialog
+                {
+                    Title = "Discard Changes?",
+                    Content = "You have unsaved changes. Are you sure you want to discard them?",
+                    PrimaryButtonText = "Discard",
+                    CloseButtonText = "Cancel"
+                };
+
+                var result = await dialog.ShowAsync();
+                if (result != ContentDialogResult.Primary)
+                {
+                    return;
+                }
+            }
+
             if (Frame.CanGoBack)
             {
                 Frame.GoBack();
             }
         }
 
-        private string GetThemeCss(bool isDark)
+        private void Page_Unloaded(object sender, RoutedEventArgs e)
         {
-            string cssVariables = isDark ? @":root {
-                --text-primary: #FFFFFF; --text-secondary: #C3C3C3; --link-color: #85B9F3; --card-shadow: rgba(0, 0, 0, 0.4);
-                --card-background: rgba(44, 44, 44, 0.7); --card-border: rgba(255, 255, 255, 0.1); --card-header-background: rgba(255, 255, 255, 0.08);
-                --item-hover-background: rgba(255, 255, 255, 0.07); --item-pressed-background: rgba(255, 255, 255, 0.05);
-                --accent-bg: #0078D4; --accent-text: #FFFFFF; --accent-hover-bg: #106EBE;
-            }" : @":root {
-                --text-primary: #000000; --text-secondary: #505050; --link-color: #0066CC; --card-shadow: rgba(0, 0, 0, 0.13);
-                --card-background: rgba(249, 249, 249, 0.7); --card-border: rgba(0, 0, 0, 0.1); --card-header-background: rgba(0, 0, 0, 0.05);
-                --item-hover-background: rgba(0, 0, 0, 0.05); --item-pressed-background: rgba(0, 0, 0, 0.04);
-                --accent-bg: #0078D4; --accent-text: #FFFFFF; --accent-hover-bg: #005A9E;
-            }";
-
-            return $@"
-                {cssVariables}
-
-                #mw-head, #mw-panel, #footer, .mw-indicators, #siteSub, #contentSub, 
-                #contentSub2, #jump-to-nav, .mw-editsection, .editOptions, 
-                .mw-cookiewarning-container, #firstHeading, #mw-head-base, #mw-page-base {{
-                    display: none !important;
-                }}
-
-                html, body {{
-                    height: 100vh !important;
-                    width: 100vw !important;
-                    background-color: transparent !important;
-                }}
-                
-                #content, .mw-body {{
-                    position: static !important; height: 100% !important;
-                    margin: 0 !important; border: none !important; padding: 0 !important;
-                    background-color: transparent !important;
-                    display: flex !important; flex-direction: column !important;
-                }}
-
-                .ve-init-target-source {{
-                     display: flex !important; flex-direction: column !important;
-                     flex-grow: 1 !important; min-height: 0;
-                }}
-
-                .ve-init-mw-desktopArticleTarget-toolbar {{
-                    flex-shrink: 0 !important; position: relative !important; z-index: 10;
-                }}
-                .oo-ui-toolbar-bar {{
-                    background: var(--card-background) !important;
-                    border-bottom: 1px solid var(--card-border) !important;
-                    box-shadow: none !important; display: flex !important; justify-content: space-between !important;
-                }}
-
-                #mw-content-text {{
-                    flex-grow: 1 !important; overflow-y: auto !important;
-                    padding: 12px !important; box-sizing: border-box;
-                }}
-
-                #editform, .ve-init-mw-desktopArticleTarget-editableContent {{
-                    height: 100%; display: flex; flex-direction: column; margin: 0 !important;
-                }}
-                #wpTextbox1 {{
-                    flex-grow: 1 !important; background-color: var(--card-background) !important;
-                    color: var(--text-primary) !important; border: 1px solid var(--card-border) !important;
-                    border-radius: 4px; font-family: 'Consolas', 'Courier New', monospace;
-                    font-size: 14px; padding: 8px; margin: 0 !important;
-                }}
-
-                .oo-ui-tool-link, .oo-ui-popupToolGroup-handle {{
-                    border-radius: 4px !important; border: 1px solid transparent !important;
-                    background-color: transparent !important; transition: background-color 0.2s ease-in-out !important;
-                }}
-                .oo-ui-tool-link:hover, .oo-ui-popupToolGroup-handle:hover {{
-                    background-color: var(--item-hover-background) !important;
-                }}
-                .oo-ui-tool-link:active, .oo-ui-popupToolGroup-handle:active, .oo-ui-tool-active > .oo-ui-tool-link {{
-                    background-color: var(--item-pressed-background) !important;
-                }}
-                .oo-ui-iconElement-icon {{ {(isDark ? "filter: invert(1);" : "")} }}
-
-                .ve-ui-toolbar-saveButton > .oo-ui-tool-link {{
-                    background-color: var(--accent-bg) !important;
-                    color: var(--accent-text) !important;
-                    border-color: var(--accent-bg) !important;
-                }}
-                .ve-ui-toolbar-saveButton > .oo-ui-tool-link:hover {{
-                    background-color: var(--accent-hover-bg) !important;
-                }}
-                .ve-ui-toolbar-saveButton .oo-ui-tool-title, .ve-ui-toolbar-saveButton .oo-ui-tool-accel, .ve-ui-toolbar-saveButton .oo-ui-iconElement-icon {{
-                    color: var(--accent-text) !important;
-                    filter: none !important; /* Remove invert filter for primary buttons */
-                }}
-
-                .oo-ui-popupWidget-popup, .oo-ui-popupToolGroup-tools {{
-                    background-color: var(--card-background) !important;
-                    border: 1px solid var(--card-border) !important;
-                    border-radius: 4px;
-                }}
-                .oo-ui-popupWidget-head, .oo-ui-tool-title, .oo-ui-labelElement-label {{
-                    color: var(--text-primary) !important;
-                }}
-                .oo-ui-tool.oo-ui-optionWidget-highlighted {{
-                    background-color: var(--item-hover-background) !important;
-                }}
-                .oo-ui-tool.oo-ui-optionWidget-selected > .oo-ui-tool-link {{
-                    background-color: var(--item-pressed-background) !important;
-                }}
-
-                .oo-ui-window-frame {{
-                    background-color: var(--card-background) !important; border-color: var(--card-border) !important;
-                    box-shadow: 0 4px 12px var(--card-shadow) !important; border-radius: 8px;
-                }}
-                .oo-ui-window-head, .oo-ui-window-foot {{
-                    background-color: transparent !important; border-color: var(--card-border) !important;
-                    box-shadow: none !important;
-                }}
-                .oo-ui-window-body {{
-                    background-color: transparent !important; color: var(--text-primary) !important;
-                }}
-                .oo-ui-processDialog-actions .oo-ui-buttonElement-button {{
-                    background-color: var(--item-hover-background) !important; border: 1px solid var(--card-border) !important;
-                    color: var(--text-primary) !important; border-radius: 4px !important;
-                }}
-                .oo-ui-processDialog-actions .oo-ui-flaggedElement-primary.oo-ui-flaggedElement-progressive .oo-ui-buttonElement-button {{
-                     background-color: var(--accent-bg) !important; color: var(--accent-text) !important;
-                     border-color: var(--accent-bg) !important;
-                }}
-                .oo-ui-processDialog-actions .oo-ui-flaggedElement-primary.oo-ui-flaggedElement-progressive .oo-ui-buttonElement-button:hover {{
-                     background-color: var(--accent-hover-bg) !important;
-                }}
-
-                .oo-ui-fieldLayout-header, label, div, p, span, li, h1, h2, h3, h4 {{
-                    color: var(--text-primary) !important;
-                }}
-                #wpSummary, .oo-ui-textInputWidget > input {{
-                    background-color: var(--card-background) !important; color: var(--text-primary) !important;
-                    border: 1px solid var(--card-border) !important; border-radius: 4px !important;
-                }}
-                .oo-ui-tool-accel {{
-                    color: var(--text-secondary) !important;
-                }}
-            ";
+            _apiWorker?.Dispose();
         }
     }
 }

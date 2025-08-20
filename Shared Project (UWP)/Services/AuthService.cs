@@ -133,7 +133,7 @@ namespace Shared_Code
             IsLoggedIn = true;
             Username = resultResponse.clientlogin.username;
 
-            await FetchCsrfTokenAsync(_authenticatedWorker);
+            await GetCsrfTokenAsync();
             await SyncAndMergeFavouritesOnLogin(_authenticatedWorker);
 
             AuthenticationStateChanged?.Invoke(null, EventArgs.Empty);
@@ -267,39 +267,63 @@ namespace Shared_Code
             return serverFavourites;
         }
 
-        private static async Task FetchCsrfTokenAsync(IApiWorker worker)
+        public static async Task<string> GetCsrfTokenAsync()
         {
-            Debug.WriteLine("[AuthService] Attempting to fetch CSRF (watch) token...");
-            string url = $"{AppSettings.ApiEndpoint}?action=query&meta=tokens&type=watch&format=json&_={DateTime.Now.Ticks}";
-            string rawResponseJson = await worker.GetJsonFromApiAsync(url);
-            string responseJson = ExtractJsonFromHtmlWrapper(rawResponseJson);
-
-            if (string.IsNullOrEmpty(responseJson))
+            if (!IsLoggedIn || _authenticatedWorker == null)
             {
-                throw new Exception("Failed to retrieve valid JSON for CSRF token (response was null or empty).");
+                throw new InvalidOperationException("User must be logged in to get a CSRF token.");
             }
 
-            Debug.WriteLine($"[AuthService] Cleaned CSRF token response: {responseJson}");
+            Debug.WriteLine("[AuthService] Attempting to fetch CSRF token...");
+            string url = $"{AppSettings.ApiEndpoint}?action=query&meta=tokens&format=json&_={DateTime.Now.Ticks}";
+            string json = await _authenticatedWorker.GetJsonFromApiAsync(url);
 
-            WatchTokenResponse tokenResponse;
-            try
+            var tokenResponse = JObject.Parse(json);
+            string csrfToken = tokenResponse?["query"]?["tokens"]?["csrftoken"]?.ToString();
+
+            if (string.IsNullOrEmpty(csrfToken) || csrfToken == "+\\")
             {
-                tokenResponse = JsonConvert.DeserializeObject<WatchTokenResponse>(responseJson);
+                throw new Exception("Failed to retrieve a valid CSRF token for editing.");
             }
-            catch (JsonReaderException ex)
+            Debug.WriteLine("[AuthService] Successfully fetched CSRF token.");
+            return csrfToken;
+        }
+
+        public static async Task<bool> SavePageAsync(string title, string content, string summary)
+        {
+            if (!IsLoggedIn || _authenticatedWorker == null)
             {
-                Debug.WriteLine($"[AuthService] FATAL: Failed to parse CSRF token JSON.");
-                throw new Exception($"The server's response for the CSRF token was not valid JSON. Raw response: '{responseJson}'", ex);
+                throw new InvalidOperationException("User must be logged in to save a page.");
             }
 
-            string rawToken = tokenResponse?.Query?.Tokens?.WatchToken;
-            if (string.IsNullOrEmpty(rawToken))
-            {
-                throw new Exception("Failed to parse a watch token from the server response.");
-            }
+            string token = await GetCsrfTokenAsync();
 
-            _csrfToken = rawToken;
-            Debug.WriteLine($"[AuthService] Successfully parsed and stored CSRF token.");
+            var postData = new Dictionary<string, string>
+            {
+                { "action", "edit" },
+                { "format", "json" },
+                { "title", title },
+                { "text", content },
+                { "summary", summary },
+                { "token", token }
+            };
+
+            Debug.WriteLine($"[AuthService] Saving page '{title}'...");
+            string resultJson = await _authenticatedWorker.PostAndGetJsonFromApiAsync(AppSettings.ApiEndpoint, postData);
+
+            var result = JObject.Parse(resultJson);
+            if (result?["edit"]?["result"]?.ToString() == "Success")
+            {
+                Debug.WriteLine($"[AuthService] Successfully saved page '{title}'.");
+                await ArticleCacheManager.ClearCacheForItemAsync(title);
+                return true;
+            }
+            else
+            {
+                string errorMessage = result?["error"]?["info"]?.ToString() ?? "Unknown error during save.";
+                Debug.WriteLine($"[AuthService] Failed to save page: {errorMessage}");
+                throw new Exception(errorMessage);
+            }
         }
 
         public static async Task<List<AuthRequest>> GetCreateAccountFieldsAsync()
