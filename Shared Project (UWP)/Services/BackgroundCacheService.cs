@@ -1,13 +1,10 @@
+using _1809_UWP;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Windows.ApplicationModel.Core;
-using Windows.UI.Core;
-using Microsoft.UI.Xaml.Controls;
-using _1809_UWP;
 
 namespace Shared_Code
 {
@@ -35,38 +32,32 @@ namespace Shared_Code
                 await semaphore.WaitAsync();
                 try
                 {
-                    await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
+                    IApiWorker tempWorker = AppSettings.ConnectionBackend == ConnectionMethod.HttpClientProxy
+                        ? (IApiWorker)new HttpClientApiWorker()
+                        : new WebView2ApiWorker();
+
+                    try
                     {
-                        WebView2 tempWorker = null;
-                        try
-                        {
-                            tempWorker = new WebView2();
-                            App.UIHost.Children.Add(tempWorker);
-                            await tempWorker.EnsureCoreWebView2Async();
+                        await tempWorker.InitializeAsync();
 
-                            if (MainPage.ApiWorker?.CoreWebView2 != null)
-                            {
-                                await ApiRequestService.CopyApiCookiesAsync(MainPage.ApiWorker.CoreWebView2, tempWorker.CoreWebView2);
-                            }
-
-                            var stopwatch = Stopwatch.StartNew();
-                            await ArticleProcessingService.FetchAndCacheArticleAsync(title, stopwatch, false, tempWorker, semaphore);
-
-                            ArticleCached?.Invoke(null, new ArticleCachedEventArgs(title));
-                        }
-                        catch (Exception ex)
+                        if (MainPage.ApiWorker != null)
                         {
-                            Debug.WriteLine($"[BG CACHE] Failed to cache '{title}': {ex.Message}");
+                            await tempWorker.CopyApiCookiesFromAsync(MainPage.ApiWorker);
                         }
-                        finally
-                        {
-                            if (tempWorker != null)
-                            {
-                                App.UIHost.Children.Remove(tempWorker);
-                                tempWorker.Close();
-                            }
-                        }
-                    });
+
+                        var stopwatch = Stopwatch.StartNew();
+                        await ArticleProcessingService.FetchAndCacheArticleAsync(title, stopwatch, false, tempWorker, semaphore);
+
+                        ArticleCached?.Invoke(null, new ArticleCachedEventArgs(title));
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[BG CACHE] Failed to cache '{title}': {ex.Message}");
+                    }
+                    finally
+                    {
+                        tempWorker.Dispose();
+                    }
                 }
                 finally
                 {
@@ -75,7 +66,6 @@ namespace Shared_Code
             });
 
             await Task.WhenAll(cachingTasks);
-
             Debug.WriteLine("[BG CACHE] Background caching queue finished.");
         }
     }

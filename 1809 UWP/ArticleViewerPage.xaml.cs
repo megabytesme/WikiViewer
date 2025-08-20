@@ -186,7 +186,14 @@ namespace _1809_UWP
             }
             catch (NeedsUserVerificationException ex)
             {
-                ShowVerificationPanelAndRetry(ex.Url);
+                if (AppSettings.ConnectionBackend == ConnectionMethod.HttpClientProxy)
+                {
+                    await ReinitializeHttpClientWorkerAndRetry();
+                }
+                else
+                {
+                    ShowVerificationPanelAndRetry(ex.Url);
+                }
             }
             catch (Exception ex)
             {
@@ -197,6 +204,33 @@ namespace _1809_UWP
             {
                 HideLoadingOverlay();
                 UpdateFavoriteButton();
+            }
+        }
+
+        private async Task ReinitializeHttpClientWorkerAndRetry()
+        {
+            ShowLoadingOverlay();
+            LoadingText.Text = "Security challenge detected. Refreshing credentials from proxy...";
+            LastUpdatedText.Visibility = Visibility.Collapsed;
+
+            try
+            {
+                MainPage.ApiWorker?.Dispose();
+
+                var newWorker = new HttpClientApiWorker();
+                await newWorker.InitializeAsync();
+
+                MainPage.ApiWorker = newWorker;
+
+                Debug.WriteLine("[Captcha] HttpClient worker re-initialized via proxy. Retrying original article fetch.");
+
+                StartArticleFetch();
+            }
+            catch (Exception ex)
+            {
+                ArticleTitle.Text = "Proxy Error";
+                LoadingText.Text = $"Failed to get new credentials from proxy: {ex.Message}";
+                HideLoadingOverlay();
             }
         }
 

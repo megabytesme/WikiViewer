@@ -20,6 +20,7 @@ namespace _1809_UWP
         private const int BaseRamMb = 400;
         private const int EstimatedRamPerTaskMb = 122;
         private const int highPerformanceMultiplier = 2;
+        private bool _isConnectionToggleEvent = false;
 
         public SettingsPage()
         {
@@ -33,6 +34,7 @@ namespace _1809_UWP
 
             UpdateUserUI();
             LoadWikiSettings();
+            LoadConnectionSettings();
             CachingToggle.IsOn = AppSettings.IsCachingEnabled;
             SetupConcurrencySlider();
 
@@ -44,6 +46,32 @@ namespace _1809_UWP
             WikiUrlTextBox.Text = AppSettings.BaseUrl;
             ScriptPathTextBox.Text = AppSettings.ScriptPath;
             ArticlePathTextBox.Text = AppSettings.ArticlePath;
+        }
+
+        private void LoadConnectionSettings()
+        {
+            _isConnectionToggleEvent = true;
+            ConnectionMethodToggle.IsOn = AppSettings.ConnectionBackend == ConnectionMethod.HttpClientProxy;
+            _isConnectionToggleEvent = false;
+        }
+
+        private async void ConnectionMethodToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_isConnectionToggleEvent) return;
+
+            AppSettings.ConnectionBackend = ConnectionMethodToggle.IsOn
+                ? ConnectionMethod.HttpClientProxy
+                : ConnectionMethod.WebView2;
+
+            var dialog = new ContentDialog
+            {
+                Title = "Restart Required",
+                Content = "Changing the connection backend requires an app restart to take effect.",
+                PrimaryButtonText = "Restart Now"
+            };
+
+            await dialog.ShowAsync();
+            App.ResetRootFrame();
         }
 
         private async void DetectButton_Click(object sender, RoutedEventArgs e)
@@ -61,12 +89,14 @@ namespace _1809_UWP
             LoadingOverlayText.Text = "Detecting paths...";
             DetectionStatusText.Visibility = Visibility.Collapsed;
 
-            WebView2 tempWorker = null;
+            IApiWorker tempWorker = null;
             try
             {
-                tempWorker = new WebView2();
-                App.UIHost.Children.Add(tempWorker);
-                await tempWorker.EnsureCoreWebView2Async();
+                tempWorker = AppSettings.ConnectionBackend == ConnectionMethod.HttpClientProxy
+                    ? (IApiWorker)new HttpClientApiWorker()
+                    : new WebView2ApiWorker();
+
+                await tempWorker.InitializeAsync(urlToDetect);
 
                 var detectedPaths = await WikiPathDetectorService.DetectPathsAsync(urlToDetect, tempWorker);
 
@@ -87,7 +117,17 @@ namespace _1809_UWP
             catch (NeedsUserVerificationException ex)
             {
                 LoadingOverlay.Visibility = Visibility.Collapsed;
-                ShowVerificationPanelAndRetryDetection(ex.Url);
+
+                if (AppSettings.ConnectionBackend == ConnectionMethod.HttpClientProxy)
+                {
+                    DetectionStatusText.Text = "Proxy failed to resolve the security challenge for this URL. Please try again or check the URL.";
+                    DetectionStatusText.Foreground = new SolidColorBrush(Colors.Red);
+                    DetectionStatusText.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    ShowVerificationPanelAndRetryDetection(ex.Url);
+                }
             }
             catch (Exception ex)
             {
@@ -98,12 +138,7 @@ namespace _1809_UWP
             finally
             {
                 LoadingOverlay.Visibility = Visibility.Collapsed;
-
-                if (tempWorker != null)
-                {
-                    App.UIHost.Children.Remove(tempWorker);
-                    tempWorker.Close();
-                }
+                tempWorker?.Dispose();
             }
         }
 
@@ -376,7 +411,7 @@ namespace _1809_UWP
                             new LineBreak(),
                             new Run() { Text = "Version 2.0.1.0 (1809_UWP)" },
                             new LineBreak(),
-                            new Run() { Text = "Copyright © 2025 MegaBytesMe" },
+                            new Run() { Text = "Copyright   2025 MegaBytesMe" },
                             new LineBreak(), new LineBreak(),
                             new Run() { Text = "Source code available on " },
                             new Hyperlink() { NavigateUri = new Uri("https://github.com/megabytesme/WikiViewer"), Inlines = { new Run() { Text = "GitHub" } }, },

@@ -73,6 +73,27 @@
                     CornerRadius="8"
                     Padding="16">
                     <StackPanel Spacing="12">
+                        <TextBlock Text="Connection" Style="{ThemeResource SubtitleTextBlockStyle}" HorizontalAlignment="Center"/>
+                        <Grid VerticalAlignment="Center">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Connection Backend" VerticalAlignment="Center" Style="{ThemeResource BodyStrongTextBlockStyle}"/>
+                                <TextBlock Text="HttpClient Proxy is intended for older devices without WebView2 support." TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}"/>
+                            </StackPanel>
+                            <ToggleSwitch x:Name="ConnectionMethodToggle" Toggled="ConnectionMethodToggle_Toggled" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="300,0,-110,0"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+                <Border
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="16">
+                    <StackPanel Spacing="12">
                         <TextBlock Text="Storage" Style="{ThemeResource SubtitleTextBlockStyle}" HorizontalAlignment="Center"/>
                         <Grid VerticalAlignment="Center">
                             <Grid.ColumnDefinitions>

@@ -20,7 +20,10 @@
     <Compile Include="$(MSBuildThisFileDirectory)Services\BackgroundCacheService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\CredentialService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\FavouritesService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)services\HttpClientApiWorker.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)services\IApiWorker.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\ReviewRequestService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)services\WebView2ApiWorker.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\WikiPathDetectorService.cs" />
   </ItemGroup>
 </Project>

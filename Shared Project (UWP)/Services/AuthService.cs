@@ -1,14 +1,10 @@
-using _1809_UWP;
-using Microsoft.UI.Xaml.Controls;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
-using Windows.ApplicationModel.Core;
-using Windows.UI.Core;
+using System;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Shared_Code
 {
@@ -18,52 +14,122 @@ namespace Shared_Code
         public static bool IsLoggedIn { get; private set; }
         public static string Username { get; private set; }
         private static string _csrfToken;
-        private static WebView2 _authenticatedWorker;
+        private static IApiWorker _authenticatedWorker;
 
-        private static async Task<WebView2> CreateAndInitWebView2()
+        private static async Task<IApiWorker> CreateAndInitApiWorker()
         {
-            WebView2 worker = null;
-            await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
-            {
-                if (App.UIHost == null) throw new InvalidOperationException("App.UIHost is not available.");
-                worker = new WebView2();
-                App.UIHost.Children.Add(worker);
-                await worker.EnsureCoreWebView2Async();
-            });
-            if (worker == null) throw new Exception("Failed to create WebView2 on UI thread.");
+            IApiWorker worker = AppSettings.ConnectionBackend == ConnectionMethod.HttpClientProxy
+                ? (IApiWorker)new HttpClientApiWorker()
+                : new WebView2ApiWorker();
+
+            await worker.InitializeAsync();
             return worker;
+        }
+
+        private static string ExtractJsonFromHtmlWrapper(string rawResponse)
+        {
+            if (string.IsNullOrWhiteSpace(rawResponse))
+            {
+                return rawResponse;
+            }
+
+            string trimmedResponse = rawResponse.Trim();
+            if (trimmedResponse.StartsWith("{") && trimmedResponse.EndsWith("}"))
+            {
+                return trimmedResponse;
+            }
+
+            try
+            {
+                var doc = new HtmlAgilityPack.HtmlDocument();
+                doc.LoadHtml(rawResponse);
+
+                var preNode = doc.DocumentNode.SelectSingleNode("//pre");
+                if (preNode != null && !string.IsNullOrWhiteSpace(preNode.InnerText))
+                {
+                    string potentialJson = preNode.InnerText.Trim();
+                    if (potentialJson.StartsWith("{") && potentialJson.EndsWith("}"))
+                    {
+                        Debug.WriteLine("[AuthService] Extracted JSON from HTML <pre> tag.");
+                        return potentialJson;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[AuthService] HTML parsing failed during JSON extraction: {ex.Message}");
+            }
+
+            return rawResponse;
         }
 
         public static async Task PerformLoginAsync(string username, string password)
         {
-            _authenticatedWorker = await CreateAndInitWebView2();
+            _authenticatedWorker = await CreateAndInitApiWorker();
 
-            string tokenJson = await ApiRequestService.GetJsonFromApiAsync(
-                $"{AppSettings.ApiEndpoint}?action=query&meta=tokens&type=login&format=json&_={DateTime.Now.Ticks}",
-                _authenticatedWorker
+            Debug.WriteLine("[AuthService] Attempting to fetch login token...");
+            string rawTokenResponse = await _authenticatedWorker.GetJsonFromApiAsync(
+                $"{AppSettings.ApiEndpoint}?action=query&meta=tokens&type=login&format=json&_={DateTime.Now.Ticks}"
             );
 
-            if (string.IsNullOrEmpty(tokenJson)) throw new Exception("Could not get a valid response for login token.");
+            string tokenJson = ExtractJsonFromHtmlWrapper(rawTokenResponse);
 
-            var tokenResponse = JsonConvert.DeserializeObject<LoginApiTokenResponse>(tokenJson);
+            if (string.IsNullOrEmpty(tokenJson))
+            {
+                throw new Exception("Could not get a valid response for login token (response was null or empty).");
+            }
+
+            Debug.WriteLine($"[AuthService] Cleaned login token response: {tokenJson}");
+
+            LoginApiTokenResponse tokenResponse;
+            try
+            {
+                tokenResponse = JsonConvert.DeserializeObject<LoginApiTokenResponse>(tokenJson);
+            }
+            catch (JsonReaderException ex)
+            {
+                Debug.WriteLine($"[AuthService] FATAL: Failed to parse login token JSON. The server likely returned an HTML error page.");
+                throw new Exception($"The server's response for the login token was not valid JSON. Raw response: '{tokenJson}'", ex);
+            }
+
             string loginToken = tokenResponse?.query?.tokens?.logintoken;
-            if (string.IsNullOrEmpty(loginToken)) throw new Exception("Failed to retrieve a login token from the JSON response.");
+            if (string.IsNullOrEmpty(loginToken))
+            {
+                throw new Exception("Failed to retrieve a login token from the JSON response.");
+            }
+            Debug.WriteLine("[AuthService] Successfully parsed login token.");
 
             var loginPostData = new Dictionary<string, string>
             {
                 { "action", "clientlogin" }, { "format", "json" }, { "username", username }, { "password", password }, { "logintoken", loginToken }, { "loginreturnurl", AppSettings.BaseUrl }
             };
 
-            string resultJson = await ApiRequestService.PostAndGetJsonFromApiAsync(_authenticatedWorker, AppSettings.ApiEndpoint, loginPostData);
+            Debug.WriteLine("[AuthService] Posting credentials to log in...");
+            string resultJson = await _authenticatedWorker.PostAndGetJsonFromApiAsync(AppSettings.ApiEndpoint, loginPostData);
+            string cleanResultJson = ExtractJsonFromHtmlWrapper(resultJson);
 
-            var resultResponse = JsonConvert.DeserializeObject<ClientLoginResponse>(resultJson);
+            Debug.WriteLine($"[AuthService] Raw client login response: {resultJson}");
+            Debug.WriteLine($"[AuthService] Cleaned client login response: {cleanResultJson}");
+
+            ClientLoginResponse resultResponse;
+            try
+            {
+                resultResponse = JsonConvert.DeserializeObject<ClientLoginResponse>(cleanResultJson);
+            }
+            catch (JsonReaderException ex)
+            {
+                Debug.WriteLine($"[AuthService] FATAL: Failed to parse client login response JSON.");
+                throw new Exception($"The server's response after posting credentials was not valid JSON. Raw response: '{resultJson}'", ex);
+            }
+
             if (resultResponse?.clientlogin?.status != "PASS")
             {
-                _authenticatedWorker?.Close();
+                _authenticatedWorker?.Dispose();
                 _authenticatedWorker = null;
                 throw new Exception($"Login failed: {resultResponse?.clientlogin?.status ?? "Unknown API response"}");
             }
 
+            Debug.WriteLine("[AuthService] Login successful!");
             IsLoggedIn = true;
             Username = resultResponse.clientlogin.username;
 
@@ -85,7 +151,7 @@ namespace Shared_Code
                 };
                 try
                 {
-                    await ApiRequestService.PostAndGetJsonFromApiAsync(_authenticatedWorker, AppSettings.ApiEndpoint, logoutPostData);
+                    await _authenticatedWorker.PostAndGetJsonFromApiAsync(AppSettings.ApiEndpoint, logoutPostData);
                 }
                 catch (Exception ex)
                 {
@@ -93,15 +159,8 @@ namespace Shared_Code
                 }
             }
 
-            await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
-            {
-                if (_authenticatedWorker != null)
-                {
-                    App.UIHost?.Children.Remove(_authenticatedWorker);
-                    _authenticatedWorker.Close();
-                    _authenticatedWorker = null;
-                }
-            });
+            _authenticatedWorker?.Dispose();
+            _authenticatedWorker = null;
 
             IsLoggedIn = false;
             Username = null;
@@ -111,7 +170,7 @@ namespace Shared_Code
             AuthenticationStateChanged?.Invoke(null, EventArgs.Empty);
         }
 
-        private static async Task SyncAndMergeFavouritesOnLogin(WebView2 worker)
+        private static async Task SyncAndMergeFavouritesOnLogin(IApiWorker worker)
         {
             Debug.WriteLine("[AuthService] Starting sync process...");
             var pendingDeletes = FavouritesService.GetAndClearPendingDeletes();
@@ -150,15 +209,15 @@ namespace Shared_Code
             await SyncMultipleFavouritesToServerInternalAsync(_authenticatedWorker, titles, add);
         }
 
-        private static async Task SyncMultipleFavouritesToServerInternalAsync(WebView2 worker, List<string> titles, bool add)
+        private static async Task SyncMultipleFavouritesToServerInternalAsync(IApiWorker worker, List<string> titles, bool add)
         {
             if (!IsLoggedIn || string.IsNullOrEmpty(_csrfToken) || !titles.Any() || worker == null) return;
             string batchedTitles = string.Join("|", titles);
 
             var postData = new Dictionary<string, string>
-            {
-                {"action", "watch"}, {"format", "json"}, {"titles", batchedTitles}, {"token", _csrfToken}
-            };
+    {
+        {"action", "watch"}, {"format", "json"}, {"titles", batchedTitles}, {"token", _csrfToken}
+    };
             if (!add)
             {
                 postData.Add("unwatch", "");
@@ -166,7 +225,9 @@ namespace Shared_Code
 
             try
             {
-                string responseJson = await ApiRequestService.PostAndGetJsonFromApiAsync(worker, AppSettings.ApiEndpoint, postData);
+                string rawResponseJson = await worker.PostAndGetJsonFromApiAsync(AppSettings.ApiEndpoint, postData);
+                string responseJson = ExtractJsonFromHtmlWrapper(rawResponseJson);
+
                 var response = JsonConvert.DeserializeObject<WatchActionResponse>(responseJson);
                 if (add && (response?.Watch == null || !response.Watch.Any())) throw new Exception("Server did not confirm watch action.");
                 else if (!add && (response?.Unwatch == null || !response.Unwatch.Any())) throw new Exception("Server did not confirm unwatch action.");
@@ -177,10 +238,10 @@ namespace Shared_Code
             }
         }
 
-        private static async Task<HashSet<string>> FetchWatchlistAsync(WebView2 worker)
+        private static async Task<HashSet<string>> FetchWatchlistAsync(IApiWorker worker)
         {
             string url = $"{AppSettings.ApiEndpoint}?action=query&list=watchlistraw&wrlimit=max&format=json&_={DateTime.Now.Ticks}";
-            string watchlistJson = await ApiRequestService.GetJsonFromApiAsync(url, worker);
+            string watchlistJson = await worker.GetJsonFromApiAsync(url);
 
             if (string.IsNullOrEmpty(watchlistJson))
             {
@@ -206,106 +267,87 @@ namespace Shared_Code
             return serverFavourites;
         }
 
-        private static async Task FetchCsrfTokenAsync(WebView2 worker)
+        private static async Task FetchCsrfTokenAsync(IApiWorker worker)
         {
+            Debug.WriteLine("[AuthService] Attempting to fetch CSRF (watch) token...");
             string url = $"{AppSettings.ApiEndpoint}?action=query&meta=tokens&type=watch&format=json&_={DateTime.Now.Ticks}";
-            string responseJson = await ApiRequestService.GetJsonFromApiAsync(url, worker);
-            if (string.IsNullOrEmpty(responseJson)) throw new Exception("Failed to retrieve valid JSON for token.");
+            string rawResponseJson = await worker.GetJsonFromApiAsync(url);
+            string responseJson = ExtractJsonFromHtmlWrapper(rawResponseJson);
 
-            var tokenResponse = JsonConvert.DeserializeObject<WatchTokenResponse>(responseJson);
+            if (string.IsNullOrEmpty(responseJson))
+            {
+                throw new Exception("Failed to retrieve valid JSON for CSRF token (response was null or empty).");
+            }
+
+            Debug.WriteLine($"[AuthService] Cleaned CSRF token response: {responseJson}");
+
+            WatchTokenResponse tokenResponse;
+            try
+            {
+                tokenResponse = JsonConvert.DeserializeObject<WatchTokenResponse>(responseJson);
+            }
+            catch (JsonReaderException ex)
+            {
+                Debug.WriteLine($"[AuthService] FATAL: Failed to parse CSRF token JSON.");
+                throw new Exception($"The server's response for the CSRF token was not valid JSON. Raw response: '{responseJson}'", ex);
+            }
+
             string rawToken = tokenResponse?.Query?.Tokens?.WatchToken;
-            if (string.IsNullOrEmpty(rawToken)) throw new Exception("Failed to parse a watch token from the server response.");
+            if (string.IsNullOrEmpty(rawToken))
+            {
+                throw new Exception("Failed to parse a watch token from the server response.");
+            }
 
             _csrfToken = rawToken;
-            Debug.WriteLine($"[AuthService] Storing complete raw watch token. Value is: [{_csrfToken}]");
+            Debug.WriteLine($"[AuthService] Successfully parsed and stored CSRF token.");
         }
 
         public static async Task<List<AuthRequest>> GetCreateAccountFieldsAsync()
         {
-            WebView2 tempWorker = null;
-            try
+            using (var tempWorker = await CreateAndInitApiWorker())
             {
-                tempWorker = await CreateAndInitWebView2();
-                {
-                    try
-                    {
-                        string url = $"{AppSettings.ApiEndpoint}?action=query&meta=authmanagerinfo&amirequestsfor=create&format=json";
-                        string json = await ApiRequestService.GetJsonFromApiAsync(url, tempWorker);
-                        var response = JsonConvert.DeserializeObject<AuthManagerInfoResponse>(json);
+                string url = $"{AppSettings.ApiEndpoint}?action=query&meta=authmanagerinfo&amirequestsfor=create&format=json";
+                string json = await tempWorker.GetJsonFromApiAsync(url);
+                var response = JsonConvert.DeserializeObject<AuthManagerInfoResponse>(json);
 
-                        if (response?.Query?.AuthManagerInfo?.Requests == null)
-                        {
-                            throw new Exception("Could not retrieve required fields for account creation.");
-                        }
-                        return response.Query.AuthManagerInfo.Requests;
-                    }
-                    finally
-                    {
-                        if (tempWorker != null)
-                        {
-                            App.UIHost?.Children.Remove(tempWorker);
-                            tempWorker.Close();
-                        }
-                    }
+                if (response?.Query?.AuthManagerInfo?.Requests == null)
+                {
+                    throw new Exception("Could not retrieve required fields for account creation.");
                 }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[AuthService] GetCreateAccountFieldsAsync failed: {ex.Message}");
-                throw;
+                return response.Query.AuthManagerInfo.Requests;
             }
         }
 
         public static async Task<CreateAccountResult> PerformCreateAccountAsync(Dictionary<string, string> fieldData)
         {
-            WebView2 tempWorker = null;
-            try
+            using (var tempWorker = await CreateAndInitApiWorker())
             {
-                tempWorker = await CreateAndInitWebView2();
+                string tokenUrl = $"{AppSettings.ApiEndpoint}?action=query&meta=tokens&type=createaccount&format=json";
+                string tokenJson = await tempWorker.GetJsonFromApiAsync(tokenUrl);
+                var tokenResponse = JObject.Parse(tokenJson);
+                string createToken = tokenResponse?["query"]?["tokens"]?["createaccounttoken"]?.ToString();
+                if (string.IsNullOrEmpty(createToken))
                 {
-                    try
-                    {
-                        string tokenUrl = $"{AppSettings.ApiEndpoint}?action=query&meta=tokens&type=createaccount&format=json";
-                        string tokenJson = await ApiRequestService.GetJsonFromApiAsync(tokenUrl, tempWorker);
-                        var tokenResponse = JObject.Parse(tokenJson);
-                        string createToken = tokenResponse?["query"]?["tokens"]?["createaccounttoken"]?.ToString();
-                        if (string.IsNullOrEmpty(createToken))
-                        {
-                            throw new Exception("Failed to retrieve a createaccount token.");
-                        }
-
-                        var postData = new Dictionary<string, string>(fieldData)
-                    {
-                        { "action", "createaccount" },
-                        { "createtoken", createToken },
-                        { "format", "json" },
-                        { "createreturnurl", AppSettings.BaseUrl }
-                    };
-
-                        string resultJson = await ApiRequestService.PostAndGetJsonFromApiAsync(tempWorker, AppSettings.ApiEndpoint, postData);
-                        var result = JsonConvert.DeserializeObject<CreateAccountResponse>(resultJson);
-
-                        if (result?.CreateAccount == null)
-                        {
-                            throw new Exception("Received an invalid response from the server.");
-                        }
-
-                        return result.CreateAccount;
-                    }
-                    finally
-                    {
-                        if (tempWorker != null)
-                        {
-                            App.UIHost?.Children.Remove(tempWorker);
-                            tempWorker.Close();
-                        }
-                    }
+                    throw new Exception("Failed to retrieve a createaccount token.");
                 }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[AuthService] PerformCreateAccountAsync failed: {ex.Message}");
-                throw;
+
+                var postData = new Dictionary<string, string>(fieldData)
+                {
+                    { "action", "createaccount" },
+                    { "createtoken", createToken },
+                    { "format", "json" },
+                    { "createreturnurl", AppSettings.BaseUrl }
+                };
+
+                string resultJson = await tempWorker.PostAndGetJsonFromApiAsync(AppSettings.ApiEndpoint, postData);
+                var result = JsonConvert.DeserializeObject<CreateAccountResponse>(resultJson);
+
+                if (result?.CreateAccount == null)
+                {
+                    throw new Exception("Received an invalid response from the server.");
+                }
+
+                return result.CreateAccount;
             }
         }
     }

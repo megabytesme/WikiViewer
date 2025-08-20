@@ -3,6 +3,12 @@ using Windows.Storage;
 
 namespace Shared_Code
 {
+    public enum ConnectionMethod
+    {
+        WebView2,
+        HttpClientProxy
+    }
+
     public static class AppSettings
     {
         private const string CachingEnabledKey = "IsCachingEnabled";
@@ -11,12 +17,26 @@ namespace Shared_Code
         private const string MediaWikiUrlKey = "MediaWikiUrl";
         private const string ScriptPathKey = "MediaWiki_ScriptPath";
         private const string ArticlePathKey = "MediaWiki_ArticlePath";
+        private const string ConnectionMethodKey = "ConnectionMethod";
         private const string DefaultMediaWikiUrl = "https://en.wikipedia.org/";
         private const string DefaultScriptPath = "w/";
         private const string DefaultArticlePath = "wiki/";
         private const string DefaultMainPageName = "Main Page";
 
         private static readonly ApplicationDataContainer _localSettings = ApplicationData.Current.LocalSettings;
+
+        public static ConnectionMethod ConnectionBackend
+        {
+            get
+            {
+                if (_localSettings.Values.TryGetValue(ConnectionMethodKey, out object value) && value is int intValue)
+                {
+                    return (ConnectionMethod)intValue;
+                }
+                return ConnectionMethod.WebView2;
+            }
+            set => _localSettings.Values[ConnectionMethodKey] = (int)value;
+        }
 
         public static bool IsCachingEnabled
         {

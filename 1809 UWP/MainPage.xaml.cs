@@ -23,7 +23,7 @@ namespace _1809_UWP
     public sealed partial class MainPage : Page
     {
         private CancellationTokenSource _suggestionCts;
-        public static WebView2 ApiWorker { get; private set; }
+        public static IApiWorker ApiWorker { get; set; }
         private bool _isPreflightCheckComplete = false;
         private string _verificationUrl;
 
@@ -42,9 +42,15 @@ namespace _1809_UWP
         {
             if (ApiWorker == null)
             {
-                ApiWorker = new WebView2();
-                WorkerWebViewHost.Children.Add(ApiWorker);
-                await ApiWorker.EnsureCoreWebView2Async();
+                if (AppSettings.ConnectionBackend == ConnectionMethod.HttpClientProxy)
+                {
+                    ApiWorker = new HttpClientApiWorker();
+                }
+                else
+                {
+                    ApiWorker = new WebView2ApiWorker();
+                }
+                await ApiWorker.InitializeAsync();
             }
 
             SearchBox.PlaceholderText = $"Search {AppSettings.Host}...";
@@ -407,7 +413,7 @@ namespace _1809_UWP
                 string url =
                     $"{AppSettings.ApiEndpoint}?action=opensearch&format=json&limit=10&search={Uri.EscapeDataString(query)}";
 
-                string json = await ApiRequestService.GetJsonFromApiAsync(url, ApiWorker);
+                string json = await ApiWorker.GetJsonFromApiAsync(url);
 
                 if (token.IsCancellationRequested)
                     return;

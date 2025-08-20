@@ -1,10 +1,9 @@
 using _1809_UWP;
 using HtmlAgilityPack;
-using Microsoft.UI.Xaml.Controls;
-using Microsoft.Web.WebView2.Core;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -12,10 +11,7 @@ using System.Net.NetworkInformation;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Windows.ApplicationModel.Core;
-using Windows.Foundation;
 using Windows.Storage;
-using Windows.UI.Core;
 
 namespace Shared_Code
 {
@@ -25,15 +21,10 @@ namespace Shared_Code
             string pageTitle,
             Stopwatch stopwatch,
             bool forceRefresh = false,
-            WebView2 worker = null,
+            IApiWorker worker = null,
             SemaphoreSlim semaphore = null
         )
         {
-            long startTime = stopwatch.ElapsedMilliseconds;
-            Debug.WriteLine(
-                $"[FETCHER] Starting fetch process for '{pageTitle}' at {startTime}ms."
-            );
-
             var workerToUse = worker ?? MainPage.ApiWorker;
 
             string resolvedTitle = pageTitle;
@@ -44,9 +35,8 @@ namespace Shared_Code
 
             if (pageTitle.Equals("random", StringComparison.OrdinalIgnoreCase))
             {
-                string randomTitleJson = await ApiRequestService.GetJsonFromApiAsync(
-                    $"{AppSettings.ApiEndpoint}?action=query&list=random&rnnamespace=0&rnlimit=1&format=json",
-                    workerToUse
+                string randomTitleJson = await workerToUse.GetJsonFromApiAsync(
+                    $"{AppSettings.ApiEndpoint}?action=query&list=random&rnnamespace=0&rnlimit=1&format=json"
                 );
                 if (string.IsNullOrEmpty(randomTitleJson))
                     throw new Exception(
@@ -84,10 +74,6 @@ namespace Shared_Code
                     );
                     if (!string.IsNullOrEmpty(cachedHtml))
                     {
-                        long cacheHitTime = stopwatch.ElapsedMilliseconds;
-                        Debug.WriteLine(
-                            $"[FETCHER] Cache hit for '{resolvedTitle}' at {cacheHitTime}ms. Duration: {cacheHitTime - startTime}ms."
-                        );
                         return (cachedHtml, resolvedTitle);
                     }
                 }
@@ -102,24 +88,9 @@ namespace Shared_Code
 
             string pageUrl = AppSettings.GetWikiPageUrl(resolvedTitle);
 
-            long downloadStartTime = stopwatch.ElapsedMilliseconds;
-            Debug.WriteLine(
-                $"[FETCHER] Starting raw HTML download for '{resolvedTitle}' at {downloadStartTime}ms."
-            );
+            var freshHtml = await workerToUse.GetRawHtmlFromUrlAsync(pageUrl);
 
-            var freshHtml = await ApiRequestService.GetRawHtmlFromUrlAsync(pageUrl, workerToUse);
-
-            long downloadEndTime = stopwatch.ElapsedMilliseconds;
-            Debug.WriteLine(
-                $"[FETCHER] Finished raw HTML download. Duration: {downloadEndTime - downloadStartTime}ms."
-            );
-
-            var processedHtml = await ProcessHtmlAsync(
-                freshHtml,
-                stopwatch,
-                workerToUse,
-                semaphore
-            );
+            var processedHtml = await ProcessHtmlAsync(freshHtml, workerToUse, semaphore);
 
             var lastUpdated = await FetchLastUpdatedTimestampAsync(resolvedTitle, workerToUse);
             if (AppSettings.IsCachingEnabled && lastUpdated.HasValue)
@@ -131,24 +102,15 @@ namespace Shared_Code
                 );
             }
 
-            long endTime = stopwatch.ElapsedMilliseconds;
-            Debug.WriteLine(
-                $"[FETCHER] Finished fetch process for '{resolvedTitle}' at {endTime}ms. Total Duration: {endTime - startTime}ms."
-            );
-
             return (processedHtml, resolvedTitle);
         }
 
         public static async Task<string> ProcessHtmlAsync(
             string rawHtml,
-            Stopwatch stopwatch,
-            WebView2 worker,
+            IApiWorker worker,
             SemaphoreSlim semaphore = null
         )
         {
-            long startTime = stopwatch.ElapsedMilliseconds;
-            Debug.WriteLine($"[PROCESSOR] Starting HTML processing at {startTime}ms.");
-
             var doc = new HtmlDocument();
             doc.LoadHtml(rawHtml);
             var contentNode =
@@ -159,11 +121,6 @@ namespace Shared_Code
 
             string styleBlock = GetCssForTheme();
 
-            long endTime = stopwatch.ElapsedMilliseconds;
-            Debug.WriteLine(
-                $"[PROCESSOR] Finished HTML processing at {endTime}ms. Duration: {endTime - startTime}ms."
-            );
-
             return $@"
     <!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>{styleBlock}</head>
     <body><div class='mw-parser-output'>{contentNode.InnerHtml}</div></body></html>";
@@ -171,32 +128,49 @@ namespace Shared_Code
 
         private static async Task ProcessMediaInDocument(
             HtmlDocument doc,
-            WebView2 worker,
+            IApiWorker worker,
             SemaphoreSlim semaphore = null
         )
         {
             string fileLinkPrefix = $"/{AppSettings.ArticlePath}File:";
-            var imageLinks = doc.DocumentNode.SelectNodes($"//a[starts-with(@href, '{fileLinkPrefix}')]");
+            var imageLinks = doc.DocumentNode.SelectNodes(
+                $"//a[starts-with(@href, '{fileLinkPrefix}')]"
+            );
             if (imageLinks != null && imageLinks.Any())
             {
-                var imageFileNames = imageLinks.Select(link => link.GetAttributeValue("href", "").Substring(fileLinkPrefix.Length - 1)).Distinct().ToList();
+                var imageFileNames = imageLinks
+                    .Select(link =>
+                        link.GetAttributeValue("href", "").Substring(fileLinkPrefix.Length - 1)
+                    )
+                    .Distinct()
+                    .ToList();
                 var titles = string.Join("|", imageFileNames.Select(Uri.EscapeDataString));
-                var imageUrlApi = $"{AppSettings.ApiEndpoint}?action=query&prop=imageinfo&iiprop=url&format=json&titles={titles}";
+                var imageUrlApi =
+                    $"{AppSettings.ApiEndpoint}?action=query&prop=imageinfo&iiprop=url&format=json&titles={titles}";
                 try
                 {
-                    string imageJsonResponse = await ApiRequestService.GetJsonFromApiAsync(imageUrlApi, worker);
+                    string imageJsonResponse = await worker.GetJsonFromApiAsync(imageUrlApi);
                     if (!string.IsNullOrEmpty(imageJsonResponse))
                     {
-                        var imageInfoResponse = JsonConvert.DeserializeObject<ImageQueryResponse>(imageJsonResponse);
+                        var imageInfoResponse = JsonConvert.DeserializeObject<ImageQueryResponse>(
+                            imageJsonResponse
+                        );
                         if (imageInfoResponse?.query?.pages != null)
                         {
-                            var imageUrlMap = imageInfoResponse.query.pages.Values.Where(p => p.imageinfo?.FirstOrDefault()?.url != null)
+                            var imageUrlMap = imageInfoResponse
+                                .query.pages.Values.Where(p =>
+                                    p.imageinfo?.FirstOrDefault()?.url != null
+                                )
                                 .ToDictionary(p => p.title, p => p.imageinfo.First().url);
                             if (imageUrlMap.Any())
                             {
                                 foreach (var link in imageLinks)
                                 {
-                                    string lookupKey = Uri.UnescapeDataString(link.GetAttributeValue("href", "").Substring(fileLinkPrefix.Length - 1)).Replace('_', ' ');
+                                    string lookupKey = Uri.UnescapeDataString(
+                                            link.GetAttributeValue("href", "")
+                                                .Substring(fileLinkPrefix.Length - 1)
+                                        )
+                                        .Replace('_', ' ');
                                     if (imageUrlMap.TryGetValue(lookupKey, out string fullImageUrl))
                                     {
                                         var img = link.SelectSingleNode(".//img");
@@ -219,32 +193,64 @@ namespace Shared_Code
             if (imageNodes != null && imageNodes.Any())
             {
                 var uniqueImageUrls = imageNodes
-                    .Select(img => img.GetAttributeValue("srcset", null)?.Split(',').FirstOrDefault()?.Trim().Split(' ')[0] ?? img.GetAttributeValue("src", null))
+                    .Select(img =>
+                        img.GetAttributeValue("srcset", null)
+                            ?.Split(',')
+                            .FirstOrDefault()
+                            ?.Trim()
+                            .Split(' ')[0] ?? img.GetAttributeValue("src", null)
+                    )
                     .Where(src => !string.IsNullOrEmpty(src) && !src.StartsWith("data:"))
-                    .Distinct().ToList();
+                    .Distinct()
+                    .ToList();
 
-                var downloadTasks = uniqueImageUrls.Select(async originalUrl => {
-                    await semaphoreToUse.WaitAsync();
-                    try { return new { OriginalUrl = originalUrl, LocalPath = await DownloadAndCacheImageAsync(originalUrl) }; }
-                    finally { semaphoreToUse.Release(); }
-                }).ToList();
+                var downloadTasks = uniqueImageUrls
+                    .Select(async originalUrl =>
+                    {
+                        await semaphoreToUse.WaitAsync();
+                        try
+                        {
+                            return new
+                            {
+                                OriginalUrl = originalUrl,
+                                LocalPath = await DownloadAndCacheMediaAsync(originalUrl, worker),
+                            };
+                        }
+                        finally
+                        {
+                            semaphoreToUse.Release();
+                        }
+                    })
+                    .ToList();
 
                 var downloadResults = await Task.WhenAll(downloadTasks);
-                var urlToLocalPathMap = downloadResults.Where(r => r.LocalPath != null).ToDictionary(r => r.OriginalUrl, r => r.LocalPath);
+                var urlToLocalPathMap = downloadResults
+                    .Where(r => r.LocalPath != null)
+                    .ToDictionary(r => r.OriginalUrl, r => r.LocalPath);
 
                 foreach (var img in imageNodes)
                 {
-                    string originalSrc = img.GetAttributeValue("srcset", null)?.Split(',').FirstOrDefault()?.Trim().Split(' ')[0] ?? img.GetAttributeValue("src", null);
+                    string originalSrc =
+                        img.GetAttributeValue("srcset", null)
+                            ?.Split(',')
+                            .FirstOrDefault()
+                            ?.Trim()
+                            .Split(' ')[0] ?? img.GetAttributeValue("src", null);
                     if (urlToLocalPathMap.TryGetValue(originalSrc, out string localImagePath))
                     {
-                        img.SetAttributeValue("src", $"https://{ArticleViewerPage.GetVirtualHostName()}{localImagePath}");
+                        img.SetAttributeValue(
+                            "src",
+                            $"https://{ArticleViewerPage.GetVirtualHostName()}{localImagePath}"
+                        );
                         img.Attributes.Remove("srcset");
                     }
                 }
             }
 
-            var audioSourceNodes = doc.DocumentNode.SelectNodes("//audio/source") ?? Enumerable.Empty<HtmlNode>();
-            var videoSourceNodes = doc.DocumentNode.SelectNodes("//video/source") ?? Enumerable.Empty<HtmlNode>();
+            var audioSourceNodes =
+                doc.DocumentNode.SelectNodes("//audio/source") ?? Enumerable.Empty<HtmlNode>();
+            var videoSourceNodes =
+                doc.DocumentNode.SelectNodes("//video/source") ?? Enumerable.Empty<HtmlNode>();
             var mediaSourceNodes = audioSourceNodes.Concat(videoSourceNodes).ToList();
 
             if (mediaSourceNodes.Any())
@@ -252,228 +258,170 @@ namespace Shared_Code
                 var uniqueMediaUrls = mediaSourceNodes
                     .Select(node => node.GetAttributeValue("src", null))
                     .Where(src => !string.IsNullOrEmpty(src) && !src.StartsWith("data:"))
-                    .Distinct().ToList();
+                    .Distinct()
+                    .ToList();
 
-                var downloadTasks = uniqueMediaUrls.Select(async originalUrl => {
-                    await semaphoreToUse.WaitAsync();
-                    try { return new { OriginalUrl = originalUrl, LocalPath = await DownloadAndCacheBinaryMediaAsync(originalUrl) }; }
-                    finally { semaphoreToUse.Release(); }
-                }).ToList();
+                var downloadTasks = uniqueMediaUrls
+                    .Select(async originalUrl =>
+                    {
+                        await semaphoreToUse.WaitAsync();
+                        try
+                        {
+                            return new
+                            {
+                                OriginalUrl = originalUrl,
+                                LocalPath = await DownloadAndCacheMediaAsync(originalUrl, worker),
+                            };
+                        }
+                        finally
+                        {
+                            semaphoreToUse.Release();
+                        }
+                    })
+                    .ToList();
 
                 var downloadResults = await Task.WhenAll(downloadTasks);
-                var urlToLocalPathMap = downloadResults.Where(r => r.LocalPath != null).ToDictionary(r => r.OriginalUrl, r => r.LocalPath);
+                var urlToLocalPathMap = downloadResults
+                    .Where(r => r.LocalPath != null)
+                    .ToDictionary(r => r.OriginalUrl, r => r.LocalPath);
 
                 foreach (var source in mediaSourceNodes)
                 {
                     string originalSrc = source.GetAttributeValue("src", null);
                     if (urlToLocalPathMap.TryGetValue(originalSrc, out string localPath))
                     {
-                        source.SetAttributeValue("src", $"https://{ArticleViewerPage.GetVirtualHostName()}{localPath}");
+                        source.SetAttributeValue(
+                            "src",
+                            $"https://{ArticleViewerPage.GetVirtualHostName()}{localPath}"
+                        );
                     }
                 }
             }
         }
 
-        private static async Task<string> DownloadAndCacheImageAsync(string originalUrl)
+        private static async Task<string> DownloadAndCacheMediaAsync(
+            string originalUrl,
+            IApiWorker worker
+        )
         {
-            if (!Uri.TryCreate(new Uri(AppSettings.BaseUrl), originalUrl, out Uri imageUrl))
+            if (!Uri.TryCreate(new Uri(AppSettings.BaseUrl), originalUrl, out Uri mediaUrl))
                 return null;
 
-            var extension = Path.GetExtension(imageUrl.LocalPath).ToLowerInvariant();
-            var hash = System.Security.Cryptography.SHA1.Create().ComputeHash(Encoding.UTF8.GetBytes(imageUrl.AbsoluteUri));
+            string urlWithoutQuery = mediaUrl.GetLeftPart(UriPartial.Path);
+            var extension = Path.GetExtension(urlWithoutQuery).ToLowerInvariant();
+            if (string.IsNullOrEmpty(extension))
+                extension = ".dat";
+
+            var hash = System
+                .Security.Cryptography.SHA1.Create()
+                .ComputeHash(System.Text.Encoding.UTF8.GetBytes(mediaUrl.AbsoluteUri));
             var baseFileName = hash.Aggregate("", (s, b) => s + b.ToString("x2"));
             var finalFileName = baseFileName + extension;
 
-            var imageCacheFolder = await ApplicationData.Current.LocalFolder.CreateFolderAsync("cache", CreationCollisionOption.OpenIfExists);
+            var cacheFolder = await ApplicationData.Current.LocalFolder.CreateFolderAsync(
+                "cache",
+                CreationCollisionOption.OpenIfExists
+            );
 
-            if (await imageCacheFolder.TryGetItemAsync(finalFileName) is StorageFile cachedFile)
+            if (await cacheFolder.TryGetItemAsync(finalFileName) is StorageFile)
                 return $"/cache/{finalFileName}";
 
-            var tcs = new TaskCompletionSource<bool>();
-            _ = CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
+            byte[] mediaBytes = null;
+            try
             {
-                if (App.UIHost == null) { tcs.TrySetResult(false); return; }
-                var tempWorker = new WebView2();
-                try
-                {
-                    App.UIHost.Children.Add(tempWorker);
-                    await tempWorker.EnsureCoreWebView2Async();
-                    if (MainPage.ApiWorker?.CoreWebView2 != null)
-                        await ApiRequestService.CopyApiCookiesAsync(MainPage.ApiWorker.CoreWebView2, tempWorker.CoreWebView2);
+                mediaBytes = await worker.GetRawBytesFromUrlAsync(mediaUrl.AbsoluteUri);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MediaDownloader] Download FAILED for {mediaUrl}: {ex.Message}");
+                return null;
+            }
 
-                    if (extension == ".svg")
-                    {
-                        string svgContent = await ApiRequestService.GetRawHtmlFromUrlAsync(imageUrl.AbsoluteUri, tempWorker);
-                        if (string.IsNullOrEmpty(svgContent)) throw new Exception("Downloaded SVG content was null or empty.");
-                        var newFile = await imageCacheFolder.CreateFileAsync(finalFileName, CreationCollisionOption.ReplaceExisting);
-                        await FileIO.WriteTextAsync(newFile, svgContent);
-                    }
-                    else
-                    {
-                        var navTcs = new TaskCompletionSource<bool>();
-                        TypedEventHandler<CoreWebView2, CoreWebView2NavigationCompletedEventArgs> navHandler = null;
-                        navHandler = (s, e) => { s.NavigationCompleted -= navHandler; navTcs.TrySetResult(e.IsSuccess); };
-                        tempWorker.CoreWebView2.NavigationCompleted += navHandler;
-                        tempWorker.CoreWebView2.Navigate(imageUrl.AbsoluteUri);
-                        if (!await navTcs.Task) throw new Exception($"Image navigation failed for {imageUrl.AbsoluteUri}");
+            if (mediaBytes == null || mediaBytes.Length == 0)
+                return null;
 
-                        const string rasterImageScript = @"(function() { const img = document.querySelector('img'); if (img && img.naturalWidth > 0) { const canvas = document.createElement('canvas'); canvas.width = img.naturalWidth; canvas.height = img.naturalHeight; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0); return canvas.toDataURL('image/png').split(',')[1]; } return null; })();";
-                        string scriptResult = await tempWorker.CoreWebView2.ExecuteScriptAsync(rasterImageScript);
-                        if (string.IsNullOrEmpty(scriptResult) || scriptResult == "null") throw new Exception("Failed to get Base64 data from script.");
-                        var base64Data = JsonConvert.DeserializeObject<string>(scriptResult);
-                        var bytes = Convert.FromBase64String(base64Data);
-                        var newFile = await imageCacheFolder.CreateFileAsync(finalFileName, CreationCollisionOption.ReplaceExisting);
-                        await FileIO.WriteBytesAsync(newFile, bytes);
-                    }
-                    Debug.WriteLine($"[ImageDownloader] Cached image {imageUrl} as {finalFileName}");
-                    tcs.TrySetResult(true);
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[ImageDownloader] Critical failure for {imageUrl}. Reason: {ex.Message}");
-                    tcs.TrySetResult(false);
-                }
-                finally
-                {
-                    App.UIHost.Children.Remove(tempWorker);
-                    tempWorker.Close();
-                }
-            });
-            bool success = await tcs.Task;
-            return success ? $"/cache/{finalFileName}" : null;
+            try
+            {
+                StorageFile newFile = await cacheFolder.CreateFileAsync(
+                    finalFileName,
+                    CreationCollisionOption.ReplaceExisting
+                );
+                await FileIO.WriteBytesAsync(newFile, mediaBytes);
+                return $"/cache/{finalFileName}";
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(
+                    $"[MediaDownloader] FAILED to save file {finalFileName}: {ex.Message}"
+                );
+                return null;
+            }
         }
 
-        private static async Task<string> DownloadAndCacheBinaryMediaAsync(string originalUrl)
+        private static async Task<string> DownloadAndCacheBinaryMediaAsync(
+            string originalUrl,
+            IApiWorker worker
+        )
         {
             if (!Uri.TryCreate(new Uri(AppSettings.BaseUrl), originalUrl, out Uri mediaUrl))
             {
-                Debug.WriteLine($"[BinaryDownloader] Failed to create valid Uri from: {originalUrl}");
                 return null;
             }
 
             string urlWithoutQuery = mediaUrl.GetLeftPart(UriPartial.Path);
             var extension = Path.GetExtension(urlWithoutQuery).ToLowerInvariant();
-            if (string.IsNullOrEmpty(extension)) extension = ".dat";
+            if (string.IsNullOrEmpty(extension))
+                extension = ".dat";
 
-            var hash = System.Security.Cryptography.SHA1.Create().ComputeHash(Encoding.UTF8.GetBytes(mediaUrl.AbsoluteUri));
+            var hash = System
+                .Security.Cryptography.SHA1.Create()
+                .ComputeHash(Encoding.UTF8.GetBytes(mediaUrl.AbsoluteUri));
             var baseFileName = hash.Aggregate("", (s, b) => s + b.ToString("x2"));
             var finalFileName = baseFileName + extension;
 
-            var cacheFolder = await ApplicationData.Current.LocalFolder.CreateFolderAsync("cache", CreationCollisionOption.OpenIfExists);
+            var cacheFolder = await ApplicationData.Current.LocalFolder.CreateFolderAsync(
+                "cache",
+                CreationCollisionOption.OpenIfExists
+            );
 
             if (await cacheFolder.TryGetItemAsync(finalFileName) is StorageFile)
             {
                 return $"/cache/{finalFileName}";
             }
 
-            var tcs = new TaskCompletionSource<string>();
-            _ = CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
+            byte[] mediaBytes = null;
+            try
             {
-                if (App.UIHost == null) { tcs.TrySetResult(null); return; }
-                var tempWorker = new WebView2();
-                try
-                {
-                    App.UIHost.Children.Add(tempWorker);
-                    await tempWorker.EnsureCoreWebView2Async();
-                    if (MainPage.ApiWorker?.CoreWebView2 != null)
-                        await ApiRequestService.CopyApiCookiesAsync(MainPage.ApiWorker.CoreWebView2, tempWorker.CoreWebView2);
+                mediaBytes = await worker.GetRawBytesFromUrlAsync(mediaUrl.AbsoluteUri);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[BinaryDownloader] Download FAILED for {mediaUrl}: {ex.Message}");
+                return null;
+            }
 
-                    var downloadTcs = new TaskCompletionSource<bool>();
-                    TypedEventHandler<CoreWebView2, CoreWebView2DownloadStartingEventArgs> downloadHandler = null;
-                    downloadHandler = (s, e) =>
-                    {
-                        s.DownloadStarting -= downloadHandler;
-                        var deferral = e.GetDeferral();
-                        e.ResultFilePath = Path.Combine(cacheFolder.Path, finalFileName);
-                        e.Handled = true;
-                        deferral.Complete();
+            if (mediaBytes == null || mediaBytes.Length == 0)
+                return null;
 
-                        TypedEventHandler<CoreWebView2DownloadOperation, object> stateChangedHandler = null;
-                        stateChangedHandler = (op, _) =>
-                        {
-                            if (op.State != CoreWebView2DownloadState.InProgress)
-                            {
-                                op.StateChanged -= stateChangedHandler;
-                                downloadTcs.TrySetResult(op.State == CoreWebView2DownloadState.Completed);
-                            }
-                        };
-                        e.DownloadOperation.StateChanged += stateChangedHandler;
-                    };
-                    tempWorker.CoreWebView2.DownloadStarting += downloadHandler;
-
-                    var navTcs = new TaskCompletionSource<bool>();
-                    TypedEventHandler<CoreWebView2, CoreWebView2NavigationCompletedEventArgs> navHandler = null;
-                    navHandler = (s, e) => {
-                        s.NavigationCompleted -= navHandler;
-                        navTcs.TrySetResult(e.IsSuccess);
-                    };
-                    tempWorker.CoreWebView2.NavigationCompleted += navHandler;
-                    tempWorker.CoreWebView2.Navigate(AppSettings.BaseUrl);
-
-                    if (!await navTcs.Task)
-                    {
-                        throw new Exception($"Navigation to base URL '{AppSettings.BaseUrl}' failed.");
-                    }
-
-                    string script = $@"
-                        (async () => {{
-                            try {{
-                                const response = await fetch('{mediaUrl.AbsoluteUri}');
-                                if (!response.ok) {{
-                                    return `Error: ${{response.status}} ${{response.statusText}}`;
-                                }}
-                                const blob = await response.blob();
-                                const url = URL.createObjectURL(blob);
-                                const a = document.createElement('a');
-                                a.href = url;
-                                a.download = '{finalFileName}';
-                                document.body.appendChild(a);
-                                a.click();
-                                a.remove();
-                                URL.revokeObjectURL(url);
-                                return 'Download initiated';
-                            }} catch (e) {{
-                                return `Error: ${{e.message}}`;
-                            }}
-                        }})();";
-
-                    var scriptResult = await tempWorker.CoreWebView2.ExecuteScriptAsync(script);
-                    Debug.WriteLine($"[BinaryDownloader] Fetch script executed for {mediaUrl.AbsoluteUri}, result: {scriptResult}");
-
-                    var timeoutTask = Task.Delay(TimeSpan.FromSeconds(30));
-                    var completedTask = await Task.WhenAny(downloadTcs.Task, timeoutTask);
-
-                    if (completedTask == timeoutTask)
-                    {
-                        throw new TimeoutException("The download was not initiated by the script within 30 seconds.");
-                    }
-
-                    if (await downloadTcs.Task)
-                    {
-                        Debug.WriteLine($"[BinaryDownloader] Successfully cached media from {mediaUrl} as {finalFileName}");
-                        tcs.TrySetResult($"/cache/{finalFileName}");
-                    }
-                    else
-                    {
-                        throw new Exception("DownloadOperation did not complete successfully.");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[BinaryDownloader] Critical failure for {mediaUrl}. Reason: {ex.Message}");
-                    tcs.TrySetResult(null);
-                }
-                finally
-                {
-                    App.UIHost.Children.Remove(tempWorker);
-                    tempWorker.Close();
-                }
-            });
-
-            return await tcs.Task;
+            try
+            {
+                StorageFile newFile = await cacheFolder.CreateFileAsync(
+                    finalFileName,
+                    CreationCollisionOption.ReplaceExisting
+                );
+                await FileIO.WriteBytesAsync(newFile, mediaBytes);
+                return $"/cache/{finalFileName}";
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(
+                    $"[BinaryDownloader] FAILED to save file {finalFileName}: {ex.Message}"
+                );
+                return null;
+            }
         }
 
-        public static async Task<string> ProcessHtmlAsync(string rawHtml, WebView2 worker)
+        public static async Task<string> ProcessHtmlAsync(string rawHtml, IApiWorker worker)
         {
             var doc = new HtmlDocument();
             doc.LoadHtml(rawHtml);
@@ -488,35 +436,37 @@ namespace Shared_Code
 
         public static async Task<DateTime?> FetchLastUpdatedTimestampAsync(
             string pageTitle,
-            WebView2 worker
+            IApiWorker worker
         )
         {
-            if (
-                string.IsNullOrEmpty(pageTitle)
-                || pageTitle.Equals("random", StringComparison.OrdinalIgnoreCase)
-            )
+            if (string.IsNullOrEmpty(pageTitle) || pageTitle.Equals("random", StringComparison.OrdinalIgnoreCase))
                 return null;
-            string url =
-                $"{AppSettings.ApiEndpoint}?action=query&prop=revisions&titles={Uri.EscapeDataString(pageTitle)}&rvprop=timestamp&rvlimit=1&format=json";
+
+            string url = $"{AppSettings.ApiEndpoint}?action=query&prop=revisions&titles={Uri.EscapeDataString(pageTitle)}&rvprop=timestamp&rvlimit=1&format=json";
+
             try
             {
-                string json = await ApiRequestService.GetJsonFromApiAsync(url, worker);
-                var response = JsonConvert.DeserializeObject<TimestampQueryResponse>(json);
-                return response
-                    ?.query?.pages?.Values.FirstOrDefault()
-                    ?.Revisions?.FirstOrDefault()
-                    ?.Timestamp;
+                string json = await worker.GetJsonFromApiAsync(url);
+
+                JObject root = JObject.Parse(json);
+                JToken pagesToken = root?["query"]?["pages"];
+
+                if (pagesToken != null && pagesToken.Type == JTokenType.Object)
+                {
+                    var pages = pagesToken.ToObject<Dictionary<string, TimestampPage>>();
+                    return pages?.Values.FirstOrDefault()?.Revisions?.FirstOrDefault()?.Timestamp;
+                }
+
+                return null;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine(
-                    $"[PROCESSOR] Failed to get timestamp for '{pageTitle}': {ex.Message}"
-                );
+                Debug.WriteLine($"[PROCESSOR] Failed to get timestamp for '{pageTitle}': {ex.Message}");
                 return null;
             }
         }
 
-        public static async Task<bool> PageExistsAsync(string pageTitle, WebView2 worker)
+        public static async Task<bool> PageExistsAsync(string pageTitle, IApiWorker worker)
         {
             if (string.IsNullOrEmpty(pageTitle))
                 return false;
@@ -527,13 +477,14 @@ namespace Shared_Code
 
             try
             {
-                string json = await ApiRequestService.GetJsonFromApiAsync(url, workerToUse);
+                string json = await workerToUse.GetJsonFromApiAsync(url);
                 if (string.IsNullOrEmpty(json))
                     return false;
 
                 JObject root = JObject.Parse(json);
                 var pages = root?["query"]?["pages"];
-                if (pages == null) return false;
+                if (pages == null)
+                    return false;
 
                 var firstPage = pages.First as JProperty;
                 if (firstPage?.Value?["missing"] != null || firstPage?.Name == "-1")
@@ -558,7 +509,7 @@ namespace Shared_Code
         public static string GetCssForTheme()
         {
             return @"<style>
-                    :root { /* Light Theme (default) */
+                    :root { 
                         --text-primary: #000000; --text-secondary: #505050; --link-color: #0066CC; --card-shadow: rgba(0, 0, 0, 0.13);
                         --card-background: rgba(249, 249, 249, 0.7); --card-border: rgba(0, 0, 0, 0.1); --card-header-background: rgba(0, 0, 0, 0.05);
                         --item-hover-background: rgba(0, 0, 0, 0.05); --table-row-divider: rgba(0, 0, 0, 0.08);
@@ -571,7 +522,7 @@ namespace Shared_Code
                     }
 
                     @media (prefers-color-scheme: dark) {
-                        :root { /* Dark Theme overrides */
+                        :root { 
                             --text-primary: #FFFFFF; --text-secondary: #C3C3C3; --link-color: #85B9F3; --card-shadow: rgba(0, 0, 0, 0.4);
                             --card-background: rgba(44, 44, 44, 0.7); --card-border: rgba(255, 255, 255, 0.1); --card-header-background: rgba(255, 255, 255, 0.08);
                             --item-hover-background: rgba(255, 255, 255, 0.07); --table-row-divider: rgba(255, 255, 255, 0.08);

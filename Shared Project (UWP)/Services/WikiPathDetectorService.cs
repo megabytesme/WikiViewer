@@ -3,7 +3,6 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using HtmlAgilityPack;
-using Microsoft.UI.Xaml.Controls;
 
 namespace Shared_Code
 {
@@ -16,7 +15,7 @@ namespace Shared_Code
 
     public static class WikiPathDetectorService
     {
-        public static async Task<WikiPaths> DetectPathsAsync(string baseUrl, WebView2 worker)
+        public static async Task<WikiPaths> DetectPathsAsync(string baseUrl, IApiWorker worker)
         {
             if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var baseUri))
             {
@@ -25,7 +24,7 @@ namespace Shared_Code
 
             try
             {
-                string mainPageHtml = await ApiRequestService.GetRawHtmlFromUrlAsync(baseUrl, worker);
+                string mainPageHtml = await worker.GetRawHtmlFromUrlAsync(baseUrl);
 
                 if (string.IsNullOrEmpty(mainPageHtml))
                 {
