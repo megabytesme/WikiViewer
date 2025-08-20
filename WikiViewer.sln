@@ -64,6 +64,7 @@ Global
 	EndGlobalSection
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
 		Shared Project (UWP)\Shared Project (UWP).projitems*{17eaf20e-8428-4e29-8369-4b30025ee5de}*SharedItemsImports = 13
+		Shared Project (UWP)\Shared Project (UWP).projitems*{5396d943-a4d3-44c8-a4da-5e526910ad6b}*SharedItemsImports = 4
 		Shared Project (UWP)\Shared Project (UWP).projitems*{6ca051f2-9f14-4663-b817-1e9e4bcff853}*SharedItemsImports = 4
 	EndGlobalSection
 EndGlobal

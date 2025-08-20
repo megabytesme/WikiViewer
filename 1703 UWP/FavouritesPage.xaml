@@ -1,0 +1,115 @@
+﻿<Page
+    x:Class="_1703_UWP.FavouritesPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:_1703_UWP"
+    xmlns:local1="using:Shared_Code"
+    Background="Transparent">
+
+    <Page.Resources>
+        <Storyboard x:Name="FadeInAnimation">
+            <DoubleAnimation
+                Storyboard.TargetName="LoadingOverlay"
+                Storyboard.TargetProperty="Opacity"
+                From="0" To="1" Duration="0:0:0.250"
+                EnableDependentAnimation="True"/>
+        </Storyboard>
+        <Storyboard x:Name="FadeOutAnimation">
+            <DoubleAnimation
+                Storyboard.TargetName="LoadingOverlay"
+                Storyboard.TargetProperty="Opacity"
+                From="1" To="0" Duration="0:0:0.350"
+                EnableDependentAnimation="True"/>
+        </Storyboard>
+    </Page.Resources>
+
+    <Grid>
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Visible">
+            <GridView x:Name="FavouritesGridView"
+                      Padding="24,52,24,48"
+                      IsItemClickEnabled="False"
+                      SelectionMode="Multiple"
+                      SelectionChanged="FavouritesGridView_SelectionChanged"
+                      HorizontalAlignment="Center">
+                <GridView.Resources>
+                    <SolidColorBrush x:Key="ListViewItemCheckBrush" Color="{ThemeResource SystemAccentColor}"/>
+                    <SolidColorBrush x:Key="ListViewItemCheckPressedBrush" Color="{ThemeResource SystemAccentColor}"/>
+                </GridView.Resources>
+                <GridView.ItemContainerStyle>
+                    <Style TargetType="GridViewItem">
+                        <Setter Property="Margin" Value="8"/>
+                    </Style>
+                </GridView.ItemContainerStyle>
+                <GridView.ItemTemplate>
+                    <DataTemplate x:DataType="local1:FavouriteItem">
+                        <Grid Width="300" 
+                              MinHeight="200"
+                              BorderThickness="1"
+                              Background="{ThemeResource SystemAccentColor}">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Rectangle Grid.Row="0">
+                                <Rectangle.Fill>
+                                    <ImageBrush ImageSource="{x:Bind ImageUrl, Mode=OneWay, Converter={StaticResource GlobalUrlToImageConverter}}" Stretch="UniformToFill"/>
+                                </Rectangle.Fill>
+                            </Rectangle>
+                            <StackPanel Grid.Row="1" Padding="12">
+                                <TextBlock Text="{x:Bind DisplayTitle}" 
+                                           Style="{ThemeResource SubtitleTextBlockStyle}" 
+                                           TextWrapping="Wrap"/>
+                                <Grid Margin="0,8,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0"
+                                            Content="Article" 
+                                            Click="ArticleButton_Click" 
+                                            Tag="{x:Bind}"
+                                            Visibility="{x:Bind IsArticleAvailable, Converter={StaticResource GlobalBoolToVisibility}}"/>
+                                    <Button Grid.Column="1"
+                                            Content="Talk" 
+                                            Margin="8,0,0,0"
+                                            Click="TalkButton_Click"
+                                            Tag="{x:Bind}"
+                                            Visibility="{x:Bind IsTalkAvailable, Converter={StaticResource GlobalBoolToVisibility}}"/>
+                                </Grid>
+                            </StackPanel>
+                        </Grid>
+                    </DataTemplate>
+                </GridView.ItemTemplate>
+            </GridView>
+        </ScrollViewer>
+
+        <TextBlock x:Name="NoFavouritesTextBlock"
+                   Text="You haven't added any Favourites yet."
+                   Style="{ThemeResource SubtitleTextBlockStyle}"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   Visibility="Collapsed"/>
+
+        <Grid VerticalAlignment="Top" Style="{StaticResource PageTitleBarGridStyle}" Background="{ThemeResource SystemControlForegroundBaseLowBrush}" Margin="0,0,15,0">
+            <TextBlock Text="Favourites" Style="{StaticResource PageTitleBarTextStyle}"/>
+        </Grid>
+
+        <CommandBar x:Name="BottomCommandBar"
+                    VerticalAlignment="Bottom"
+                    Visibility="Collapsed"
+                    Margin="0,0,15,0">
+            <AppBarButton x:Name="DeleteButton" 
+                          Icon="Delete" 
+                          Label="Delete" 
+                          Click="DeleteButton_Click"/>
+        </CommandBar>
+
+        <Grid x:Name="LoadingOverlay" 
+              Opacity="0" 
+              IsHitTestVisible="False">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <ProgressRing IsActive="True" Width="60" Height="60"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Page>

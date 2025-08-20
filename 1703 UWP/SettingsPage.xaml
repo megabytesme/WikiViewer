@@ -1,0 +1,145 @@
+﻿<Page
+    x:Class="_1703_UWP.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="Transparent">
+
+    <Grid>
+        <ScrollViewer>
+            <StackPanel Padding="16,64,16,12" HorizontalAlignment="Center" MaxWidth="500">
+                <Border BorderThickness="1" CornerRadius="8" Padding="16">
+                    <StackPanel>
+                        <TextBlock Text="Account" Style="{ThemeResource SubtitleTextBlockStyle}" HorizontalAlignment="Center"/>
+                        <StackPanel x:Name="LoggedInState" Orientation="Horizontal" Visibility="Collapsed">
+                            <Ellipse Width="64" Height="64">
+                                <Ellipse.Fill>
+                                    <SolidColorBrush Color="{ThemeResource SystemAccentColor}"/>
+                                </Ellipse.Fill>
+                            </Ellipse>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock x:Name="UsernameText" Text="Username"/>
+                                <HyperlinkButton Content="Sign out" Click="SignOutButton_Click" Padding="0"/>
+                            </StackPanel>
+                        </StackPanel>
+                        <StackPanel x:Name="LoggedOutState" Visibility="Collapsed">
+                            <TextBlock x:Name="LoggedOutStateTextBlock" Text="You are not signed in. Sign in to make edits and synchronise favourites!" Style="{ThemeResource BodyTextBlockStyle}" TextWrapping="Wrap"/>
+                            <HyperlinkButton x:Name="SignInLink" Content="Sign in" Click="SignInButton_Click" Padding="0"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+                <Border BorderThickness="1" CornerRadius="8" Padding="16">
+                    <StackPanel>
+                        <TextBlock Text="Wiki Instance" Style="{ThemeResource SubtitleTextBlockStyle}" HorizontalAlignment="Center"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="WikiUrlTextBox" Header="MediaWiki Base URL" PlaceholderText="https://en.wikipedia.org/"/>
+                            <Button x:Name="DetectButton" Grid.Column="1" VerticalAlignment="Bottom" Margin="8,0,0,0" Click="DetectButton_Click">
+                                <StackPanel Orientation="Horizontal">
+                                    <SymbolIcon Symbol="Find"/>
+                                    <TextBlock Text="Detect"/>
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                        <TextBox x:Name="ScriptPathTextBox" Header="Script Path (if any)"/>
+                        <TextBox x:Name="ArticlePathTextBox" Header="Article Path (if any)"/>
+                        <TextBlock x:Name="DetectionStatusText" Visibility="Collapsed" TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}"/>
+                        <TextBlock Text="Changing these values will clear all local data (cache, favourites) and log you out." TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}"/>
+                        <Button x:Name="ApplyUrlButton" Content="Apply and Clear Data" Click="ApplyUrlButton_Click" HorizontalAlignment="Stretch"/>
+                    </StackPanel>
+                </Border>
+                <Border BorderThickness="1" CornerRadius="8" Padding="16">
+                    <StackPanel>
+                        <TextBlock Text="Connection" Style="{ThemeResource SubtitleTextBlockStyle}" HorizontalAlignment="Center"/>
+                        <Grid VerticalAlignment="Center">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Connection Backend" VerticalAlignment="Center"/>
+                                <TextBlock Text="HttpClient Proxy is intended for older devices without WebView2 support." TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}"/>
+                            </StackPanel>
+                            <ToggleSwitch x:Name="ConnectionMethodToggle" Toggled="ConnectionMethodToggle_Toggled" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="300,0,-110,0"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+                <Border BorderThickness="1" CornerRadius="8" Padding="16">
+                    <StackPanel>
+                        <TextBlock Text="Storage" Style="{ThemeResource SubtitleTextBlockStyle}" HorizontalAlignment="Center"/>
+                        <Grid VerticalAlignment="Center">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Enable Article Caching" VerticalAlignment="Center"/>
+                            <ToggleSwitch x:Name="CachingToggle" Toggled="CachingToggle_Toggled" VerticalAlignment="Center" HorizontalAlignment="Right" OffContent="" OnContent="" Margin="300,0,-110,0"/>
+                        </Grid>
+                        <Grid Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Slider x:Name="ConcurrentDownloadsSlider" Header="Maximum concurrent downloads per page" StepFrequency="1" ValueChanged="ConcurrentDownloadsSlider_ValueChanged" VerticalAlignment="Center">
+                                <Slider.Minimum>
+                                    <x:Double>1</x:Double>
+                                </Slider.Minimum>
+                            </Slider>
+                            <TextBlock x:Name="ConcurrentDownloadsValueText" Grid.Column="1" Text="4" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                        </Grid>
+                        <TextBlock x:Name="RamEstimateText" Style="{ThemeResource CaptionTextBlockStyle}" Opacity="0.8" Margin="0,4,0,0" Text="Estimated peak background RAM usage: ~500 MB"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                <TextBlock Text="Storage Used"/>
+                                <TextBlock x:Name="CacheSizeText" Text="Calculating..." Style="{ThemeResource BodyTextBlockStyle}" Opacity="0.7"/>
+                            </StackPanel>
+                            <Button x:Name="ClearCacheButton" Grid.Column="1" Content="Clear Cache" Click="ClearCacheButton_Click" VerticalAlignment="Center" Style="{ThemeResource AccentButtonStyle}"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+                <Border BorderThickness="1" CornerRadius="8" Padding="16">
+                    <StackPanel>
+                        <TextBlock Text="About" Style="{ThemeResource SubtitleTextBlockStyle}" HorizontalAlignment="Center"/>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <Button Content="About This App" Click="AboutButton_Click" VerticalAlignment="Center"/>
+                            <Button Content="Disclaimer" Click="DisclaimerButton_Click" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Grid Style="{StaticResource PageTitleBarGridStyle}" 
+              Background="{ThemeResource SystemControlForegroundBaseLowBrush}" VerticalAlignment="Top" Margin="0,0,7,0">
+            <TextBlock Text="Settings" Style="{StaticResource PageTitleBarTextStyle}"/>
+        </Grid>
+
+        <Grid x:Name="LoadingOverlay" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Visibility="Collapsed">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <ProgressRing IsActive="True" Width="60" Height="60"/>
+                <TextBlock x:Name="LoadingOverlayText" Text="Please wait..."/>
+            </StackPanel>
+        </Grid>
+
+        <Grid x:Name="VerificationPanel" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Visibility="Collapsed">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <StackPanel Margin="12">
+                <TextBlock Text="Please complete the security check" Style="{ThemeResource TitleTextBlockStyle}"/>
+                <TextBlock Text="Detection will continue automatically once you finish." Style="{ThemeResource BodyTextBlockStyle}" TextWrapping="Wrap"/>
+            </StackPanel>
+            <WebView x:Name="VerificationWebView" Grid.Row="1" />
+        </Grid>
+    </Grid>
+</Page>
