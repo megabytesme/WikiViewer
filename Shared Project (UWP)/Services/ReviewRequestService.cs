@@ -3,7 +3,9 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using Windows.Services.Store;
 using Windows.Storage;
+#if UWP_1809
 using Windows.System;
+#endif
 
 public static class ReviewRequestService
 {
@@ -16,6 +18,7 @@ public static class ReviewRequestService
 
     public static void Initialize()
     {
+#if UWP_1809
         if (User.GetDefault() != null)
         {
             _storeContext = StoreContext.GetForUser(User.GetDefault());
@@ -24,6 +27,9 @@ public static class ReviewRequestService
         {
             _storeContext = StoreContext.GetDefault();
         }
+#else
+        _storeContext = StoreContext.GetDefault();
+#endif
     }
 
     public static void IncrementLaunchCount()
@@ -59,6 +65,7 @@ public static class ReviewRequestService
             _localSettings.Values[ReviewRequestShownKey] = true;
             Debug.WriteLine("[Review] CONDITIONS MET. 'alreadyShown' flag has been set to true.");
 
+#if UWP_1809
             Debug.WriteLine("[Review] Requesting review dialog from the Store service...");
             StoreRateAndReviewResult result = await _storeContext.RequestRateAndReviewAppAsync();
 
@@ -78,6 +85,9 @@ public static class ReviewRequestService
                     Debug.WriteLine($"[Review] Store service reported: OtherError. This is EXPECTED in a local debug session. Error: {result.ExtendedError}");
                     break;
             }
+#else
+    Debug.WriteLine("[Review] Windows Store Rate & review API not available.");
+#endif
         }
         else
         {

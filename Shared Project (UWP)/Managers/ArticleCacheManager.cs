@@ -40,7 +40,6 @@ public static class ArticleCacheManager
     {
         await InitializeAsync();
         ulong totalSize = 0;
-
         try
         {
             var articleFiles = await _cacheFolder.GetFilesAsync();
@@ -49,7 +48,6 @@ public static class ArticleCacheManager
                 var properties = await file.GetBasicPropertiesAsync();
                 totalSize += properties.Size;
             }
-
             var imageFiles = await _imageCacheFolder.GetFilesAsync();
             foreach (var file in imageFiles)
             {
@@ -61,14 +59,12 @@ public static class ArticleCacheManager
         {
             Debug.WriteLine($"[CACHE] Error calculating cache size: {ex.Message}");
         }
-
         return totalSize;
     }
 
     public static async Task ClearCacheAsync()
     {
         await InitializeAsync();
-
         try
         {
             var articleFiles = await _cacheFolder.GetFilesAsync();
@@ -76,14 +72,11 @@ public static class ArticleCacheManager
             {
                 await file.DeleteAsync(StorageDeleteOption.PermanentDelete);
             }
-
             var imageFiles = await _imageCacheFolder.GetFilesAsync();
             foreach (var file in imageFiles)
             {
                 await file.DeleteAsync(StorageDeleteOption.PermanentDelete);
             }
-
-            Debug.WriteLine("[CACHE] All cache folders cleared.");
         }
         catch (Exception ex)
         {
@@ -94,10 +87,7 @@ public static class ArticleCacheManager
     private static string GetHashedFileName(string pageTitle)
     {
         string sanitizedTitle = string.Join("_", pageTitle.Split(Path.GetInvalidFileNameChars()));
-
-        var hash = System
-            .Security.Cryptography.SHA1.Create()
-            .ComputeHash(Encoding.UTF8.GetBytes(sanitizedTitle.ToLowerInvariant()));
+        var hash = System.Security.Cryptography.SHA1.Create().ComputeHash(Encoding.UTF8.GetBytes(sanitizedTitle.ToLowerInvariant()));
         return hash.Aggregate("", (s, b) => s + b.ToString("x2"));
     }
 
@@ -113,10 +103,7 @@ public static class ArticleCacheManager
                 string json = await FileIO.ReadTextAsync(file);
                 return JsonConvert.DeserializeObject<ArticleCacheItem>(json);
             }
-            catch
-            {
-                return null;
-            }
+            catch { return null; }
         }
         return null;
     }
@@ -133,30 +120,16 @@ public static class ArticleCacheManager
         return null;
     }
 
-    public static async Task SaveArticleToCacheAsync(
-        string pageTitle,
-        string htmlContent,
-        DateTime lastUpdated
-    )
+    public static async Task SaveArticleToCacheAsync(string pageTitle, string htmlContent, DateTime lastUpdated)
     {
         await InitializeAsync();
         string baseFileName = GetHashedFileName(pageTitle);
-
         var metadata = new ArticleCacheItem { Title = pageTitle, LastUpdated = lastUpdated };
         string json = JsonConvert.SerializeObject(metadata);
-        StorageFile metadataFile = await _cacheFolder.CreateFileAsync(
-            baseFileName + ".json",
-            CreationCollisionOption.ReplaceExisting
-        );
+        StorageFile metadataFile = await _cacheFolder.CreateFileAsync(baseFileName + ".json", CreationCollisionOption.ReplaceExisting);
         await FileIO.WriteTextAsync(metadataFile, json);
-
-        StorageFile htmlFile = await _cacheFolder.CreateFileAsync(
-            baseFileName + ".html",
-            CreationCollisionOption.ReplaceExisting
-        );
+        StorageFile htmlFile = await _cacheFolder.CreateFileAsync(baseFileName + ".html", CreationCollisionOption.ReplaceExisting);
         await FileIO.WriteTextAsync(htmlFile, htmlContent);
-
-        Debug.WriteLine($"[CACHE] Saved '{pageTitle}' to cache.");
     }
 
     public static async Task ClearCacheForItemAsync(string pageTitle)
@@ -167,11 +140,8 @@ public static class ArticleCacheManager
         {
             var metaFile = await _cacheFolder.TryGetItemAsync(baseFileName + ".json") as StorageFile;
             if (metaFile != null) await metaFile.DeleteAsync();
-
             var htmlFile = await _cacheFolder.TryGetItemAsync(baseFileName + ".html") as StorageFile;
             if (htmlFile != null) await htmlFile.DeleteAsync();
-
-            Debug.WriteLine($"[CACHE] Invalidated cache for '{pageTitle}'.");
         }
         catch (Exception ex)
         {

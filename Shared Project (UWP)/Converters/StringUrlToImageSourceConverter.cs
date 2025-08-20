@@ -10,6 +10,17 @@ namespace Shared_Code
         {
             if (value is string imageUrl && !string.IsNullOrEmpty(imageUrl))
             {
+#if UWP_1703
+                try
+                {
+                    return new BitmapImage(new Uri(imageUrl));
+                }
+                catch
+                {
+                    return null;
+                }
+#endif
+#if UWP_1809
                 var imageUri = new Uri(imageUrl);
 
                 if (imageUrl.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
@@ -20,6 +31,7 @@ namespace Shared_Code
                 {
                     return new BitmapImage(imageUri);
                 }
+#endif
             }
             return null;
         }

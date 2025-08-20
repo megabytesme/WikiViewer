@@ -219,10 +219,8 @@ namespace Shared_Code
     {
         public event PropertyChangedEventHandler PropertyChanged;
 
-        private void OnPropertyChanged([CallerMemberName] string propertyName = null)
-        {
+        private void OnPropertyChanged([CallerMemberName] string propertyName = null) =>
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
 
         private string _imageUrl;
         public string ImageUrl
@@ -234,15 +232,10 @@ namespace Shared_Code
                 OnPropertyChanged();
             }
         }
-
         public string DisplayTitle { get; set; }
-
         public string ArticlePageTitle { get; set; }
-
         public string TalkPageTitle { get; set; }
-
         public bool IsArticleAvailable => !string.IsNullOrEmpty(ArticlePageTitle);
-
         public bool IsTalkAvailable => !string.IsNullOrEmpty(TalkPageTitle);
 
         public FavouriteItem(string baseTitle)

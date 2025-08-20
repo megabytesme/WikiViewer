@@ -1,4 +1,3 @@
-using _1809_UWP;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -14,40 +13,49 @@ namespace Shared_Code
 
         public static async Task CacheFavouritesAsync(IEnumerable<string> titles)
         {
-            var titlesToCache = titles.Where(t => !t.StartsWith("Talk:") && !t.StartsWith("User talk:")).ToList();
+            var titlesToCache = titles
+                .Where(t => !t.StartsWith("Talk:") && !t.StartsWith("User talk:"))
+                .ToList();
             if (!titlesToCache.Any())
-            {
-                Debug.WriteLine("[BG CACHE] No articles in favourites list to cache.");
                 return;
-            }
-
             int maxConcurrency = AppSettings.MaxConcurrentDownloads;
-
-            Debug.WriteLine($"[BG CACHE] Starting PARALLEL caching for {titlesToCache.Count} favourites with a concurrency of {maxConcurrency}.");
-
             var semaphore = new SemaphoreSlim(maxConcurrency);
-
             var cachingTasks = titlesToCache.Select(async title =>
             {
                 await semaphore.WaitAsync();
                 try
                 {
-                    IApiWorker tempWorker = AppSettings.ConnectionBackend == ConnectionMethod.HttpClientProxy
-                        ? (IApiWorker)new HttpClientApiWorker()
-                        : new WebView2ApiWorker();
+                    IApiWorker tempWorker;
+                    if (AppSettings.ConnectionBackend == ConnectionMethod.HttpClientProxy)
+                    {
+                        tempWorker = new HttpClientApiWorker();
+                    }
+                    else
+                    {
+#if UWP_1703
+                        tempWorker = (IApiWorker)
+                            Activator.CreateInstance(
+                                Type.GetType("_1703_UWP.WebViewApiWorker, 1703 UWP")
+                            );
+#else
+                        tempWorker = (IApiWorker)
+                            Activator.CreateInstance(
+                                Type.GetType("_1809_UWP.WebView2ApiWorker, 1809 UWP")
+                            );
+#endif
+                    }
 
                     try
                     {
                         await tempWorker.InitializeAsync();
-
-                        if (MainPage.ApiWorker != null)
-                        {
-                            await tempWorker.CopyApiCookiesFromAsync(MainPage.ApiWorker);
-                        }
-
                         var stopwatch = Stopwatch.StartNew();
-                        await ArticleProcessingService.FetchAndCacheArticleAsync(title, stopwatch, false, tempWorker, semaphore);
-
+                        await ArticleProcessingService.FetchAndCacheArticleAsync(
+                            title,
+                            stopwatch,
+                            tempWorker,
+                            false,
+                            semaphore
+                        );
                         ArticleCached?.Invoke(null, new ArticleCachedEventArgs(title));
                     }
                     catch (Exception ex)
@@ -64,9 +72,7 @@ namespace Shared_Code
                     semaphore.Release();
                 }
             });
-
             await Task.WhenAll(cachingTasks);
-            Debug.WriteLine("[BG CACHE] Background caching queue finished.");
         }
     }
 }

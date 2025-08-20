@@ -137,15 +137,11 @@ namespace _1809_UWP
                 ShowVerificationPanelAndRetry(_verificationUrl);
                 return;
             }
-
-            if (!_isInitialized || VerificationPanel.Visibility == Visibility.Visible)
-                return;
+            if (!_isInitialized || VerificationPanel.Visibility == Visibility.Visible) return;
 
             ReviewRequestService.IncrementPageLoadCount();
             ReviewRequestService.TryRequestReview();
-
             var fetchStopwatch = Stopwatch.StartNew();
-
             ShowLoadingOverlay();
             LastUpdatedText.Visibility = Visibility.Collapsed;
             var displayTitle = _pageTitleToFetch.Replace('_', ' ');
@@ -154,16 +150,7 @@ namespace _1809_UWP
 
             try
             {
-                var worker = MainPage.ApiWorker;
-
-                var (processedHtml, resolvedTitle) =
-                    await ArticleProcessingService.FetchAndCacheArticleAsync(
-                        _pageTitleToFetch,
-                        fetchStopwatch,
-                        false,
-                        worker
-                    );
-
+                var (processedHtml, resolvedTitle) = await ArticleProcessingService.FetchAndCacheArticleAsync(_pageTitleToFetch, fetchStopwatch, MainPage.ApiWorker);
                 if (_pageTitleToFetch.Equals("random", StringComparison.OrdinalIgnoreCase))
                 {
                     _pageTitleToFetch = resolvedTitle.Replace(' ', '_');
@@ -171,13 +158,8 @@ namespace _1809_UWP
                     _articleHistory.Push(_pageTitleToFetch);
                     ArticleTitle.Text = resolvedTitle;
                 }
-
                 await DisplayProcessedHtml(processedHtml);
-
-                var lastUpdated = await ArticleProcessingService.FetchLastUpdatedTimestampAsync(
-                    _pageTitleToFetch,
-                    worker
-                );
+                var lastUpdated = await ArticleProcessingService.FetchLastUpdatedTimestampAsync(_pageTitleToFetch, MainPage.ApiWorker);
                 if (lastUpdated.HasValue)
                 {
                     LastUpdatedText.Text = $"Last updated: {lastUpdated.Value.ToLocalTime():g}";
@@ -186,14 +168,7 @@ namespace _1809_UWP
             }
             catch (NeedsUserVerificationException ex)
             {
-                if (AppSettings.ConnectionBackend == ConnectionMethod.HttpClientProxy)
-                {
-                    await ReinitializeHttpClientWorkerAndRetry();
-                }
-                else
-                {
-                    ShowVerificationPanelAndRetry(ex.Url);
-                }
+                ShowVerificationPanelAndRetry(ex.Url);
             }
             catch (Exception ex)
             {
