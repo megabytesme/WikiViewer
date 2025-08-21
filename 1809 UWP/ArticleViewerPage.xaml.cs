@@ -111,9 +111,9 @@ namespace _1809_UWP.Pages
         }
 
         private async void ArticleDisplayWebView_NavigationStarting(
-            CoreWebView2 sender,
-            CoreWebView2NavigationStartingEventArgs args
-        )
+    CoreWebView2 sender,
+    CoreWebView2NavigationStartingEventArgs args
+)
         {
             if (args.Uri.EndsWith("/article.html", StringComparison.OrdinalIgnoreCase))
             {
@@ -122,14 +122,10 @@ namespace _1809_UWP.Pages
 
             args.Cancel = true;
 
-            if (string.IsNullOrEmpty(args.Uri) || !args.Uri.StartsWith("http"))
-            {
-                return;
-            }
-
+            if (string.IsNullOrEmpty(args.Uri)) return;
             var uri = new Uri(args.Uri);
 
-            if (uri.Host.Equals(AppSettings.Host, StringComparison.OrdinalIgnoreCase))
+            if (uri.Host.Equals(AppSettings.GetVirtualHostName(), StringComparison.OrdinalIgnoreCase))
             {
                 string clickedPath = uri.AbsolutePath;
                 string newTitle = null;

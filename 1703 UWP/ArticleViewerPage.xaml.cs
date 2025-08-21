@@ -104,9 +104,9 @@ namespace _1703_UWP.Pages
         }
 
         private async void ArticleDisplayWebView_NavigationStarting(
-            WebView sender,
-            WebViewNavigationStartingEventArgs args
-        )
+    WebView sender,
+    WebViewNavigationStartingEventArgs args
+)
         {
             if (
                 args.Uri != null
@@ -120,10 +120,21 @@ namespace _1703_UWP.Pages
             }
 
             args.Cancel = true;
-            if (args.Uri == null)
-                return;
+            if (args.Uri == null) return;
 
-            if (args.Uri.Scheme == "ms-appdata")
+            string path = args.Uri.ToString();
+
+            if (path.Contains("http://") || path.Contains("https://"))
+            {
+                int httpIndex = path.IndexOf("http");
+                if (httpIndex != -1)
+                {
+                    string realUrl = path.Substring(httpIndex);
+                    await Windows.System.Launcher.LaunchUriAsync(new Uri(realUrl));
+                }
+                return;
+            }
+            if (args.Uri.Scheme == "ms-appdata" || args.Uri.Scheme == "ms-local-stream")
             {
                 string clickedPath = args.Uri.AbsolutePath;
                 string newTitle = null;
@@ -142,10 +153,6 @@ namespace _1703_UWP.Pages
                     _articleHistory.Push(_pageTitleToFetch);
                     StartArticleFetch();
                 }
-            }
-            else
-            {
-                await Windows.System.Launcher.LaunchUriAsync(args.Uri);
             }
         }
 
