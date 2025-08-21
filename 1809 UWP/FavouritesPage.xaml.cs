@@ -11,6 +11,10 @@ namespace _1809_UWP.Pages
         protected override GridView FavouritesGridViewControl => FavouritesGridView;
         protected override TextBlock NoFavouritesTextBlock => NoFavouritesTextBlockControl;
         protected override CommandBar BottomCommandBar => PageBottomCommandBar;
+        protected override ListView FavouritesListViewControl => FavouritesListView;
+        protected override ScrollViewer GridViewScrollViewerControl => GridViewScrollViewer;
+        protected override ScrollViewer ListViewScrollViewerControl => ListViewScrollViewer;
+        protected override AppBarButton ViewToggleButtonControl => ViewToggleButton;
 
         protected override Type GetArticleViewerPageType() => typeof(ArticleViewerPage);
 

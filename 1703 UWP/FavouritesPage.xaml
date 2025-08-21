@@ -15,7 +15,7 @@
         </Storyboard>
     </Page.Resources>
     <Grid>
-        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Visible">
+        <ScrollViewer x:Name="GridViewScrollViewer" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Visible">
             <GridView x:Name="FavouritesGridView" Padding="24,52,24,48" IsItemClickEnabled="False" SelectionMode="Multiple" SelectionChanged="FavouritesGridView_SelectionChanged" HorizontalAlignment="Center">
                 <GridView.ItemContainerStyle>
                     <Style TargetType="GridViewItem">
@@ -47,12 +47,48 @@
                 </GridView.ItemTemplate>
             </GridView>
         </ScrollViewer>
+        <ScrollViewer x:Name="ListViewScrollViewer" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Visible" Visibility="Collapsed">
+            <ListView x:Name="FavouritesListView" Padding="12,52,12,48" SelectionMode="Multiple" SelectionChanged="FavouritesListView_SelectionChanged">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem">
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    </Style>
+                </ListView.ItemContainerStyle>
+                <ListView.ItemTemplate>
+                    <DataTemplate x:DataType="models:FavouriteItem">
+                        <Grid Height="80" Padding="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="80"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Grid Grid.Column="0" Width="64" Height="64" CornerRadius="4" VerticalAlignment="Center">
+                                <WebView DefaultBackgroundColor="Transparent"
+                                         helpers:AnimatedImageLoader.SourceObject="{x:Bind ImageUrl, Mode=OneWay, Converter={StaticResource GlobalUrlToImageConverter}}"/>
+                            </Grid>
+
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0">
+                                <TextBlock Text="{x:Bind DisplayTitle}" Style="{ThemeResource BodyStrongTextBlockStyle}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Text="{x:Bind ArticlePageTitle}" Style="{ThemeResource CaptionTextBlockStyle}" Opacity="0.7"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="8" VerticalAlignment="Center">
+                                <Button Content="Article" Click="ArticleButton_Click" Tag="{x:Bind}" Visibility="{x:Bind IsArticleAvailable, Converter={StaticResource GlobalBoolToVisibility}}"/>
+                                <Button Content="Talk" Click="TalkButton_Click" Tag="{x:Bind}" Visibility="{x:Bind IsTalkAvailable, Converter={StaticResource GlobalBoolToVisibility}}"/>
+                            </StackPanel>
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+        </ScrollViewer>
         <TextBlock x:Name="NoFavouritesTextBlockControl" Text="You haven't added any Favourites yet." Style="{ThemeResource SubtitleTextBlockStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
         <Grid VerticalAlignment="Top" Style="{StaticResource PageTitleBarGridStyle}" Background="{ThemeResource SystemControlForegroundBaseLowBrush}" Margin="0,0,15,0">
             <TextBlock Text="Favourites" Style="{StaticResource PageTitleBarTextStyle}"/>
         </Grid>
         <CommandBar x:Name="PageBottomCommandBar" VerticalAlignment="Bottom" Visibility="Collapsed" Margin="0,0,15,0">
             <AppBarButton x:Name="DeleteButton" Icon="Delete" Label="Delete" Click="DeleteButton_Click"/>
+            <AppBarButton x:Name="ViewToggleButton" Icon="List" Label="Switch to List View" Click="ViewToggleButton_Click"/>
         </CommandBar>
         <Grid x:Name="LoadingOverlay" Opacity="0" IsHitTestVisible="False">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
