@@ -9,6 +9,9 @@
     <Import_RootNamespace>WikiViewer.Core</Import_RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)Enums\ConnectionMethod.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Interfaces\IApiWorker.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Interfaces\ISettingsProvider.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\ApiModels.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Repositories\AppSettings.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\ArticleProcessingService.cs" />
