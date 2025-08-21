@@ -497,5 +497,19 @@ namespace WikiViewer.Core.Services
                 return result.CreateAccount;
             }
         }
+
+        public static void ResetStateForReload()
+        {
+
+            if (!IsLoggedIn)
+                return;
+
+            _authenticatedWorker?.Dispose();
+            _authenticatedWorker = null;
+            IsLoggedIn = false;
+            Username = null;
+
+            AuthenticationStateChanged?.Invoke(null, EventArgs.Empty);
+        }
     }
 }

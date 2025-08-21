@@ -30,12 +30,20 @@ namespace WikiViewer.Shared.Uwp
 
         public static void ResetRootFrame()
         {
+            AuthService.ResetStateForReload();
+
+            if (WikiViewer.Shared.Uwp.Pages.MainPageBase.ApiWorker != null)
+            {
+                WikiViewer.Shared.Uwp.Pages.MainPageBase.ApiWorker.Dispose();
+                WikiViewer.Shared.Uwp.Pages.MainPageBase.ApiWorker = null;
+            }
+
             Frame rootFrame = new Frame();
             Window.Current.Content = rootFrame;
 #if UWP_1703
             rootFrame.Navigate(typeof(_1703_UWP.Pages.MainPage));
 #else
-            rootFrame.Navigate(typeof(_1809_UWP.Pages.MainPage));
+    rootFrame.Navigate(typeof(_1809_UWP.Pages.MainPage));
 #endif
             Window.Current.Activate();
         }
