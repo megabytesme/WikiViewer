@@ -1,32 +1,34 @@
-# Wikibeta
+# WikiViewer
 
 <img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/01570b60-d75d-45c0-87bb-6c69fa414550" />
 
-WikiBeta is an unofficial, third-party client for browsing the BetaWiki (not affiliated) without your web browser, online and offline (after caching).
+**Wiki Viewer** is an unofficial, third-party client for browsing any MediaWiki-powered site - from Wikipedia, to Fandom and beyond - without your web browser. It provides a clean, native, and performance-tuned experience for Windows, both online and offline.
 
-**Disclaimer:** This is an unofficial, third-party client for browsing BetaWiki. This app was created by [MegaBytesMe](https://github.com/megabytesme) and is not affiliated with, endorsed, or sponsored by the official BetaWiki team. All article data, content, and trademarks are the property of BetaWiki and its respective contributors. This app simply provides a native viewing experience for publicly available content. You can view the official BetaWiki here: [BetaWiki](https://betawiki.net/). For upmost clarity, this disclaimer is also presented within the app.
+**Disclaimer:** This is an unofficial, third-party client for browsing MediaWiki sites. This app was created by [MegaBytesMe](https://github.com/megabytesme) and is not affiliated with, endorsed, or sponsored by the operators of any specific wiki. All article data, content, and trademarks are the property of their respective owners and contributors. This app simply provides a native viewing experience for publicly available content.
 
 ## Features
 
-- **Clean & Native Interface:** Enjoy a fast, fluid, and ad-free reading experience designed for Windows, free from the clutter of a standard web browser.
+- **Universal Wiki Support:** Connect to your favorite MediaWiki site by simply changing the URL in the settings. From Wikipedia to niche wikis, enjoy them all in one app.
 
-- **Offline Reading & Caching:** Save your favourite articles and all their images directly to your device, allowing you to continue reading even when you're without an internet connection.
+- **Clean & Native Interface:** Experience a fast, fluid, and ad-free reading experience designed for Windows, free from the clutter of a standard web browser.
 
-- **Full Account Integration:** Sign in with your BetaWiki account to edit pages, manage your watchlist, and contribute to the community directly from the app.
+- **Advanced Offline Caching:** Save articles and all their images directly to your device. The intelligent caching system ensures you can continue reading even when you're without an internet connection.
 
-- **Favourites & Watchlist Sync:** Keep a list of your most-visited articles. When you're logged in, this list automatically syncs with your official BetaWiki watchlist.
+- **Full Account Integration:** Sign in with your wiki account to edit pages, manage your watchlist, and contribute to the community directly from the app, with support for two-factor authentication (2FA).
 
-- **Advanced Performance Tuning:** Take control of your system's resources with a unique slider to manage concurrent downloads, balancing speed against RAM and CPU usage to fit your hardware.
+- **Favourites & Watchlist Sync:** Keep a list of your most-visited articles. When logged in, this list automatically syncs with your official wiki watchlist.
+
+- **Performance Tuning:** Take control of system resources with a unique slider to manage concurrent downloads, balancing speed against RAM and CPU usage to fit your hardware.
 
 - **Smart Search with Suggestions:** Find articles quickly with a built-in search bar that provides instant suggestions as you type, powered directly by the MediaWiki API.
 
-- **Discover Something New:** Jump to a random article with a single click and explore the depths of software history.
+- **Discover Something New:** Jump to a random article with a single click and explore the depths of your favorite topics.
 
-- **Privacy-Focused Design:** Your data is your own. WikiBeta collects no personal information, and all your caches, favourites, and credentials are stored securely and only on your local device.
+- **Privacy-Focused by Design:** Your data is your own. The app collects no personal information, and all caches, favourites, and credentials are stored securely and only on your local device.
 
 ## Download
 
-<a href="https://apps.microsoft.com/detail/9N5V233G177B"><img src="https://get.microsoft.com/images/en-us%20dark.svg" width="200"/>
+<a href="https://apps.microsoft.com/detail/9NXGG8M4XF48"><img src="https://get.microsoft.com/images/en-us%20dark.svg" width="200"/>
 
 ## Build Guide
 
@@ -34,24 +36,31 @@ WikiBeta is an unofficial, third-party client for browsing the BetaWiki (not aff
 
 - Windows 11 or later
 - Visual Studio 2022 or later
+- **Workloads:** Universal Windows Platform development
 
 ### Installation
 
 1. Clone the repository:
    ```sh
-   git clone https://github.com/megabytesme/WikiBeta.git
+   git clone https://github.com/megabytesme/WikiViewer.git
    ```
-2. Open the project in Visual Studio.
-3. Build the solution.
+2. Open the `WikiViewer.sln` solution file in Visual Studio.
+3. Restore NuGet packages if prompted.
 
 ### Running the Application
 
-1. Start the application by pressing `F5` or by selecting `Debug > Start Debugging`.
+1. In the Solution Explorer, right-click the desired project (`1809 UWP` is recommended) and select **"Set as Startup Project"**.
+2. Press `F5` or select `Debug > Start Debugging` to build and run.
 
-## Folder Structure
+## Architectural Overview
 
-- `1809 UWP`: UWP app implementation which supports devices on Windows 1809 and above (Includes 10X!) - Uses WinUI 2. Recommended for all Windows device users.
-- `App Assets`: Folder which holds the assets used by all projects when publishing to App Stores.
+This project utilizes a **Shared UI Logic (MVC)** architecture to support multiple Windows 10/11 versions from a single, highly reusable codebase.
+
+- **`Shared Project (UWP)` (Model/Services):** Contains all platform-agnostic business logic, data models, API services, and caching mechanisms.
+- **`WikiViewer.Shared.Uwp` (Shared UI Logic):** Contains abstract `PageBase` classes that act as Controllers/ViewModels. They define the UI state, event handling, and a contract of abstract properties that the Views must implement.
+- **`1703 UWP` (Legacy View):** The UWP head for Windows 10 Version 1703 and newer. It implements the UI using the original `WebView` (EdgeHTML) and legacy controls for maximum compatibility. Recommended for Windows 10 Mobile users.
+- **`1809 UWP` (Modern View):** The UWP head for Windows 10 Version 1809 and newer. It implements the UI using **WinUI 2**, including the modern `WebView2` (Chromium) and `NavigationView` for the best performance and user experience. Recommended for most users.
+- **`App Assets`:** Holds shared assets used for store listings and branding.
 
 ## Contributing
 
