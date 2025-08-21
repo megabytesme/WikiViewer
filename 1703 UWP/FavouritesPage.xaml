@@ -69,7 +69,7 @@
                             </Grid>
 
                             <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0">
-                                <TextBlock Text="{x:Bind DisplayTitle}" Style="{ThemeResource BodyStrongTextBlockStyle}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Text="{x:Bind DisplayTitle}" Style="{ThemeResource BodyTextBlockStyle}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
                                 <TextBlock Text="{x:Bind ArticlePageTitle}" Style="{ThemeResource CaptionTextBlockStyle}" Opacity="0.7"/>
                             </StackPanel>
 
@@ -83,8 +83,14 @@
             </ListView>
         </ScrollViewer>
         <TextBlock x:Name="NoFavouritesTextBlockControl" Text="You haven't added any Favourites yet." Style="{ThemeResource SubtitleTextBlockStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
-        <Grid VerticalAlignment="Top" Style="{StaticResource PageTitleBarGridStyle}" Background="{ThemeResource SystemControlForegroundBaseLowBrush}" Margin="0,0,15,0">
-            <TextBlock Text="Favourites" Style="{StaticResource PageTitleBarTextStyle}"/>
+        <Grid VerticalAlignment="Top"
+              Style="{StaticResource PageTitleBarGridStyle}"
+              Margin="0,0,15,0"
+              Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}">
+            <TextBlock Text="Favourites"
+                       Style="{StaticResource PageTitleBarTextStyle}"
+                       TextWrapping="Wrap"
+                       Foreground="{ThemeResource SystemControlForegroundBaseHighBrush}"/>
         </Grid>
         <CommandBar x:Name="PageBottomCommandBar" VerticalAlignment="Bottom" Margin="0,0,15,0">
             <AppBarButton x:Name="DeleteButton" Icon="Delete" Label="Delete" Click="DeleteButton_Click" Visibility="Collapsed"/>
