@@ -9,6 +9,7 @@
     <Import_RootNamespace>WikiViewer.Shared.Uwp</Import_RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)helpers\AnimatedImageLoader.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Pages\AppBase.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Converters\BooleanToVisibilityConverter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Converters\StringUrlToImageSourceConverter.cs" />
@@ -28,6 +29,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)services\VisualTreeHelpers.cs" />
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="$(MSBuildThisFileDirectory)Helpers\" />
     <Folder Include="$(MSBuildThisFileDirectory)Services\" />
   </ItemGroup>
 </Project>

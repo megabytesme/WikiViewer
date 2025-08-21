@@ -156,32 +156,32 @@ namespace WikiViewer.Shared.Uwp.Pages
             item.ImageUrl = "ms-appx:///Assets/Square150x150Logo.png";
             if (string.IsNullOrEmpty(item.ArticlePageTitle))
                 return;
+
             string cachedHtml = await ArticleCacheManager.GetCachedArticleHtmlAsync(
                 item.ArticlePageTitle
             );
             if (string.IsNullOrEmpty(cachedHtml))
                 return;
+
             var doc = new HtmlDocument();
             doc.LoadHtml(cachedHtml);
-            var allCachedImageNodes = doc.DocumentNode.SelectNodes(
-                $"//img[contains(@src, '{AppSettings.GetVirtualHostName()}') or contains(@src, 'ms-local-stream')]"
-            );
-            if (allCachedImageNodes == null || !allCachedImageNodes.Any())
-                return;
-            string chosenImageUrl =
-                allCachedImageNodes
-                    .FirstOrDefault(node =>
-                        !node.GetAttributeValue("src", "")
-                            .EndsWith(".svg", StringComparison.OrdinalIgnoreCase)
-                    )
-                    ?.GetAttributeValue("src", null)
-                ?? allCachedImageNodes.FirstOrDefault()?.GetAttributeValue("src", null);
-            if (!string.IsNullOrEmpty(chosenImageUrl))
+
+            var firstImageNode = doc.DocumentNode.SelectSingleNode("//img[@src]");
+
+            if (firstImageNode != null)
             {
-                string uwpImageUrl = chosenImageUrl
-                    .Replace($"https://{AppSettings.GetVirtualHostName()}", "ms-appdata:///local")
-                    .Replace("ms-local-stream:", "ms-appdata:");
-                item.ImageUrl = uwpImageUrl;
+                string src = firstImageNode.GetAttributeValue("src", "");
+                if (!string.IsNullOrEmpty(src))
+                {
+                    if (!src.StartsWith("/"))
+                    {
+                        item.ImageUrl = $"ms-appdata:///local/cache/{src}";
+                    }
+                    else
+                    {
+                        item.ImageUrl = $"ms-appdata:///local{src}";
+                    }
+                }
             }
         }
 

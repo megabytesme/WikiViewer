@@ -4,7 +4,8 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:models="using:WikiViewer.Core.Models"
     xmlns:local="using:WikiViewer.Shared.Uwp.Pages"
-    Background="Transparent">
+    xmlns:helpers="using:WikiViewer.Shared.Uwp.Helpers"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
     <Page.Resources>
         <Storyboard x:Name="FadeInAnimation">
             <DoubleAnimation Storyboard.TargetName="LoadingOverlay" Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.250" EnableDependentAnimation="True"/>
@@ -28,11 +29,8 @@
                                 <RowDefinition Height="*" />
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
-                            <Rectangle Grid.Row="0">
-                                <Rectangle.Fill>
-                                    <ImageBrush ImageSource="{x:Bind ImageUrl, Mode=OneWay, Converter={StaticResource GlobalUrlToImageConverter}}" Stretch="UniformToFill"/>
-                                </Rectangle.Fill>
-                            </Rectangle>
+                            <WebView Grid.Row="0" DefaultBackgroundColor="Transparent"
+                                     helpers:AnimatedImageLoader.SourceObject="{x:Bind ImageUrl, Mode=OneWay, Converter={StaticResource GlobalUrlToImageConverter}}"/>
                             <StackPanel Grid.Row="1" Padding="12">
                                 <TextBlock Text="{x:Bind DisplayTitle}" Style="{ThemeResource SubtitleTextBlockStyle}" TextWrapping="Wrap"/>
                                 <Grid Margin="0,8,0,0">
