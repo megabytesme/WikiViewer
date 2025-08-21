@@ -107,7 +107,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                 }
             }
             catch (Exception ex)
-            {
+           {
                 ShowError($"Failed to load account fields: {ex.Message}");
                 CreateAccountButton.IsEnabled = false;
             }

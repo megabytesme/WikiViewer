@@ -372,7 +372,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                         {
                             new Run() { Text = "Wiki Viewer" },
                             new LineBreak(),
-                            new Run() { Text = $"Version 2.0.1.0 ({GetAppName()})" },
+                            new Run() { Text = $"Version {GetAppVersion()} ({GetAppName()})" },
                             new LineBreak(),
                             new Run() { Text = "Copyright   2025 MegaBytesMe" },
                             new LineBreak(),
@@ -481,17 +481,7 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         private IApiWorker CreateWebViewApiWorker()
         {
-#if UWP_1703
-            return (IApiWorker)
-                Activator.CreateInstance(
-                    Type.GetType("_1703_UWP.Services.WebViewApiWorker, 1703 UWP")
-                );
-#else
-            return (IApiWorker)
-                Activator.CreateInstance(
-                    Type.GetType("_1809_UWP.Services.WebView2ApiWorker, 1809 UWP")
-                );
-#endif
+            return App.ApiWorkerFactory.CreateApiWorker();
         }
 
         private string GetAppName()
@@ -500,6 +490,15 @@ namespace WikiViewer.Shared.Uwp.Pages
             return "1703_UWP";
 #else
             return "1809_UWP";
+#endif
+        }
+
+        private string GetAppVersion()
+        {
+#if UWP_1703
+            return "1.0.1.0";
+#else
+            return "2.0.1.0";
 #endif
         }
     }

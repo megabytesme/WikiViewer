@@ -166,7 +166,7 @@ namespace WikiViewer.Core.Models
     public class WatchlistItem
     {
         [JsonProperty("ns")]
-        public int Ns { get; set; }
+        public int Namespace { get; set; }
 
         [JsonProperty("title")]
         public string Title { get; set; }
@@ -174,6 +174,12 @@ namespace WikiViewer.Core.Models
 
     public class WatchlistApiResponse
     {
+        [JsonProperty("warnings")]
+        public object Warnings { get; set; }
+
+        [JsonProperty("batchcomplete")]
+        public string BatchComplete { get; set; }
+
         [JsonProperty("watchlistraw")]
         public List<WatchlistItem> WatchlistRaw { get; set; }
     }

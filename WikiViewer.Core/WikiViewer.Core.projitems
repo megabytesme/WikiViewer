@@ -10,6 +10,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="$(MSBuildThisFileDirectory)Enums\ConnectionMethod.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Interfaces\IApiWorkerFactory.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Interfaces\IApiWorker.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Interfaces\ISettingsProvider.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\ApiModels.cs" />

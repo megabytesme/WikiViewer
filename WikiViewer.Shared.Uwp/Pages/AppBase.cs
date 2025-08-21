@@ -1,5 +1,6 @@
 using System;
 using WikiViewer.Core;
+using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Services;
 using WikiViewer.Shared.Uwp.Managers;
 using WikiViewer.Shared.Uwp.Services;
@@ -14,6 +15,7 @@ namespace WikiViewer.Shared.Uwp
     public sealed partial class App : Application
     {
         public static Panel UIHost { get; set; }
+        public static IApiWorkerFactory ApiWorkerFactory { get; private set; }
         public static event Action<Type, object> RequestNavigation;
 
         public static void Navigate(Type sourcePageType, object parameter) =>
@@ -42,6 +44,11 @@ namespace WikiViewer.Shared.Uwp
         {
             ReviewRequestService.IncrementLaunchCount();
             ReviewRequestService.Initialize();
+#if UWP_1703
+            ApiWorkerFactory = new _1703_UWP.Services.ApiWorkerFactory();
+#else
+            ApiWorkerFactory = new _1809_UWP.Services.ApiWorkerFactory();
+#endif
             await FavouritesService.InitializeAsync();
             await ArticleCacheManager.InitializeAsync();
 

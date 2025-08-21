@@ -74,24 +74,7 @@ namespace WikiViewer.Shared.Uwp.Pages
         {
             if (ApiWorker == null)
             {
-                if (AppSettings.ConnectionBackend == ConnectionMethod.HttpClientProxy)
-                {
-                    ApiWorker = new HttpClientApiWorker();
-                }
-                else
-                {
-#if UWP_1703
-                    ApiWorker = (IApiWorker)
-                        Activator.CreateInstance(
-                            Type.GetType("_1703_UWP.Services.WebViewApiWorker, 1703 UWP")
-                        );
-#else
-                    ApiWorker = (IApiWorker)
-                        Activator.CreateInstance(
-                            Type.GetType("_1809_UWP.Services.WebView2ApiWorker, 1809 UWP")
-                        );
-#endif
-                }
+                ApiWorker = App.ApiWorkerFactory.CreateApiWorker();
                 await ApiWorker.InitializeAsync();
             }
 

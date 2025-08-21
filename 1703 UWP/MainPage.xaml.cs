@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Diagnostics;
+using System.Linq;
 using WikiViewer.Shared.Uwp.Pages;
 using WikiViewer.Shared.Uwp.Services;
 using Windows.UI.Xaml;
@@ -9,25 +9,21 @@ namespace _1703_UWP.Pages
 {
     public sealed partial class MainPage : MainPageBase
     {
-        private readonly Frame _contentFrame;
-
         public MainPage()
         {
             this.InitializeComponent();
-            _contentFrame = this.FindName("PageContentFrame") as Frame;
         }
 
-        protected override Frame ContentFrame
-        {
-            get { return _contentFrame; }
-        }
+        protected override Frame ContentFrame => this.FindName("PageContentFrame") as Frame;
+        protected override AutoSuggestBox SearchBox =>
+            this.FindName("NavSearchBox") as AutoSuggestBox;
+        protected override Grid AppTitleBarGrid => this.FindName("AppTitleBar") as Grid;
+        protected override ColumnDefinition LeftPaddingColumn =>
+            this.FindName("TitleBarLeftPaddingColumn") as ColumnDefinition;
+        protected override ColumnDefinition RightPaddingColumn =>
+            this.FindName("TitleBarRightPaddingColumn") as ColumnDefinition;
 
-        protected override AutoSuggestBox SearchBox => this.NavSearchBox;
-        protected override Grid AppTitleBarGrid => this.AppTitleBar;
-        protected override ColumnDefinition LeftPaddingColumn => this.TitleBarLeftPaddingColumn;
-        protected override ColumnDefinition RightPaddingColumn => this.TitleBarRightPaddingColumn;
-
-        protected override Panel GetWorkerHost() => this.WorkerWebViewHost;
+        protected override Panel GetWorkerHost() => this.FindName("WorkerWebViewHost") as Grid;
 
         protected override Type GetArticleViewerPageType() => typeof(ArticleViewerPage);
 
@@ -90,31 +86,35 @@ namespace _1703_UWP.Pages
                 tag = "settings";
 
             if (
-                page != null
+                ContentFrame != null
+                && page != null
                 && (
                     ContentFrame.SourcePageType != page
                     || (ContentFrame.GetNavigationState() as string) != parameter
                 )
             )
-                ContentFrame.Navigate(page, parameter);
-
-            foreach (
-                var item in (navSplitView.Pane as FrameworkElement).FindChildren<RadioButton>()
-            )
             {
-                if (item.Tag as string == tag)
+                ContentFrame.Navigate(page, parameter);
+            }
+
+            if (navSplitView?.Pane is FrameworkElement pane)
+            {
+                foreach (var item in pane.FindChildren<RadioButton>())
                 {
-                    item.IsChecked = true;
-                    break;
+                    if (item.Tag as string == tag)
+                    {
+                        item.IsChecked = true;
+                        break;
+                    }
                 }
             }
         }
 
         protected override bool TryGoBack()
         {
-            if (ContentFrame.Content is ArticleViewerPage avp && avp.CanGoBackInPage)
+            if (ContentFrame?.Content is ArticleViewerPage avp && avp.CanGoBackInPage)
                 return avp.GoBackInPage();
-            if (ContentFrame.CanGoBack)
+            if (ContentFrame?.CanGoBack == true)
             {
                 ContentFrame.GoBack();
                 return true;
@@ -122,19 +122,17 @@ namespace _1703_UWP.Pages
             return false;
         }
 
-        private void HamburgerButton_Click(object sender, RoutedEventArgs e) =>
-            (this.FindName("NavSplitView") as SplitView).IsPaneOpen = !(
-                this.FindName("NavSplitView") as SplitView
-            ).IsPaneOpen;
+        private void HamburgerButton_Click(object sender, RoutedEventArgs e)
+        {
+            var navSplitView = this.FindName("NavSplitView") as SplitView;
+            if (navSplitView != null)
+                navSplitView.IsPaneOpen = !navSplitView.IsPaneOpen;
+        }
 
         private void NavRadioButton_Checked(object sender, RoutedEventArgs e)
         {
             if (sender is RadioButton rb && rb.Tag is string tag)
             {
-                Debug.WriteLine(
-                    $"[1703.MainPage.NavRadioButton_Checked] Clicked on tag: '{tag}'. ContentFrame is currently {(ContentFrame == null ? "NULL!" : "VALID")}"
-                );
-
                 Type targetPage = null;
                 string pageParameter = null;
                 switch (tag)
@@ -174,6 +172,8 @@ namespace _1703_UWP.Pages
             Windows.UI.Xaml.Navigation.NavigationEventArgs e
         )
         {
+            if (ContentFrame == null)
+                return;
             bool canGoBackInPage =
                 (ContentFrame.Content as ArticleViewerPage)?.CanGoBackInPage == true;
             bool canGoBack = ContentFrame.CanGoBack || canGoBackInPage;

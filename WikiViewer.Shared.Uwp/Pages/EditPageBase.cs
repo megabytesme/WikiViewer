@@ -46,24 +46,8 @@ namespace WikiViewer.Shared.Uwp.Pages
 
             PageTitleTextBlock.Text = $"Editing: {_pageTitle.Replace('_', ' ')}";
 
-            if (AppSettings.ConnectionBackend == ConnectionMethod.HttpClientProxy)
-            {
-                _apiWorker = new HttpClientApiWorker();
-            }
-            else
-            {
-#if UWP_1703
-                _apiWorker = (IApiWorker)
-                    Activator.CreateInstance(
-                        Type.GetType("_1703_UWP.Services.WebViewApiWorker, 1703 UWP")
-                    );
-#else
-                _apiWorker = (IApiWorker)
-                    Activator.CreateInstance(
-                        Type.GetType("_1809_UWP.Services.WebView2ApiWorker, 1809 UWP")
-                    );
-#endif
-            }
+            _apiWorker = App.ApiWorkerFactory.CreateApiWorker();
+
             _ = LoadContentAsync();
         }
 
