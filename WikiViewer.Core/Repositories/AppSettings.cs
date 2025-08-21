@@ -19,6 +19,7 @@ namespace WikiViewer.Core
         private const string DefaultScriptPath = "w/";
         private const string DefaultArticlePath = "wiki/";
         private const string DefaultMainPageName = "Main Page";
+        private const string ProxyDisclaimerAcceptedKey = "HasAcceptedProxyDisclaimer";
 
         public static ConnectionMethod ConnectionBackend
         {
@@ -82,5 +83,11 @@ namespace WikiViewer.Core
             $"{IndexEndpoint}?title={Uri.EscapeDataString(pageTitle)}&action=edit";
 
         public static string GetVirtualHostName() => $"local-content.{Host}";
+
+        public static bool HasAcceptedProxyDisclaimer
+        {
+            get => SettingsProvider.GetValue(ProxyDisclaimerAcceptedKey, false);
+            set => SettingsProvider.SetValue(ProxyDisclaimerAcceptedKey, value);
+        }
     }
 }
