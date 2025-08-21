@@ -1,21 +1,19 @@
-﻿<Page
+﻿<local:LoginPageBase
     x:Class="_1703_UWP.LoginPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:WikiViewer.Shared.Uwp.Pages"
     Background="Transparent">
     <Grid>
         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Width="320">
-            <TextBlock x:Name="LoginTitle" Text="Log In" Style="{ThemeResource TitleTextBlockStyle}" HorizontalAlignment="Center"/>
-            <TextBox x:Name="UsernameBox" Header="Username" AutomationProperties.Name="Username"/>
-            <PasswordBox x:Name="PasswordBox" Header="Password" AutomationProperties.Name="Password"/>
-            <CheckBox x:Name="RememberMeCheckBox" Content="Remember me" IsChecked="True" Margin="0,12"/>
-            <Button x:Name="LoginButton" Content="Log In" HorizontalAlignment="Stretch" Click="LoginButton_Click"/>
-            <HyperlinkButton Content="Don't have an account? Create one." 
-                             HorizontalAlignment="Center" 
-                             Click="CreateAccountButton_Click"
-                             Margin="0,8,0,0"/>
-            <ProgressRing x:Name="LoadingRing" IsActive="False"/>
+            <TextBlock x:Name="LoginTitle" Text="Log In" Style="{ThemeResource TitleTextBlockStyle}" HorizontalAlignment="Center" Margin="0,0,0,12"/>
+            <TextBox x:Name="UsernameBox" Header="Username" AutomationProperties.Name="Username" Margin="0,0,0,12"/>
+            <PasswordBox x:Name="PasswordBox" Header="Password" AutomationProperties.Name="Password" Margin="0,0,0,12"/>
+            <CheckBox x:Name="RememberMeCheckBox" Content="Remember me" IsChecked="True" Margin="0,0,0,12"/>
+            <Button x:Name="LoginButton" Content="Log In" HorizontalAlignment="Stretch" Click="LoginButton_Click" Margin="0,0,0,12"/>
+            <HyperlinkButton Content="Don't have an account? Create one." HorizontalAlignment="Center" Click="CreateAccountButton_Click" Margin="0,0,0,12"/>
+            <ProgressRing x:Name="LoadingRing" IsActive="False" Margin="0,0,0,12"/>
             <TextBlock x:Name="ErrorTextBlock" Foreground="Red" TextWrapping="Wrap"/>
         </StackPanel>
     </Grid>
-</Page>
+</local:LoginPageBase>

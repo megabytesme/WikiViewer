@@ -1,11 +1,8 @@
-﻿<Page
-    x:Class="_1703_UWP.MainPage"
+﻿<local:MainPageBase
+    x:Class="_1703_UWP.Pages.MainPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    mc:Ignorable="d">
-
+    xmlns:local="using:WikiViewer.Shared.Uwp.Pages">
     <Grid>
         <VisualStateManager.VisualStateGroups>
             <VisualStateGroup x:Name="WindowStates">
@@ -27,29 +24,19 @@
                 </VisualState>
             </VisualStateGroup>
         </VisualStateManager.VisualStateGroups>
-
         <Grid.RowDefinitions>
             <RowDefinition Height="32"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
-
         <Grid x:Name="AppTitleBar" Background="Transparent" Grid.Row="0">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition x:Name="LeftPaddingColumn" Width="0"/>
+                <ColumnDefinition x:Name="TitleBarLeftPaddingColumn" Width="0"/>
                 <ColumnDefinition/>
-                <ColumnDefinition x:Name="RightPaddingColumn" Width="0"/>
+                <ColumnDefinition x:Name="TitleBarRightPaddingColumn" Width="0"/>
             </Grid.ColumnDefinitions>
-            <TextBlock Text="WikiViewer"
-                       VerticalAlignment="Center"
-                       HorizontalAlignment="Left"
-                       Margin="16,0,0,0"
-                       Grid.Column="1"
-                       Style="{StaticResource CaptionTextBlockStyle}"/>
+            <TextBlock Text="WikiViewer" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="16,0,0,0" Grid.Column="1" Style="{StaticResource CaptionTextBlockStyle}"/>
         </Grid>
-
-        <SplitView Grid.Row="1" x:Name="NavSplitView" IsPaneOpen="False"
-                   CompactPaneLength="45" OpenPaneLength="250"
-                   PaneBackground="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}">
+        <SplitView Grid.Row="1" x:Name="NavSplitView" IsPaneOpen="False" CompactPaneLength="45" OpenPaneLength="250" PaneBackground="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}">
             <SplitView.Pane>
                 <Grid>
                     <Grid.RowDefinitions>
@@ -106,20 +93,13 @@
                             </RadioButton.Template>
                         </RadioButton>
                     </StackPanel>
-                    <RadioButton x:Name="SettingsNavItem"
-                                 Grid.Row="1"
-                                 Tag="settings"
-                                 Content="Settings"
-                                 Checked="NavRadioButton_Checked"
-                                 Margin="0,0,0,10">
+                    <RadioButton x:Name="SettingsNavItem" Grid.Row="1" Tag="settings" Content="Settings" Checked="NavRadioButton_Checked" Margin="0,0,0,10">
                         <RadioButton.Template>
                             <ControlTemplate TargetType="RadioButton">
                                 <Grid Background="{TemplateBinding Background}">
                                     <StackPanel Orientation="Horizontal">
                                         <SymbolIcon Symbol="Setting" Margin="12,0" />
-                                        <TextBlock x:Name="SettingsNavItemText"
-                                   Text="{TemplateBinding Content}"
-                                   VerticalAlignment="Center" />
+                                        <TextBlock x:Name="SettingsNavItemText" Text="{TemplateBinding Content}" VerticalAlignment="Center" />
                                     </StackPanel>
                                 </Grid>
                             </ControlTemplate>
@@ -133,61 +113,20 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
-
-                    <Grid Grid.Row="0"
-                          BorderBrush="{ThemeResource SystemControlForegroundBaseLowBrush}"
-                          BorderThickness="0,0,0,1">
+                    <Grid Grid.Row="0" BorderBrush="{ThemeResource SystemControlForegroundBaseLowBrush}" BorderThickness="0,0,0,1">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="48"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-
-                        <Button x:Name="HamburgerButton"
-                                Grid.Column="0"
-                                Click="HamburgerButton_Click"
-                                Width="48" Height="48"
-                                Background="Transparent"
-                                BorderThickness="0"
-                                FontFamily="Segoe MDL2 Assets"
-                                Content="&#xE700;"/>
-
-                        <AutoSuggestBox x:Name="SearchBox"
-                                        Grid.Column="1"
-                                        QueryIcon="Find"
-                                        PlaceholderText="Search..."
-                                        QuerySubmitted="SearchBox_QuerySubmitted"
-                                        TextChanged="SearchBox_TextChanged"
-                                        Margin="0,4,12,4"/>
+                        <Button x:Name="HamburgerButton" Grid.Column="0" Click="HamburgerButton_Click" Width="48" Height="48" Background="Transparent" BorderThickness="0" FontFamily="Segoe MDL2 Assets" Content="&#xE700;"/>
+                        <AutoSuggestBox x:Name="NavSearchBox" Grid.Column="1" QueryIcon="Find" PlaceholderText="Search..." QuerySubmitted="SearchBox_QuerySubmitted" TextChanged="SearchBox_TextChanged" Margin="0,4,12,4"/>
                     </Grid>
-
-                    <Frame x:Name="ContentFrame"
-                           Grid.Row="1"
-                           Navigated="ContentFrame_Navigated"/>
-
-                    <Border x:Name="ConnectionInfoBar"
-                            Grid.Row="1"
-                            BorderThickness="1"
-                            CornerRadius="4"
-                            Visibility="Collapsed"
-                            Margin="12,12,12,0"
-                            VerticalAlignment="Top">
+                    <Frame x:Name="PageContentFrame" Grid.Row="1" Navigated="ContentFrame_Navigated"/>
+                    <Border x:Name="ConnectionInfoBar" Grid.Row="1" BorderThickness="1" CornerRadius="4" Visibility="Collapsed" Margin="12,12,12,0" VerticalAlignment="Top">
                         <StackPanel Padding="12">
-                            <TextBlock x:Name="InfoBarTitle"
-                                       Text="Connection Issue"
-                                       Style="{ThemeResource BaseTextBlockStyle}"
-                                       FontWeight="Bold"
-                                       Foreground="White"/>
-                            <TextBlock x:Name="InfoBarMessage"
-                                        Text="Message"
-                                        Style="{ThemeResource BodyTextBlockStyle}"
-                                        TextWrapping="Wrap"
-                                        Foreground="White"/>
-                            <Button x:Name="InfoBarButton"
-                                    Content="Action"
-                                    Click="InfoBarButton_Click"
-                                    Visibility="Collapsed"
-                                    Background="White"
-                                    Foreground="Black"/>
+                            <TextBlock x:Name="InfoBarTitle" Text="Connection Issue" Style="{ThemeResource BaseTextBlockStyle}" FontWeight="Bold" Foreground="White"/>
+                            <TextBlock x:Name="InfoBarMessage" Text="Message" Style="{ThemeResource BodyTextBlockStyle}" TextWrapping="Wrap" Foreground="White"/>
+                            <Button x:Name="InfoBarButton" Content="Action" Click="InfoBarButton_Click" Visibility="Collapsed" Background="White" Foreground="Black"/>
                         </StackPanel>
                     </Border>
                 </Grid>
@@ -195,4 +134,4 @@
         </SplitView>
         <Grid x:Name="WorkerWebViewHost" Visibility="Collapsed" />
     </Grid>
-</Page>
+</local:MainPageBase>

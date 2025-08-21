@@ -7,7 +7,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "1703 UWP", "1703 UWP\1703 U
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "1809 UWP", "1809 UWP\1809 UWP.csproj", "{6CA051F2-9F14-4663-B817-1E9E4BCFF853}"
 EndProject
-Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Shared Project (UWP)", "Shared Project (UWP)\Shared Project (UWP).shproj", "{17EAF20E-8428-4E29-8369-4B30025EE5DE}"
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "WikiViewer.Core", "WikiViewer.Core\WikiViewer.Core.shproj", "{17EAF20E-8428-4E29-8369-4B30025EE5DE}"
+EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "WikiViewer.Shared.Uwp", "WikiViewer.Shared.Uwp\WikiViewer.Shared.Uwp.shproj", "{8BB51741-66A8-4F1B-9257-013806B5D9CF}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -63,8 +65,11 @@ Global
 		SolutionGuid = {777CB651-4BFD-4A62-94F6-9C65905D2FC4}
 	EndGlobalSection
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
-		Shared Project (UWP)\Shared Project (UWP).projitems*{17eaf20e-8428-4e29-8369-4b30025ee5de}*SharedItemsImports = 13
-		Shared Project (UWP)\Shared Project (UWP).projitems*{5396d943-a4d3-44c8-a4da-5e526910ad6b}*SharedItemsImports = 4
-		Shared Project (UWP)\Shared Project (UWP).projitems*{6ca051f2-9f14-4663-b817-1e9e4bcff853}*SharedItemsImports = 4
+		WikiViewer.Core\WikiViewer.Core.projitems*{17eaf20e-8428-4e29-8369-4b30025ee5de}*SharedItemsImports = 13
+		WikiViewer.Core\WikiViewer.Core.projitems*{5396d943-a4d3-44c8-a4da-5e526910ad6b}*SharedItemsImports = 4
+		WikiViewer.Shared.Uwp\WikiViewer.Shared.Uwp.projitems*{5396d943-a4d3-44c8-a4da-5e526910ad6b}*SharedItemsImports = 4
+		WikiViewer.Core\WikiViewer.Core.projitems*{6ca051f2-9f14-4663-b817-1e9e4bcff853}*SharedItemsImports = 4
+		WikiViewer.Shared.Uwp\WikiViewer.Shared.Uwp.projitems*{6ca051f2-9f14-4663-b817-1e9e4bcff853}*SharedItemsImports = 4
+		WikiViewer.Shared.Uwp\WikiViewer.Shared.Uwp.projitems*{8bb51741-66a8-4f1b-9257-013806b5d9cf}*SharedItemsImports = 13
 	EndGlobalSection
 EndGlobal

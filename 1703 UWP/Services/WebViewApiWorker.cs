@@ -1,10 +1,13 @@
-using Shared_Code;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Threading.Tasks;
+using WikiViewer.Core;
+using WikiViewer.Core.Interfaces;
+using WikiViewer.Core.Models;
+using WikiViewer.Shared.Uwp.Services;
 using Windows.ApplicationModel.Core;
 using Windows.Foundation;
 using Windows.UI.Core;
@@ -12,7 +15,7 @@ using Windows.UI.Xaml.Controls;
 using Windows.Web.Http;
 using Windows.Web.Http.Filters;
 
-namespace _1703_UWP
+namespace _1703_UWP.Services
 {
     public class WebViewApiWorker : IApiWorker
     {
@@ -22,94 +25,150 @@ namespace _1703_UWP
         public Task InitializeAsync(string baseUrl = null)
         {
             var tcs = new TaskCompletionSource<bool>();
-            _ = CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
-            {
-                try
+            _ = CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(
+                CoreDispatcherPriority.Normal,
+                () =>
                 {
-                    if (App.UIHost == null) throw new InvalidOperationException("App.UIHost is not available for WebView worker.");
-                    WebView = new WebView();
-                    App.UIHost.Children.Add(WebView);
+                    try
+                    {
+                        if (WikiViewer.Shared.Uwp.App.UIHost == null)
+                            throw new InvalidOperationException(
+                                "App.UIHost is not available for WebView worker."
+                            );
+                        WebView = new WebView();
+                        WikiViewer.Shared.Uwp.App.UIHost.Children.Add(WebView);
 
-                    TypedEventHandler<WebView, WebViewNavigationCompletedEventArgs> navHandler = null;
-                    navHandler = (s, e) => {
-                        WebView.NavigationCompleted -= navHandler;
-                        if (!tcs.Task.IsCompleted) tcs.SetResult(e.IsSuccess);
-                    };
-                    WebView.NavigationCompleted += navHandler;
-                    WebView.Navigate(new Uri(baseUrl ?? AppSettings.BaseUrl));
+                        TypedEventHandler<WebView, WebViewNavigationCompletedEventArgs> navHandler =
+                            null;
+                        navHandler = (s, e) =>
+                        {
+                            WebView.NavigationCompleted -= navHandler;
+                            if (!tcs.Task.IsCompleted)
+                                tcs.SetResult(e.IsSuccess);
+                        };
+                        WebView.NavigationCompleted += navHandler;
+                        WebView.Navigate(new Uri(baseUrl ?? AppSettings.BaseUrl));
+                    }
+                    catch (Exception ex)
+                    {
+                        if (!tcs.Task.IsCompleted)
+                            tcs.SetException(ex);
+                    }
                 }
-                catch (Exception ex) { if (!tcs.Task.IsCompleted) tcs.SetException(ex); }
-            });
+            );
             return tcs.Task;
         }
 
-        public async Task<string> GetJsonFromApiAsync(string url)
-        {
-            return await GetContentFromUrlCore(url, (fullHtml) => {
-                var doc = new HtmlAgilityPack.HtmlDocument();
-                doc.LoadHtml(fullHtml);
-                string json = doc.DocumentNode.SelectSingleNode("//body/pre")?.InnerText;
-                if (string.IsNullOrWhiteSpace(json)) json = doc.DocumentNode.SelectSingleNode("//body")?.InnerText;
-                if (!string.IsNullOrWhiteSpace(json) && (json.Trim().StartsWith("{") || json.Trim().StartsWith("["))) return json.Trim();
-                return null;
-            });
-        }
-
-        public async Task<string> PostAndGetJsonFromApiAsync(string url, Dictionary<string, string> postData)
-        {
-            return await CoreApplication.MainView.CoreWindow.Dispatcher.RunTaskAsync(async () =>
-            {
-                if (WebView == null) throw new InvalidOperationException("WebView not initialized.");
-                var formContent = new HttpFormUrlEncodedContent(postData);
-                var httpRequest = new HttpRequestMessage(HttpMethod.Post, new Uri(url)) { Content = formContent };
-                WebView.NavigateWithHttpRequestMessage(httpRequest);
-                var stopwatch = Stopwatch.StartNew();
-                while (stopwatch.Elapsed.TotalSeconds < 15)
+        public async Task<string> GetJsonFromApiAsync(string url) =>
+            await GetContentFromUrlCore(
+                url,
+                (fullHtml) =>
                 {
-                    await Task.Delay(250);
-                    string fullHtml = await WebView.InvokeScriptAsync("eval", new[] { "document.documentElement.outerHTML" });
-                    if (string.IsNullOrEmpty(fullHtml)) continue;
                     var doc = new HtmlAgilityPack.HtmlDocument();
                     doc.LoadHtml(fullHtml);
                     string json = doc.DocumentNode.SelectSingleNode("//body/pre")?.InnerText;
-                    if (!string.IsNullOrWhiteSpace(json) && (json.Trim().StartsWith("{") || json.Trim().StartsWith("["))) return json.Trim();
+                    if (string.IsNullOrWhiteSpace(json))
+                        json = doc.DocumentNode.SelectSingleNode("//body")?.InnerText;
+                    if (
+                        !string.IsNullOrWhiteSpace(json)
+                        && (json.Trim().StartsWith("{") || json.Trim().StartsWith("["))
+                    )
+                        return json.Trim();
+                    return null;
                 }
-                throw new TimeoutException($"Content validation timed out for POST URL: {url}");
-            });
-        }
+            );
 
-        public async Task<string> GetRawHtmlFromUrlAsync(string url)
-        {
-            return await GetContentFromUrlCore(url, (fullHtml) => !string.IsNullOrEmpty(fullHtml) ? fullHtml : null);
-        }
-
-        private async Task<string> GetContentFromUrlCore(string url, Func<string, string> validationLogic)
-        {
-            return await CoreApplication.MainView.CoreWindow.Dispatcher.RunTaskAsync(async () =>
-            {
-                if (WebView == null) throw new InvalidOperationException("WebView is not initialized.");
-                var navTcs = new TaskCompletionSource<bool>();
-                TypedEventHandler<WebView, WebViewNavigationCompletedEventArgs> navHandler = null;
-                navHandler = (s, e) => {
-                    WebView.NavigationCompleted -= navHandler;
-                    navTcs.TrySetResult(e.IsSuccess);
-                };
-                WebView.NavigationCompleted += navHandler;
-                WebView.Navigate(new Uri(url));
-                await navTcs.Task;
-                var stopwatch = Stopwatch.StartNew();
-                while (stopwatch.Elapsed.TotalSeconds < 15)
+        public async Task<string> PostAndGetJsonFromApiAsync(
+            string url,
+            Dictionary<string, string> postData
+        ) =>
+            await DispatcherTaskExtensions.RunTaskAsync(
+                CoreApplication.MainView.CoreWindow.Dispatcher,
+                async () =>
                 {
-                    await Task.Delay(250);
-                    string fullHtml = await WebView.InvokeScriptAsync("eval", new[] { "document.documentElement.outerHTML" });
-                    if (string.IsNullOrEmpty(fullHtml)) continue;
-                    if (fullHtml.Contains("g-recaptcha") || fullHtml.Contains("Verifying you are human")) throw new NeedsUserVerificationException("Interactive user verification required.", url);
-                    string extractedContent = validationLogic(fullHtml);
-                    if (extractedContent != null) return extractedContent;
+                    if (WebView == null)
+                        throw new InvalidOperationException("WebView not initialized.");
+                    var formContent = new HttpFormUrlEncodedContent(postData);
+                    var httpRequest = new HttpRequestMessage(HttpMethod.Post, new Uri(url))
+                    {
+                        Content = formContent,
+                    };
+                    WebView.NavigateWithHttpRequestMessage(httpRequest);
+                    var stopwatch = Stopwatch.StartNew();
+                    while (stopwatch.Elapsed.TotalSeconds < 15)
+                    {
+                        await Task.Delay(250);
+                        string fullHtml = await WebView.InvokeScriptAsync(
+                            "eval",
+                            new[] { "document.documentElement.outerHTML" }
+                        );
+                        if (string.IsNullOrEmpty(fullHtml))
+                            continue;
+                        var doc = new HtmlAgilityPack.HtmlDocument();
+                        doc.LoadHtml(fullHtml);
+                        string json = doc.DocumentNode.SelectSingleNode("//body/pre")?.InnerText;
+                        if (
+                            !string.IsNullOrWhiteSpace(json)
+                            && (json.Trim().StartsWith("{") || json.Trim().StartsWith("["))
+                        )
+                            return json.Trim();
+                    }
+                    throw new TimeoutException($"Content validation timed out for POST URL: {url}");
                 }
-                throw new TimeoutException($"Content validation timed out for GET URL: {url}");
-            });
-        }
+            );
+
+        public async Task<string> GetRawHtmlFromUrlAsync(string url) =>
+            await GetContentFromUrlCore(
+                url,
+                (fullHtml) => !string.IsNullOrEmpty(fullHtml) ? fullHtml : null
+            );
+
+        private async Task<string> GetContentFromUrlCore(
+            string url,
+            Func<string, string> validationLogic
+        ) =>
+            await DispatcherTaskExtensions.RunTaskAsync(
+                CoreApplication.MainView.CoreWindow.Dispatcher,
+                async () =>
+                {
+                    if (WebView == null)
+                        throw new InvalidOperationException("WebView is not initialized.");
+                    var navTcs = new TaskCompletionSource<bool>();
+                    TypedEventHandler<WebView, WebViewNavigationCompletedEventArgs> navHandler =
+                        null;
+                    navHandler = (s, e) =>
+                    {
+                        WebView.NavigationCompleted -= navHandler;
+                        navTcs.TrySetResult(e.IsSuccess);
+                    };
+                    WebView.NavigationCompleted += navHandler;
+                    WebView.Navigate(new Uri(url));
+                    await navTcs.Task;
+                    var stopwatch = Stopwatch.StartNew();
+                    while (stopwatch.Elapsed.TotalSeconds < 15)
+                    {
+                        await Task.Delay(250);
+                        string fullHtml = await WebView.InvokeScriptAsync(
+                            "eval",
+                            new[] { "document.documentElement.outerHTML" }
+                        );
+                        if (string.IsNullOrEmpty(fullHtml))
+                            continue;
+                        if (
+                            fullHtml.Contains("g-recaptcha")
+                            || fullHtml.Contains("Verifying you are human")
+                        )
+                            throw new NeedsUserVerificationException(
+                                "Interactive user verification required.",
+                                url
+                            );
+                        string extractedContent = validationLogic(fullHtml);
+                        if (extractedContent != null)
+                            return extractedContent;
+                    }
+                    throw new TimeoutException($"Content validation timed out for GET URL: {url}");
+                }
+            );
 
         public async Task<byte[]> GetRawBytesFromUrlAsync(string url)
         {
@@ -122,37 +181,45 @@ namespace _1703_UWP
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[WebViewApiWorker-Bytes] Failed to get bytes from {url}: {ex.Message}");
+                Debug.WriteLine(
+                    $"[WebViewApiWorker-Bytes] Failed to get bytes from {url}: {ex.Message}"
+                );
                 return null;
             }
         }
 
         public Task CopyApiCookiesFromAsync(IApiWorker source)
         {
-            if (!(source is WebViewApiWorker sourceWorker)) return Task.CompletedTask;
+            if (!(source is WebViewApiWorker sourceWorker))
+                return Task.CompletedTask;
             var filter = new HttpBaseProtocolFilter();
             var cookieManager = filter.CookieManager;
             var sourceCookies = cookieManager.GetCookies(new Uri(AppSettings.BaseUrl));
-            if (sourceCookies == null || !sourceCookies.Any()) return Task.CompletedTask;
-
+            if (sourceCookies == null || !sourceCookies.Any())
+                return Task.CompletedTask;
             foreach (var cookie in sourceCookies)
             {
-                cookieManager.SetCookie(new HttpCookie(cookie.Name, cookie.Domain, cookie.Path) { Value = cookie.Value });
+                cookieManager.SetCookie(
+                    new HttpCookie(cookie.Name, cookie.Domain, cookie.Path) { Value = cookie.Value }
+                );
             }
             return Task.CompletedTask;
         }
 
         public void Dispose()
         {
-            _ = CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
-            {
-                if (WebView != null)
+            _ = CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(
+                CoreDispatcherPriority.Normal,
+                () =>
                 {
-                    App.UIHost?.Children.Remove(WebView);
-                    WebView.Stop();
-                    WebView = null;
+                    if (WebView != null)
+                    {
+                        WikiViewer.Shared.Uwp.App.UIHost?.Children.Remove(WebView);
+                        WebView.Stop();
+                        WebView = null;
+                    }
                 }
-            });
+            );
         }
     }
 }

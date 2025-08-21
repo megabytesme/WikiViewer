@@ -127,9 +127,6 @@
     <Compile Include="CreateAccountPage.xaml.cs">
       <DependentUpon>CreateAccountPage.xaml</DependentUpon>
     </Compile>
-    <Compile Include="App.xaml.cs">
-      <DependentUpon>App.xaml</DependentUpon>
-    </Compile>
     <Compile Include="ArticleViewerPage.xaml.cs">
       <DependentUpon>ArticleViewerPage.xaml</DependentUpon>
     </Compile>
@@ -262,7 +259,8 @@
       <SubType>Designer</SubType>
     </Page>
   </ItemGroup>
-  <Import Project="..\Shared Project (UWP)\Shared Project (UWP).projitems" Label="Shared" />
+  <Import Project="..\WikiViewer.Core\WikiViewer.Core.projitems" Label="Shared" />
+  <Import Project="..\WikiViewer.Shared.Uwp\WikiViewer.Shared.Uwp.projitems" Label="Shared" />
   <PropertyGroup Condition=" '$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '14.0' ">
     <VisualStudioVersion>14.0</VisualStudioVersion>
   </PropertyGroup>

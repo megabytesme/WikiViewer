@@ -1,261 +1,213 @@
-﻿using Microsoft.UI.Xaml.Controls;
-using Newtonsoft.Json.Linq;
-using Shared_Code;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
+﻿using System;
 using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using Windows.ApplicationModel.Core;
-using Windows.UI;
-using Windows.UI.Core;
-using Windows.UI.ViewManagement;
-using Windows.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using WikiViewer.Shared.Uwp.Pages;
 using Windows.UI.Xaml.Controls;
-using Windows.UI.Xaml.Documents;
 using Windows.UI.Xaml.Media;
-using Windows.UI.Xaml.Navigation;
-using muxc = Microsoft.UI.Xaml.Controls;
+using NavigationViewItem = Microsoft.UI.Xaml.Controls.NavigationViewItem;
 
-namespace _1809_UWP
+namespace _1809_UWP.Pages
 {
-    public sealed partial class MainPage : Page
+    public sealed partial class MainPage : MainPageBase
     {
-        private CancellationTokenSource _suggestionCts;
-        public static IApiWorker ApiWorker { get; set; }
-        private bool _isPreflightCheckComplete = false;
-        private string _verificationUrl;
-
         public MainPage()
         {
             this.InitializeComponent();
-            App.UIHost = this.WorkerWebViewHost;
             ApplyBackdropOrAcrylic();
-            SetupTitleBar();
-            AuthService.AuthenticationStateChanged += AuthService_AuthenticationStateChanged;
-            this.Unloaded += (s, e) => { AuthService.AuthenticationStateChanged -= AuthService_AuthenticationStateChanged; };
-            this.Loaded += MainPage_Loaded;
         }
 
-        private async void MainPage_Loaded(object sender, RoutedEventArgs e)
+        protected override Frame ContentFrame => this.PageContentFrame;
+        protected override AutoSuggestBox SearchBox => this.NavSearchBox;
+        protected override Grid AppTitleBarGrid => this.AppTitleBar;
+        protected override ColumnDefinition LeftPaddingColumn => this.TitleBarLeftPaddingColumn;
+        protected override ColumnDefinition RightPaddingColumn => this.TitleBarRightPaddingColumn;
+
+        protected override Panel GetWorkerHost() => this.WorkerWebViewHost;
+
+        protected override Type GetArticleViewerPageType() => typeof(ArticleViewerPage);
+
+        protected override Type GetFavouritesPageType() => typeof(FavouritesPage);
+
+        protected override Type GetLoginPageType() => typeof(_1809_UWP.LoginPage);
+
+        protected override Type GetSettingsPageType() => typeof(SettingsPage);
+
+        protected override void UpdateUserUI(bool isLoggedIn, string username)
         {
-            if (ApiWorker == null)
+            if (isLoggedIn)
             {
-                if (AppSettings.ConnectionBackend == ConnectionMethod.HttpClientProxy)
+                LoginNavItem.Content = username;
+                LoginNavItem.Icon = new FontIcon
                 {
-                    ApiWorker = new HttpClientApiWorker();
-                }
-                else
-                {
-                    ApiWorker = new WebView2ApiWorker();
-                }
-                await ApiWorker.InitializeAsync();
-            }
-
-            SearchBox.PlaceholderText = $"Search {AppSettings.Host}...";
-            if (ContentFrame.Content == null)
-            {
-                NavView.SelectedItem = NavView.MenuItems.OfType<muxc.NavigationViewItem>().FirstOrDefault();
-                ContentFrame.Navigate(typeof(ArticleViewerPage), AppSettings.MainPageName);
-            }
-
-            await CheckAndShowFirstRunDisclaimerAsync();
-            await PerformPreflightCheckAsync();
-            await TryAutoLoginAsync();
-        }
-
-        private async Task PerformPreflightCheckAsync()
-        {
-            ConnectionInfoBar.IsOpen = false;
-
-            try
-            {
-                Debug.WriteLine("[MainPage] Performing non-blocking pre-flight check...");
-                await ArticleProcessingService.PageExistsAsync(AppSettings.MainPageName, ApiWorker);
-                Debug.WriteLine("[MainPage] Pre-flight check successful. Connection is clear.");
-            }
-            catch (NeedsUserVerificationException ex)
-            {
-                Debug.WriteLine("[MainPage] Pre-flight check failed. Cloudflare verification required.");
-                _verificationUrl = ex.Url;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[MainPage] Pre-flight check failed with a general error: {ex.Message}");
-
-                if (!AppSettings.HasShownDisclaimer)
-                {
-                    var dialog = new ContentDialog
-                    {
-                        Title = "Connection Required for First Launch",
-                        Content = "This app needs to connect to the internet for its first use to set things up. Please check your connection and restart the app.",
-                        CloseButtonText = "Close App"
-                    };
-                    await dialog.ShowAsync();
-                    Application.Current.Exit();
-                }
-                else
-                {
-                    ConnectionInfoBar.Title = "Offline Mode";
-                    ConnectionInfoBar.Message = $"Could not connect to {AppSettings.Host}. Only cached articles and favourites are available.";
-                    InfoBarButton.Visibility = Visibility.Collapsed;
-                    ConnectionInfoBar.Severity = muxc.InfoBarSeverity.Error;
-                    ConnectionInfoBar.IsOpen = true;
-                }
-            }
-        }
-
-        private void InfoBarButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (!string.IsNullOrEmpty(_verificationUrl))
-            {
-                ContentFrame.Navigate(typeof(ArticleViewerPage), _verificationUrl);
-                ConnectionInfoBar.IsOpen = false;
-            }
-        }
-
-        private async Task<bool> TryAutoLoginAsync()
-        {
-            Debug.WriteLine("[MainPage] Attempting to auto-login...");
-            var savedCreds = CredentialService.LoadCredentials();
-            if (savedCreds != null)
-            {
-                Debug.WriteLine(
-                    $"[MainPage] Found saved credentials for user: {savedCreds.Username}."
-                );
-                LoginNavItem.Content = "Signing in...";
-                try
-                {
-                    await AuthService.PerformLoginAsync(savedCreds.Username, savedCreds.Password);
-                    Debug.WriteLine("[MainPage] Auto-login successful.");
-
-                    return true;
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[MainPage] Auto-login failed: {ex.Message}");
-                    CredentialService.ClearCredentials();
-                    AuthService_AuthenticationStateChanged(null, null);
-                    return false;
-                }
+                    FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                    Glyph = "\uE77B",
+                };
+                LoginNavItem.Tag = "userpage";
             }
             else
             {
-                Debug.WriteLine("[MainPage] No saved credentials found.");
+                LoginNavItem.Content = username ?? "Login";
+                LoginNavItem.Icon = new FontIcon
+                {
+                    FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                    Glyph = "\uE77B",
+                };
+                LoginNavItem.Tag = "login";
+            }
+        }
+
+        protected override void ShowConnectionInfoBar(
+            string title,
+            string message,
+            bool showActionButton
+        )
+        {
+            ConnectionInfoBar.Title = title;
+            ConnectionInfoBar.Message = message;
+            InfoBarButton.Visibility = showActionButton
+                ? Windows.UI.Xaml.Visibility.Visible
+                : Windows.UI.Xaml.Visibility.Collapsed;
+            ConnectionInfoBar.IsOpen = true;
+        }
+
+        protected override void HideConnectionInfoBar() => ConnectionInfoBar.IsOpen = false;
+
+        protected override void NavigateToPage(Type page, string parameter)
+        {
+            if (
+                page != null
+                && (
+                    ContentFrame.SourcePageType != page
+                    || (ContentFrame.GetNavigationState() as string) != parameter
+                )
+            )
+            {
+                ContentFrame.Navigate(
+                    page,
+                    parameter,
+                    new Windows.UI.Xaml.Media.Animation.EntranceNavigationTransitionInfo()
+                );
+            }
+        }
+
+        protected override bool TryGoBack()
+        {
+            if (ContentFrame.Content is ArticleViewerPage avp && avp.CanGoBackInPage)
+            {
+                NavView.IsBackEnabled = ContentFrame.CanGoBack || avp.CanGoBackInPage;
+                return avp.GoBackInPage();
+            }
+            if (ContentFrame.CanGoBack)
+            {
+                ContentFrame.GoBack();
+                return true;
             }
             return false;
         }
 
-        private async Task CheckAndShowFirstRunDisclaimerAsync()
+        private void NavView_Loaded(object sender, Windows.UI.Xaml.RoutedEventArgs e)
         {
-            if (!AppSettings.HasShownDisclaimer)
+            if (ContentFrame.Content == null)
+                NavigateToPage(
+                    GetArticleViewerPageType(),
+                    WikiViewer.Core.AppSettings.MainPageName
+                );
+        }
+
+        private void NavView_ItemInvoked(
+            Microsoft.UI.Xaml.Controls.NavigationView sender,
+            Microsoft.UI.Xaml.Controls.NavigationViewItemInvokedEventArgs args
+        )
+        {
+            Type targetPage = null;
+            string pageParameter = null;
+            if (args.IsSettingsInvoked)
             {
-                var dialog = new ContentDialog
-                {
-                    Title = "Welcome & Disclaimer",
-                    Content = new ScrollViewer()
-                    {
-                        Content = new TextBlock()
-                        {
-                            Inlines =
-                            {
-                                new Run()
-                                {
-                                    Text =
-                                        "This is an unofficial, third-party client for browsing MediaWiki sites. This app was created by ",
-                                },
-                                new Hyperlink()
-                                {
-                                    NavigateUri = new Uri("https://github.com/megabytesme"),
-                                    Inlines = { new Run() { Text = "MegaBytesMe" } },
-                                },
-                                new Run()
-                                {
-                                    Text =
-                                        " and is not affiliated with, endorsed, or sponsored by the operators of any specific wiki.",
-                                },
-                                new LineBreak(),
-                                new LineBreak(),
-                                new Run()
-                                {
-                                    Text =
-                                        "All article data, content, and trademarks are the property of their respective owners and contributors.",
-                                },
-                                new LineBreak(),
-                                new LineBreak(),
-                                new Run()
-                                {
-                                    Text =
-                                        "This disclaimer is available to view again in the settings.",
-                                }
-                            },
-                            TextWrapping = TextWrapping.Wrap,
-                        },
-                    },
-                    CloseButtonText = "I Understand",
-                    DefaultButton = ContentDialogButton.Close,
-                };
-
-                await dialog.ShowAsync();
-
-                AppSettings.HasShownDisclaimer = true;
+                targetPage = GetSettingsPageType();
             }
-        }
-
-        private void AuthService_AuthenticationStateChanged(object sender, EventArgs e)
-        {
-            _ = Dispatcher.RunAsync(
-                Windows.UI.Core.CoreDispatcherPriority.Normal,
-                () =>
+            else if (args.InvokedItemContainer?.Tag is string tag)
+            {
+                switch (tag)
                 {
-                    if (AuthService.IsLoggedIn)
-                    {
-                        LoginNavItem.Content = AuthService.Username;
-                        LoginNavItem.Icon = new FontIcon
+                    case "home":
+                        targetPage = GetArticleViewerPageType();
+                        pageParameter = WikiViewer.Core.AppSettings.MainPageName;
+                        break;
+                    case "random":
+                        targetPage = GetArticleViewerPageType();
+                        pageParameter = "random";
+                        break;
+                    case "favourites":
+                        targetPage = GetFavouritesPageType();
+                        break;
+                    case "login":
+                        targetPage = GetLoginPageType();
+                        break;
+                    case "userpage":
+                        if (WikiViewer.Core.Services.AuthService.IsLoggedIn)
                         {
-                            FontFamily = new FontFamily("Segoe MDL2 Assets"),
-                            Glyph = "\uE77B",
-                        };
-                        LoginNavItem.Tag = "userpage";
-                    }
-                    else
-                    {
-                        LoginNavItem.Content = "Login";
-                        LoginNavItem.Icon = new FontIcon
-                        {
-                            FontFamily = new FontFamily("Segoe MDL2 Assets"),
-                            Glyph = "\uE77B",
-                        };
-                        LoginNavItem.Tag = "login";
-                    }
+                            targetPage = GetArticleViewerPageType();
+                            pageParameter = $"User:{WikiViewer.Core.Services.AuthService.Username}";
+                        }
+                        break;
                 }
-            );
+            }
+            if (targetPage != null)
+                NavigateToPage(targetPage, pageParameter);
         }
 
-        private void OnNavigationRequested(Type sourcePageType, object parameter)
-        {
-            _ = Dispatcher.RunAsync(
-                CoreDispatcherPriority.Normal,
-                () =>
-                {
-                    ContentFrame.Navigate(sourcePageType, parameter);
-                }
-            );
-        }
+        private void NavView_BackRequested(
+            Microsoft.UI.Xaml.Controls.NavigationView sender,
+            Microsoft.UI.Xaml.Controls.NavigationViewBackRequestedEventArgs args
+        ) => TryGoBack();
 
-        protected override void OnNavigatedTo(NavigationEventArgs e)
+        private void ContentFrame_Navigated(
+            object sender,
+            Windows.UI.Xaml.Navigation.NavigationEventArgs e
+        )
         {
-            base.OnNavigatedTo(e);
-            SystemNavigationManager.GetForCurrentView().BackRequested += System_BackRequested;
-            App.RequestNavigation += OnNavigationRequested;
-        }
+            NavView.IsBackEnabled =
+                ContentFrame.CanGoBack
+                || (ContentFrame.Content as ArticleViewerPage)?.CanGoBackInPage == true;
+            Windows
+                .UI.Core.SystemNavigationManager.GetForCurrentView()
+                .AppViewBackButtonVisibility = NavView.IsBackEnabled
+                ? Windows.UI.Core.AppViewBackButtonVisibility.Visible
+                : Windows.UI.Core.AppViewBackButtonVisibility.Collapsed;
 
-        protected override void OnNavigatedFrom(NavigationEventArgs e)
-        {
-            base.OnNavigatedFrom(e);
-            SystemNavigationManager.GetForCurrentView().BackRequested -= System_BackRequested;
-            App.RequestNavigation -= OnNavigationRequested;
+            if (e.SourcePageType == GetSettingsPageType())
+            {
+                NavView.SelectedItem = NavView.SettingsItem;
+                return;
+            }
+
+            string tag = null;
+            if (e.SourcePageType == GetFavouritesPageType())
+                tag = "favourites";
+            else if (e.SourcePageType == GetLoginPageType())
+                tag = "login";
+            else if (e.SourcePageType == GetArticleViewerPageType() && e.Parameter is string p)
+            {
+                if (
+                    p.Equals(
+                        WikiViewer.Core.AppSettings.MainPageName,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
+                    tag = "home";
+                else if (p.Equals("random", StringComparison.OrdinalIgnoreCase))
+                    tag = "random";
+                else if (
+                    p.Equals(
+                        $"User:{WikiViewer.Core.Services.AuthService.Username}",
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
+                    tag = "userpage";
+            }
+            NavView.SelectedItem = NavView
+                .MenuItems.OfType<NavigationViewItem>()
+                .FirstOrDefault(i => (string)i.Tag == tag);
         }
 
         private void ApplyBackdropOrAcrylic()
@@ -267,272 +219,21 @@ namespace _1809_UWP
                 )
             )
             {
-                muxc.BackdropMaterial.SetApplyToRootOrPageBackground(this, true);
+                Microsoft.UI.Xaml.Controls.BackdropMaterial.SetApplyToRootOrPageBackground(
+                    this,
+                    true
+                );
             }
             else
             {
                 this.Background = new AcrylicBrush
                 {
                     BackgroundSource = AcrylicBackgroundSource.HostBackdrop,
-                    TintColor = Colors.Transparent,
+                    TintColor = Windows.UI.Colors.Transparent,
                     TintOpacity = 0.6,
-                    FallbackColor = Color.FromArgb(255, 40, 40, 40),
+                    FallbackColor = Windows.UI.Color.FromArgb(255, 40, 40, 40),
                 };
             }
-        }
-
-        private void SetupTitleBar()
-        {
-            CoreApplication.GetCurrentView().TitleBar.ExtendViewIntoTitleBar = true;
-            Window.Current.SetTitleBar(AppTitleBar);
-            var titleBar = ApplicationView.GetForCurrentView().TitleBar;
-            titleBar.ButtonBackgroundColor = Colors.Transparent;
-            titleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
-            CoreApplication.GetCurrentView().TitleBar.LayoutMetricsChanged += (s, e) =>
-                UpdateTitleBarLayout();
-        }
-
-        private void UpdateTitleBarLayout()
-        {
-            if (CoreApplication.GetCurrentView().TitleBar.ExtendViewIntoTitleBar)
-            {
-                LeftPaddingColumn.Width = new GridLength(
-                    CoreApplication.GetCurrentView().TitleBar.SystemOverlayLeftInset
-                );
-                RightPaddingColumn.Width = new GridLength(
-                    CoreApplication.GetCurrentView().TitleBar.SystemOverlayRightInset
-                );
-            }
-            else
-            {
-                LeftPaddingColumn.Width = new GridLength(0);
-                RightPaddingColumn.Width = new GridLength(0);
-            }
-        }
-
-        private void NavView_Loaded(object sender, RoutedEventArgs e)
-        {
-            if (_isPreflightCheckComplete && ContentFrame.Content == null)
-            {
-                NavView.SelectedItem = NavView
-                    .MenuItems.OfType<muxc.NavigationViewItem>()
-                    .FirstOrDefault();
-                ContentFrame.Navigate(typeof(ArticleViewerPage), AppSettings.MainPageName);
-            }
-        }
-
-        private void NavView_ItemInvoked(
-            muxc.NavigationView sender,
-            muxc.NavigationViewItemInvokedEventArgs args
-        )
-        {
-            Type targetPage = null;
-            string pageParameter = null;
-
-            if (args.IsSettingsInvoked)
-            {
-                targetPage = typeof(SettingsPage);
-            }
-            else if (args.InvokedItemContainer?.Tag is string tag)
-            {
-                switch (tag)
-                {
-                    case "home":
-                        targetPage = typeof(ArticleViewerPage);
-                        pageParameter = AppSettings.MainPageName;
-                        break;
-                    case "random":
-                        targetPage = typeof(ArticleViewerPage);
-                        pageParameter = "random";
-                        break;
-                    case "favourites":
-                        targetPage = typeof(FavouritesPage);
-                        break;
-                    case "login":
-                        targetPage = typeof(LoginPage);
-                        break;
-                    case "userpage":
-                        if (AuthService.IsLoggedIn)
-                        {
-                            targetPage = typeof(ArticleViewerPage);
-                            pageParameter = $"User:{AuthService.Username}";
-                        }
-                        break;
-                }
-            }
-
-            if (targetPage != null)
-            {
-                if (
-                    ContentFrame.SourcePageType != targetPage
-                    || (ContentFrame.GetNavigationState() as string) != pageParameter
-                )
-                {
-                    ContentFrame.Navigate(
-                        targetPage,
-                        pageParameter,
-                        args.RecommendedNavigationTransitionInfo
-                    );
-                }
-            }
-        }
-
-        private void SearchBox_QuerySubmitted(
-            AutoSuggestBox sender,
-            AutoSuggestBoxQuerySubmittedEventArgs args
-        )
-        {
-            if (!string.IsNullOrEmpty(args.QueryText))
-            {
-                ContentFrame.Navigate(typeof(ArticleViewerPage), args.QueryText);
-            }
-        }
-
-        private async void SearchBox_TextChanged(
-            AutoSuggestBox sender,
-            AutoSuggestBoxTextChangedEventArgs args
-        )
-        {
-            if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput)
-                return;
-
-            string query = sender.Text;
-            if (string.IsNullOrWhiteSpace(query) || query.Length < 2)
-            {
-                sender.ItemsSource = null;
-                return;
-            }
-
-            _suggestionCts?.Cancel();
-            _suggestionCts = new CancellationTokenSource();
-            var token = _suggestionCts.Token;
-
-            try
-            {
-                await Task.Delay(300, token);
-                string url =
-                    $"{AppSettings.ApiEndpoint}?action=opensearch&format=json&limit=10&search={Uri.EscapeDataString(query)}";
-
-                string json = await ApiWorker.GetJsonFromApiAsync(url);
-
-                if (token.IsCancellationRequested)
-                    return;
-
-                if (string.IsNullOrEmpty(json))
-                {
-                    sender.ItemsSource = null;
-                    return;
-                }
-
-                JArray root = JArray.Parse(json);
-
-                if (root.Count > 1 && root[1] is JArray suggestionsArray)
-                {
-                    var suggestions = suggestionsArray.ToObject<List<string>>();
-                    sender.ItemsSource = suggestions;
-                }
-                else
-                {
-                    sender.ItemsSource = null;
-                }
-            }
-            catch (TaskCanceledException) { }
-            catch (NeedsUserVerificationException)
-            {
-                sender.ItemsSource = null;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Suggestion fetch failed: {ex.Message}");
-                sender.ItemsSource = null;
-            }
-        }
-
-        private void ContentFrame_Navigated(object sender, NavigationEventArgs e)
-        {
-            bool canGoBackInArticlePage =
-                (ContentFrame.Content as ArticleViewerPage)?.CanGoBackInPage ?? false;
-            NavView.IsBackEnabled = ContentFrame.CanGoBack || canGoBackInArticlePage;
-            SystemNavigationManager.GetForCurrentView().AppViewBackButtonVisibility =
-                NavView.IsBackEnabled
-                    ? AppViewBackButtonVisibility.Visible
-                    : AppViewBackButtonVisibility.Collapsed;
-
-            if (e.SourcePageType == typeof(SettingsPage))
-            {
-                NavView.SelectedItem = NavView.SettingsItem;
-                return;
-            }
-
-            string targetTag = null;
-            if (e.SourcePageType == typeof(FavouritesPage))
-            {
-                targetTag = "favourites";
-            }
-            else if (e.SourcePageType == typeof(LoginPage))
-            {
-                targetTag = "login";
-            }
-            else if (
-                e.SourcePageType == typeof(ArticleViewerPage)
-                && e.Parameter is string pageParameter
-            )
-            {
-                if (pageParameter.Equals(AppSettings.MainPageName, StringComparison.OrdinalIgnoreCase))
-                {
-                    targetTag = "home";
-                }
-                else if (pageParameter.Equals("random", StringComparison.OrdinalIgnoreCase))
-                {
-                    targetTag = "random";
-                }
-                else if (
-                    pageParameter.Equals(
-                        $"User:{AuthService.Username}",
-                        StringComparison.OrdinalIgnoreCase
-                    )
-                )
-                {
-                    targetTag = "userpage";
-                }
-            }
-
-            NavView.SelectedItem = NavView
-                .MenuItems.OfType<muxc.NavigationViewItem>()
-                .FirstOrDefault(item => string.Equals(item.Tag as string, targetTag));
-        }
-
-        private void NavView_BackRequested(
-            muxc.NavigationView sender,
-            muxc.NavigationViewBackRequestedEventArgs args
-        )
-        {
-            TryGoBack();
-        }
-
-        private void System_BackRequested(object sender, BackRequestedEventArgs e)
-        {
-            if (!e.Handled)
-            {
-                e.Handled = TryGoBack();
-            }
-        }
-
-        private bool TryGoBack()
-        {
-            if (ContentFrame.Content is ArticleViewerPage articlePage && articlePage.GoBackInPage())
-            {
-                NavView.IsBackEnabled = ContentFrame.CanGoBack || articlePage.CanGoBackInPage;
-                return true;
-            }
-
-            if (ContentFrame.CanGoBack)
-            {
-                ContentFrame.GoBack();
-                return true;
-            }
-
-            return false;
         }
     }
 }

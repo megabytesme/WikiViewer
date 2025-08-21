@@ -1,22 +1,18 @@
-﻿<Page
-    x:Class="_1703_UWP.CreateAccountPage"
+﻿<local:CreateAccountPageBase
+    x:Class="_1703_UWP.Pages.CreateAccountPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:WikiViewer.Shared.Uwp.Pages"
     Background="Transparent">
-
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <Grid>
             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Width="360" Padding="0,24">
                 <TextBlock x:Name="PageTitle" Text="Create Account" Style="{ThemeResource TitleTextBlockStyle}" HorizontalAlignment="Center"/>
-
                 <StackPanel x:Name="FieldsPanel" />
-
                 <Button x:Name="CreateButton" Content="Create Account" HorizontalAlignment="Stretch" Click="CreateButton_Click" Margin="0,12,0,0"/>
                 <ProgressRing x:Name="LoadingRing" IsActive="False"/>
-
-                <WebView x:Name="ErrorWebView" Height="150" Visibility="Collapsed"/>
-
+                <WebView x:Name="ErrorWebView" Height="150" Visibility="Collapsed" DefaultBackgroundColor="Transparent"/>
             </StackPanel>
         </Grid>
     </ScrollViewer>
-</Page>
+</local:CreateAccountPageBase>

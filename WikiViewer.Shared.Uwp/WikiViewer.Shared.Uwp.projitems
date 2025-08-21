@@ -1,0 +1,33 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <MSBuildAllProjects Condition="'$(MSBuildVersion)' == '' Or '$(MSBuildVersion)' &lt; '16.0'">$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <SharedGUID>8bb51741-66a8-4f1b-9257-013806b5d9cf</SharedGUID>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration">
+    <Import_RootNamespace>WikiViewer.Shared.Uwp</Import_RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)Pages\AppBase.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Converters\BooleanToVisibilityConverter.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Converters\StringUrlToImageSourceConverter.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Managers\ArticleCacheManager.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)pages\ArticleViewerPageBase.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)pages\CreateAccountPageBase.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)pages\EditPageBase.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)pages\FavouritesPageBase.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Pages\LoginPageBase.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)pages\MainPageBase.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)pages\SettingsPageBase.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)services\BackgroundCacheService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)services\CredentialService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)services\DispatcherTaskExtensions.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)services\ReviewRequestService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)services\UwpSettingsProvider.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)services\VisualTreeHelpers.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="$(MSBuildThisFileDirectory)Services\" />
+  </ItemGroup>
+</Project>
