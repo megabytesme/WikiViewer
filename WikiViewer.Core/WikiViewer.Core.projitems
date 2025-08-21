@@ -17,6 +17,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Repositories\AppSettings.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\ArticleProcessingService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\AuthService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)services\CloudflareDetector.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\FavouritesService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)services\HttpClientApiWorker.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\WikiPathDetectorService.cs" />

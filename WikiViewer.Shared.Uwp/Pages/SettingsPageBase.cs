@@ -123,15 +123,13 @@ namespace WikiViewer.Shared.Uwp.Pages
             IApiWorker tempWorker = null;
             try
             {
-                tempWorker =
-                    AppSettings.ConnectionBackend == ConnectionMethod.HttpClientProxy
-                        ? (IApiWorker)new HttpClientApiWorker()
-                        : CreateWebViewApiWorker();
+                tempWorker = CreateWebViewApiWorker();
                 await tempWorker.InitializeAsync(urlToDetect);
                 var detectedPaths = await WikiPathDetectorService.DetectPathsAsync(
                     urlToDetect,
                     tempWorker
                 );
+
                 if (detectedPaths.WasDetectedSuccessfully)
                 {
                     ScriptPathTextBox.Text = detectedPaths.ScriptPath;
@@ -151,17 +149,16 @@ namespace WikiViewer.Shared.Uwp.Pages
             catch (NeedsUserVerificationException ex)
             {
                 LoadingOverlayGrid.Visibility = Visibility.Collapsed;
-                if (AppSettings.ConnectionBackend == ConnectionMethod.HttpClientProxy)
-                {
-                    DetectionStatusTextBlock.Text =
-                        "Proxy failed to resolve the security challenge for this URL. Please try again or check the URL.";
-                    DetectionStatusTextBlock.Foreground = new SolidColorBrush(Colors.Red);
-                    DetectionStatusTextBlock.Visibility = Visibility.Visible;
-                }
-                else
-                {
+
+#if UWP_1809
                     ShowVerificationPanel(ex.Url);
-                }
+#else
+                DetectionStatusTextBlock.Text =
+                    "Detection failed because the site is protected by Cloudflare. " +
+                    "Please switch to the 'Proxy' connection backend in the settings below and try again.";
+                DetectionStatusTextBlock.Foreground = new SolidColorBrush(Colors.Orange);
+                DetectionStatusTextBlock.Visibility = Visibility.Visible;
+#endif
             }
             catch (Exception ex)
             {

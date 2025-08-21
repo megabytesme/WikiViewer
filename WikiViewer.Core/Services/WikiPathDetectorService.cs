@@ -34,6 +34,15 @@ namespace WikiViewer.Core.Services
                     return new WikiPaths();
                 }
 
+                if (CloudflareDetector.IsCloudflareChallenge(mainPageHtml))
+                {
+                    Debug.WriteLine($"[PathDetector] Cloudflare challenge detected for {baseUrl}.");
+                    throw new NeedsUserVerificationException(
+                        "Cloudflare challenge detected.",
+                        baseUrl
+                    );
+                }
+
                 var doc = new HtmlDocument();
                 doc.LoadHtml(mainPageHtml);
 
