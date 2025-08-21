@@ -127,6 +127,8 @@ namespace WikiViewer.Core.Models
     {
         public string status { get; set; }
         public string username { get; set; }
+        [JsonProperty("requests")]
+        public List<AuthRequest> Requests { get; set; }
     }
 
     public class CsrfTokenResponse
@@ -329,6 +331,17 @@ namespace WikiViewer.Core.Models
         public ArticleCachedEventArgs(string pageTitle)
         {
             PageTitle = pageTitle;
+        }
+    }
+
+    public class AuthUiRequiredException : Exception
+    {
+        public ClientLoginResult LoginResult { get; }
+
+        public AuthUiRequiredException(ClientLoginResult result)
+            : base("Interactive UI is required to complete login.")
+        {
+            LoginResult = result;
         }
     }
 }

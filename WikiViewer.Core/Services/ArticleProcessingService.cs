@@ -270,9 +270,11 @@ namespace WikiViewer.Core.Services
         {
             if (!Uri.TryCreate(new Uri(AppSettings.BaseUrl), originalUrl, out Uri mediaUrl))
                 return null;
+
             var extension = Path.GetExtension(mediaUrl.AbsolutePath).ToLowerInvariant();
             if (string.IsNullOrEmpty(extension))
                 extension = ".dat";
+
             var hash = System
                 .Security.Cryptography.SHA1.Create()
                 .ComputeHash(System.Text.Encoding.UTF8.GetBytes(mediaUrl.AbsoluteUri));
@@ -283,8 +285,10 @@ namespace WikiViewer.Core.Services
                 CreationCollisionOption.OpenIfExists
             );
             var relativePath = $"/cache/{finalFileName}";
+
             if (await cacheFolder.TryGetItemAsync(finalFileName) is StorageFile)
                 return relativePath;
+
             byte[] mediaBytes = null;
             try
             {
@@ -292,11 +296,15 @@ namespace WikiViewer.Core.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[MediaDownloader] Download FAILED for {mediaUrl}: {ex.Message}");
+                Debug.WriteLine(
+                    $"[MediaDownloader] Non-critical download FAILED for {mediaUrl}: {ex.Message}"
+                );
                 return null;
             }
+
             if (mediaBytes == null || mediaBytes.Length == 0)
                 return null;
+
             try
             {
                 StorageFile newFile = await cacheFolder.CreateFileAsync(

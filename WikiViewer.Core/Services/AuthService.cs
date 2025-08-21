@@ -88,10 +88,6 @@ namespace WikiViewer.Core.Services
                 $"{AppSettings.ApiEndpoint}?action=query&meta=tokens&type=login&format=json&_={DateTime.Now.Ticks}"
             );
             string tokenJson = ExtractJsonFromHtmlWrapper(rawTokenResponse);
-            if (string.IsNullOrEmpty(tokenJson))
-                throw new Exception(
-                    "Could not get a valid response for login token (response was null or empty)."
-                );
             LoginApiTokenResponse tokenResponse;
             try
             {
@@ -141,6 +137,14 @@ namespace WikiViewer.Core.Services
                     ex
                 );
             }
+
+            if (resultResponse?.clientlogin?.status == "UI")
+            {
+                _authenticatedWorker?.Dispose();
+                _authenticatedWorker = null;
+                throw new AuthUiRequiredException(resultResponse.clientlogin);
+            }
+
             if (resultResponse?.clientlogin?.status != "PASS")
             {
                 _authenticatedWorker?.Dispose();
@@ -149,6 +153,49 @@ namespace WikiViewer.Core.Services
                     $"Login failed: {resultResponse?.clientlogin?.status ?? "Unknown API response"}"
                 );
             }
+            IsLoggedIn = true;
+            Username = resultResponse.clientlogin.username;
+            await SyncAndMergeFavouritesOnLogin(_authenticatedWorker);
+            AuthenticationStateChanged?.Invoke(null, EventArgs.Empty);
+        }
+
+        public static async Task ContinueLoginAsync(Dictionary<string, string> fieldData)
+        {
+            _authenticatedWorker = await CreateAndInitApiWorker();
+
+            string rawTokenResponse = await _authenticatedWorker.GetJsonFromApiAsync(
+                $"{AppSettings.ApiEndpoint}?action=query&meta=tokens&type=login&format=json&_={DateTime.Now.Ticks}"
+            );
+            string tokenJson = ExtractJsonFromHtmlWrapper(rawTokenResponse);
+            var tokenResponse = JsonConvert.DeserializeObject<LoginApiTokenResponse>(tokenJson);
+            string loginToken = tokenResponse?.query?.tokens?.logintoken;
+
+            var continuePostData = new Dictionary<string, string>(fieldData)
+            {
+                { "action", "clientlogin" },
+                { "format", "json" },
+                { "logincontinue", "1" },
+                { "logintoken", loginToken },
+            };
+
+            string resultJson = await _authenticatedWorker.PostAndGetJsonFromApiAsync(
+                AppSettings.ApiEndpoint,
+                continuePostData
+            );
+
+            var resultResponse = JsonConvert.DeserializeObject<ClientLoginResponse>(
+                ExtractJsonFromHtmlWrapper(resultJson)
+            );
+
+            if (resultResponse?.clientlogin?.status != "PASS")
+            {
+                _authenticatedWorker?.Dispose();
+                _authenticatedWorker = null;
+                throw new Exception(
+                    $"Login failed: {resultResponse?.clientlogin?.status ?? "Unknown API response"}"
+                );
+            }
+
             IsLoggedIn = true;
             Username = resultResponse.clientlogin.username;
             await SyncAndMergeFavouritesOnLogin(_authenticatedWorker);
@@ -466,6 +513,17 @@ namespace WikiViewer.Core.Services
                     throw new Exception("Received an invalid response from the server.");
                 return result.CreateAccount;
             }
+        }
+
+        public static async Task ReinitializeAfterInteractiveLoginAsync(
+            string username,
+            string password
+        )
+        {
+            _authenticatedWorker?.Dispose();
+            _authenticatedWorker = null;
+
+            await PerformLoginAsync(username, password);
         }
     }
 }

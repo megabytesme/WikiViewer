@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using WikiViewer.Core;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
@@ -19,6 +20,11 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected abstract ProgressRing LoadingProgressRing { get; }
         protected abstract TextBlock ErrorTextBlockControl { get; }
         protected abstract Type GetCreateAccountPageType();
+        protected abstract Task ShowInteractiveLoginAsync(
+            ClientLoginResult loginResult,
+            string username,
+            string password
+        );
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
@@ -51,6 +57,11 @@ namespace WikiViewer.Shared.Uwp.Pages
                     CredentialService.ClearCredentials();
                 if (this.Frame.CanGoBack)
                     this.Frame.GoBack();
+            }
+            catch (AuthUiRequiredException ex)
+            {
+                ErrorTextBlockControl.Text = "An additional verification step is required.";
+                await ShowInteractiveLoginAsync(ex.LoginResult, username, password);
             }
             catch (NeedsUserVerificationException)
             {

@@ -3,9 +3,10 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:WikiViewer.Shared.Uwp.Pages"
-    Background="Transparent">
+    xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
     <Grid>
-        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Width="320" Spacing="12">
+        <StackPanel x:Name="LoginFormPanel" VerticalAlignment="Center" HorizontalAlignment="Center" Width="320" Spacing="12">
             <TextBlock x:Name="LoginTitle" Text="Log In" Style="{ThemeResource TitleTextBlockStyle}" HorizontalAlignment="Center"/>
             <TextBox x:Name="UsernameBox" Header="Username" AutomationProperties.Name="Username"/>
             <PasswordBox x:Name="PasswordBox" Header="Password" AutomationProperties.Name="Password"/>
@@ -18,5 +19,17 @@
             <ProgressRing x:Name="LoadingRing" IsActive="False"/>
             <TextBlock x:Name="ErrorTextBlock" Foreground="Red" TextWrapping="Wrap"/>
         </StackPanel>
+
+        <Grid x:Name="InteractiveLoginPanel" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Visibility="Collapsed">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <StackPanel Margin="12" Spacing="8">
+                <TextBlock Text="Additional step required" Style="{ThemeResource TitleTextBlockStyle}"/>
+                <TextBlock Text="Please complete the login process below. The app will continue automatically when you are successfully logged in." Style="{ThemeResource BodyTextBlockStyle}" TextWrapping="Wrap"/>
+            </StackPanel>
+            <muxc:WebView2 x:Name="InteractiveWebView" Grid.Row="1" />
+        </Grid>
     </Grid>
 </local:LoginPageBase>
