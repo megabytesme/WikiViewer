@@ -15,6 +15,7 @@ namespace _1703_UWP.Pages
         protected override ScrollViewer GridViewScrollViewerControl => GridViewScrollViewer;
         protected override ScrollViewer ListViewScrollViewerControl => ListViewScrollViewer;
         protected override AppBarButton ViewToggleButtonControl => ViewToggleButton;
+        protected override AppBarButton DeleteButtonControl => DeleteButton;
 
         protected override Type GetArticleViewerPageType() => typeof(ArticleViewerPage);
 

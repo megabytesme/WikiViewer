@@ -26,6 +26,7 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected abstract ScrollViewer GridViewScrollViewerControl { get; }
         protected abstract ScrollViewer ListViewScrollViewerControl { get; }
         protected abstract AppBarButton ViewToggleButtonControl { get; }
+        protected abstract AppBarButton DeleteButtonControl { get; }
 
         protected abstract GridView FavouritesGridViewControl { get; }
         protected abstract TextBlock NoFavouritesTextBlock { get; }
@@ -273,31 +274,27 @@ namespace WikiViewer.Shared.Uwp.Pages
         {
             var gridSelectionCount = FavouritesGridViewControl.SelectedItems.Count;
             var listSelectionCount = FavouritesListViewControl.SelectedItems.Count;
-            BottomCommandBar.Visibility =
-                (gridSelectionCount > 0 || listSelectionCount > 0)
-                    ? Visibility.Visible
-                    : Visibility.Collapsed;
+
+            DeleteButtonControl.Visibility = (gridSelectionCount > 0 || listSelectionCount > 0) ? Visibility.Visible : Visibility.Collapsed;
         }
 
         protected async void DeleteButton_Click(object sender, RoutedEventArgs e)
         {
-            var itemsToDelete = (
-                _isGridView
-                    ? FavouritesGridViewControl.SelectedItems
-                    : FavouritesListViewControl.SelectedItems
-            )
-                .Cast<FavouriteItem>()
-                .ToList();
+            var itemsToDelete = (_isGridView ? FavouritesGridViewControl.SelectedItems : FavouritesListViewControl.SelectedItems)
+                                .Cast<FavouriteItem>().ToList();
+
             var titlesToRemove = new HashSet<string>();
             foreach (var item in itemsToDelete)
             {
-                if (item.IsArticleAvailable)
-                    titlesToRemove.Add(item.ArticlePageTitle);
-                else if (item.IsTalkAvailable)
-                    titlesToRemove.Add(item.TalkPageTitle);
+                if (item.IsArticleAvailable) titlesToRemove.Add(item.ArticlePageTitle);
+                if (item.IsTalkAvailable) titlesToRemove.Add(item.TalkPageTitle);
             }
+
             foreach (var title in titlesToRemove)
+            {
                 await FavouritesService.RemoveFavoriteAsync(title);
+            }
+
             FavouritesGridViewControl.SelectedItem = null;
             FavouritesListViewControl.SelectedItem = null;
         }
@@ -310,14 +307,14 @@ namespace WikiViewer.Shared.Uwp.Pages
                 GridViewScrollViewerControl.Visibility = Visibility.Visible;
                 ListViewScrollViewerControl.Visibility = Visibility.Collapsed;
                 ViewToggleButtonControl.Icon = new SymbolIcon(Symbol.List);
-                ViewToggleButtonControl.Label = "Switch to List View";
+                ViewToggleButtonControl.Label = "List View";
             }
             else
             {
                 GridViewScrollViewerControl.Visibility = Visibility.Collapsed;
                 ListViewScrollViewerControl.Visibility = Visibility.Visible;
                 ViewToggleButtonControl.Icon = new SymbolIcon(Symbol.ViewAll);
-                ViewToggleButtonControl.Label = "Switch to Grid View";
+                ViewToggleButtonControl.Label = "Grid View";
             }
         }
     }
