@@ -11,24 +11,33 @@ using WikiViewer.Shared.Uwp.Managers;
 using WikiViewer.Shared.Uwp.Services;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Data;
 using Windows.UI.Xaml.Navigation;
 
 namespace WikiViewer.Shared.Uwp.Pages
 {
+    public class FavouriteGroup
+    {
+        public WikiInstance Wiki { get; set; }
+        public ObservableCollection<FavouriteItem> Favourites { get; set; }
+    }
+
     public abstract class FavouritesPageBase : Page
     {
         private static bool _isCachingInProgress = false;
-        private readonly ObservableCollection<FavouriteItem> _favouritesCollection =
+        private readonly ObservableCollection<FavouriteItem> _unifiedFavourites =
             new ObservableCollection<FavouriteItem>();
         private bool _isGridView = true;
-        protected abstract ListView FavouritesListViewControl { get; }
-        protected abstract ScrollViewer GridViewScrollViewerControl { get; }
-        protected abstract ScrollViewer ListViewScrollViewerControl { get; }
-        protected abstract AppBarButton ViewToggleButtonControl { get; }
-        protected abstract AppBarButton DeleteButtonControl { get; }
-        protected abstract GridView FavouritesGridViewControl { get; }
+
+        protected abstract ListView FavouritesListView { get; }
+        protected abstract GridView FavouritesGridView { get; }
         protected abstract TextBlock NoFavouritesTextBlock { get; }
         protected abstract CommandBar BottomCommandBar { get; }
+        protected abstract ScrollViewer GridViewScrollViewer { get; }
+        protected abstract ScrollViewer ListViewScrollViewer { get; }
+        protected abstract AppBarButton ViewToggleButton { get; }
+        protected abstract AppBarButton DeleteButton { get; }
+        protected abstract Grid LoadingOverlay { get; }
         protected abstract void ShowLoadingOverlay();
         protected abstract void HideLoadingOverlay();
         protected abstract Type GetArticleViewerPageType();
@@ -43,9 +52,11 @@ namespace WikiViewer.Shared.Uwp.Pages
         {
             FavouritesService.FavouritesChanged += OnFavouritesChanged;
             BackgroundCacheService.ArticleCached += OnArticleCached;
-            FavouritesGridViewControl.ItemsSource = _favouritesCollection;
-            FavouritesListViewControl.ItemsSource = _favouritesCollection;
-            LoadFavourites();
+
+            FavouritesGridView.ItemsSource = _unifiedFavourites;
+            FavouritesListView.ItemsSource = _unifiedFavourites;
+
+            LoadAllFavourites();
             _ = CheckAndStartCachingFavouritesAsync();
         }
 
@@ -63,34 +74,29 @@ namespace WikiViewer.Shared.Uwp.Pages
             try
             {
                 _isCachingInProgress = true;
-                var allFavouriteArticles = FavouritesService
-                    .GetFavourites(SessionManager.CurrentWiki.Id)
-                    .Where(t => !t.StartsWith("Talk:") && !t.StartsWith("User talk:"))
-                    .ToList();
-                if (!allFavouriteArticles.Any())
-                    return;
-
-                var checkTasks = allFavouriteArticles.Select(async title => new
+                var articlesToCache = new Dictionary<string, WikiInstance>();
+                foreach (var item in _unifiedFavourites)
                 {
-                    Title = title,
-                    IsCached = await ArticleCacheManager.GetCacheMetadataAsync(title) != null,
-                });
-                var cacheStatusResults = await Task.WhenAll(checkTasks);
-                var titlesToCache = cacheStatusResults
-                    .Where(r => !r.IsCached)
-                    .Select(r => r.Title)
-                    .ToList();
-
-                if (titlesToCache.Any())
-                {
-                    await BackgroundCacheService.CacheFavouritesAsync(titlesToCache);
+                    if (!string.IsNullOrEmpty(item.ArticlePageTitle))
+                    {
+                        if (
+                            !await ArticleCacheManager.IsArticleCachedAsync(
+                                item.ArticlePageTitle,
+                                item.WikiId
+                            )
+                        )
+                        {
+                            articlesToCache[item.ArticlePageTitle] = WikiManager.GetWikiById(
+                                item.WikiId
+                            );
+                        }
+                    }
                 }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine(
-                    $"[FAV PAGE] An error occurred during background cache check: {ex.Message}"
-                );
+
+                if (articlesToCache.Any())
+                {
+                    await BackgroundCacheService.CacheArticlesAsync(articlesToCache);
+                }
             }
             finally
             {
@@ -100,16 +106,22 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         private async void OnArticleCached(object sender, ArticleCachedEventArgs e)
         {
-            var itemToUpdate = _favouritesCollection.FirstOrDefault(item =>
+            var itemToUpdate = _unifiedFavourites.FirstOrDefault(item =>
                 item.ArticlePageTitle == e.PageTitle
             );
             if (itemToUpdate != null)
-                await FindAndSetLeadImage(itemToUpdate);
+            {
+                var wiki = WikiManager.GetWikiById(itemToUpdate.WikiId);
+                await FindAndSetLeadImage(itemToUpdate, wiki);
+            }
         }
 
         private void OnFavouritesChanged(object sender, EventArgs e)
         {
-            _ = Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, LoadFavourites);
+            _ = Dispatcher.RunAsync(
+                Windows.UI.Core.CoreDispatcherPriority.Normal,
+                LoadAllFavourites
+            );
         }
 
         private string GetBaseTitle(string fullTitle)
@@ -123,53 +135,69 @@ namespace WikiViewer.Shared.Uwp.Pages
             return fullTitle;
         }
 
-        private void LoadFavourites()
+        private void LoadAllFavourites()
         {
-            _favouritesCollection.Clear();
-            var rawFavourites = FavouritesService.GetFavourites(SessionManager.CurrentWiki.Id);
-            if (rawFavourites.Any())
+            _unifiedFavourites.Clear();
+            var allWikis = WikiManager.GetWikis();
+            var tempList = new List<FavouriteItem>();
+
+            foreach (var wiki in allWikis)
             {
+                var rawFavourites = FavouritesService.GetFavourites(wiki.Id);
+                if (!rawFavourites.Any())
+                    continue;
+
                 var groupedFavourites = new Dictionary<string, FavouriteItem>();
                 foreach (var title in rawFavourites)
                 {
                     string baseTitle = GetBaseTitle(title);
                     if (!groupedFavourites.ContainsKey(baseTitle))
-                        groupedFavourites[baseTitle] = new FavouriteItem(baseTitle);
+                    {
+                        groupedFavourites[baseTitle] = new FavouriteItem(baseTitle)
+                        {
+                            WikiId = wiki.Id,
+                            WikiName = wiki.Name,
+                        };
+                    }
                     if (title.StartsWith("Talk:") || title.StartsWith("User talk:"))
                         groupedFavourites[baseTitle].TalkPageTitle = title;
                     else
                         groupedFavourites[baseTitle].ArticlePageTitle = title;
                 }
-                foreach (var item in groupedFavourites.Values.OrderBy(i => i.DisplayTitle))
-                {
-                    _favouritesCollection.Add(item);
-                    _ = FindAndSetLeadImage(item);
-                }
-                FavouritesGridViewControl.Visibility = Visibility.Visible;
-                NoFavouritesTextBlock.Visibility = Visibility.Collapsed;
+                tempList.AddRange(groupedFavourites.Values);
             }
-            else
+
+            foreach (var item in tempList.OrderBy(i => i.DisplayTitle))
             {
-                FavouritesGridViewControl.Visibility = Visibility.Collapsed;
-                NoFavouritesTextBlock.Visibility = Visibility.Visible;
-                NoFavouritesTextBlock.Text = SessionManager.IsLoggedIn
-                    ? "Your watchlist is empty."
-                    : "You haven't added any Favourites yet.";
+                _unifiedFavourites.Add(item);
+                var wiki = WikiManager.GetWikiById(item.WikiId);
+                _ = FindAndSetLeadImage(item, wiki);
+            }
+
+            NoFavouritesTextBlock.Visibility = _unifiedFavourites.Any()
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+            if (!_unifiedFavourites.Any())
+            {
+                NoFavouritesTextBlock.Text =
+                    "You haven't added any Favourites yet across any of your wikis.";
             }
         }
 
-        private async Task FindAndSetLeadImage(FavouriteItem item)
+        private async Task FindAndSetLeadImage(FavouriteItem item, WikiInstance wiki)
         {
             item.ImageUrl = "ms-appx:///Assets/Square150x150Logo.png";
-            if (string.IsNullOrEmpty(item.ArticlePageTitle))
+            if (wiki == null || string.IsNullOrEmpty(item.ArticlePageTitle))
                 return;
+
             string cachedHtml = await ArticleCacheManager.GetCachedArticleHtmlAsync(
-                item.ArticlePageTitle
+                item.ArticlePageTitle,
+                wiki.Id
             );
             if (string.IsNullOrEmpty(cachedHtml))
                 return;
 
-            var doc = new HtmlDocument();
+            var doc = new HtmlAgilityPack.HtmlDocument();
             doc.LoadHtml(cachedHtml);
             var firstImageNode = doc.DocumentNode.SelectSingleNode("//img[@src]");
             if (firstImageNode != null)
@@ -177,25 +205,25 @@ namespace WikiViewer.Shared.Uwp.Pages
                 string src = firstImageNode.GetAttributeValue("src", "");
                 if (!string.IsNullOrEmpty(src))
                 {
-                    if (!src.StartsWith("/"))
-                        item.ImageUrl = $"ms-appdata:///local/cache/{src}";
-                    else
-                        item.ImageUrl = $"ms-appdata:///local{src}";
+                    item.ImageUrl = src.StartsWith("/")
+                        ? $"ms-appdata:///local{src}"
+                        : $"ms-appdata:///local/cache/{src}";
                 }
             }
         }
 
-        protected async void NavigateToArticleIfItExists(string pageTitle)
+        protected async void NavigateToArticleIfItExists(string pageTitle, WikiInstance wiki)
         {
             ShowLoadingOverlay();
             try
             {
-                bool pageExists = await ArticleProcessingService.PageExistsAsync(
-                    pageTitle,
-                    SessionManager.CurrentApiWorker
-                );
+                var worker = App.ApiWorkerFactory.CreateApiWorker(wiki.PreferredConnectionMethod);
+                await worker.InitializeAsync(wiki.BaseUrl);
+                bool pageExists = await ArticleProcessingService.PageExistsAsync(pageTitle, worker);
+
                 if (pageExists)
                 {
+                    SessionManager.SetCurrentWiki(wiki);
                     App.Navigate(GetArticleViewerPageType(), pageTitle);
                 }
                 else
@@ -211,12 +239,17 @@ namespace WikiViewer.Shared.Uwp.Pages
                     var result = await dialog.ShowAsync();
                     if (result == ContentDialogResult.Primary)
                     {
-                        if (!SessionManager.IsLoggedIn)
+                        SessionManager.SetCurrentWiki(wiki);
+                        var accountForWiki = AccountManager
+                            .GetAccountsForWiki(wiki.Id)
+                            .FirstOrDefault(a => a.IsLoggedIn);
+                        if (accountForWiki == null)
                         {
                             await new ContentDialog
                             {
                                 Title = "Login Required",
-                                Content = "You must be logged in to create or edit pages.",
+                                Content =
+                                    "You must be logged in to create or edit pages on this wiki.",
                                 CloseButtonText = "OK",
                             }.ShowAsync();
                         }
@@ -245,14 +278,31 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         protected void ArticleButton_Click(object sender, RoutedEventArgs e)
         {
-            if ((sender as FrameworkElement)?.Tag is FavouriteItem item && item.IsArticleAvailable)
-                NavigateToArticleIfItExists(item.ArticlePageTitle);
+            if ((sender as FrameworkElement)?.DataContext is FavouriteItem item)
+            {
+                var wiki = WikiManager.GetWikiById(item.WikiId);
+                if (wiki != null && item.IsArticleAvailable)
+                {
+                    NavigateToArticleIfItExists(item.ArticlePageTitle, wiki);
+                }
+            }
         }
 
         protected void TalkButton_Click(object sender, RoutedEventArgs e)
         {
-            if ((sender as FrameworkElement)?.Tag is FavouriteItem item && item.IsTalkAvailable)
-                NavigateToArticleIfItExists(item.TalkPageTitle);
+            if ((sender as FrameworkElement)?.DataContext is FavouriteItem item)
+            {
+                var wiki = WikiManager.GetWikiById(item.WikiId);
+                if (wiki != null && item.IsTalkAvailable)
+                {
+                    NavigateToArticleIfItExists(item.TalkPageTitle, wiki);
+                }
+            }
+        }
+
+        private FavouriteItem FindItemFromDataContext(object dataContext)
+        {
+            return dataContext as FavouriteItem;
         }
 
         protected void FavouritesGridView_SelectionChanged(
@@ -267,10 +317,11 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         private void UpdateSelection()
         {
-            var gridSelectionCount = FavouritesGridViewControl.SelectedItems.Count;
-            var listSelectionCount = FavouritesListViewControl.SelectedItems.Count;
-            DeleteButtonControl.Visibility =
-                (gridSelectionCount > 0 || listSelectionCount > 0)
+            DeleteButton.Visibility =
+                (
+                    FavouritesGridView.SelectedItems.Any()
+                    || FavouritesListView.SelectedItems.Any()
+                )
                     ? Visibility.Visible
                     : Visibility.Collapsed;
         }
@@ -279,51 +330,57 @@ namespace WikiViewer.Shared.Uwp.Pages
         {
             var itemsToDelete = (
                 _isGridView
-                    ? FavouritesGridViewControl.SelectedItems
-                    : FavouritesListViewControl.SelectedItems
+                    ? FavouritesGridView.SelectedItems
+                    : FavouritesListView.SelectedItems
             )
                 .Cast<FavouriteItem>()
                 .ToList();
+            var itemsByWiki = itemsToDelete.GroupBy(item => item.WikiId);
 
-            var authService = SessionManager.IsLoggedIn
-                ? new AuthenticationService(
-                    SessionManager.CurrentAccount,
-                    SessionManager.CurrentWiki,
-                    App.ApiWorkerFactory
-                )
-                : null;
-
-            foreach (var item in itemsToDelete)
+            foreach (var group in itemsByWiki)
             {
-                if (item.IsArticleAvailable)
-                    await FavouritesService.RemoveFavoriteAsync(
-                        item.ArticlePageTitle,
-                        SessionManager.CurrentWiki.Id,
+                var wikiId = group.Key;
+                var wiki = WikiManager.GetWikiById(wikiId);
+                var account = AccountManager
+                    .GetAccountsForWiki(wikiId)
+                    .FirstOrDefault(a => a.IsLoggedIn);
+                var authService =
+                    (account != null)
+                        ? new AuthenticationService(account, wiki, App.ApiWorkerFactory)
+                        : null;
+
+                var titlesToRemove = group
+                    .Select(item => item.ArticlePageTitle)
+                    .Where(t => !string.IsNullOrEmpty(t))
+                    .ToList();
+
+                if (titlesToRemove.Any())
+                {
+                    await FavouritesService.RemoveMultipleFavoritesAsync(
+                        titlesToRemove,
+                        wikiId,
                         authService
                     );
+                }
             }
 
-            FavouritesGridViewControl.SelectedItem = null;
-            FavouritesListViewControl.SelectedItem = null;
+            FavouritesGridView.SelectedItem = null;
+            FavouritesListView.SelectedItem = null;
         }
 
         protected void ViewToggleButton_Click(object sender, RoutedEventArgs e)
         {
             _isGridView = !_isGridView;
-            if (_isGridView)
-            {
-                GridViewScrollViewerControl.Visibility = Visibility.Visible;
-                ListViewScrollViewerControl.Visibility = Visibility.Collapsed;
-                ViewToggleButtonControl.Icon = new SymbolIcon(Symbol.List);
-                ViewToggleButtonControl.Label = "List View";
-            }
-            else
-            {
-                GridViewScrollViewerControl.Visibility = Visibility.Collapsed;
-                ListViewScrollViewerControl.Visibility = Visibility.Visible;
-                ViewToggleButtonControl.Icon = new SymbolIcon(Symbol.ViewAll);
-                ViewToggleButtonControl.Label = "Grid View";
-            }
+            GridViewScrollViewer.Visibility = _isGridView
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            ListViewScrollViewer.Visibility = _isGridView
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+            ViewToggleButton.Icon = new SymbolIcon(
+                _isGridView ? Symbol.List : Symbol.ViewAll
+            );
+            ViewToggleButton.Label = _isGridView ? "List View" : "Grid View";
         }
     }
 }

@@ -8,34 +8,36 @@ namespace _1809_UWP.Pages
     {
         public FavouritesPage() => this.InitializeComponent();
 
-        protected override GridView FavouritesGridViewControl => FavouritesGridView;
+        protected override GridView FavouritesGridView => FavouritesGridViewControl;
+        protected override ListView FavouritesListView => FavouritesListViewControl;
         protected override TextBlock NoFavouritesTextBlock => NoFavouritesTextBlockControl;
-        protected override CommandBar BottomCommandBar => PageBottomCommandBar;
-        protected override ListView FavouritesListViewControl => FavouritesListView;
-        protected override ScrollViewer GridViewScrollViewerControl => GridViewScrollViewer;
-        protected override ScrollViewer ListViewScrollViewerControl => ListViewScrollViewer;
-        protected override AppBarButton ViewToggleButtonControl => ViewToggleButton;
-        protected override AppBarButton DeleteButtonControl => DeleteButton;
+        protected override CommandBar BottomCommandBar => BottomCommandBarControl;
+        protected override ScrollViewer GridViewScrollViewer => GridViewScrollViewerControl;
+        protected override ScrollViewer ListViewScrollViewer => ListViewScrollViewerControl;
+        protected override AppBarButton ViewToggleButton => ViewToggleButtonControl;
+        protected override AppBarButton DeleteButton => DeleteButtonControl;
+        protected override Grid LoadingOverlay => LoadingOverlayControl;
 
         protected override Type GetArticleViewerPageType() => typeof(ArticleViewerPage);
-
         protected override Type GetEditPageType() => typeof(EditPage);
 
         protected override void ShowLoadingOverlay()
         {
-            LoadingOverlay.IsHitTestVisible = true;
-            FadeInAnimation.Begin();
+            var animation = this.Resources["FadeInAnimation"] as Windows.UI.Xaml.Media.Animation.Storyboard;
+            LoadingOverlayControl.IsHitTestVisible = true;
+            animation.Begin();
         }
 
         protected override void HideLoadingOverlay()
         {
+            var animation = this.Resources["FadeOutAnimation"] as Windows.UI.Xaml.Media.Animation.Storyboard;
             void onAnimationCompleted(object s, object e)
             {
-                LoadingOverlay.IsHitTestVisible = false;
-                FadeOutAnimation.Completed -= onAnimationCompleted;
+                LoadingOverlayControl.IsHitTestVisible = false;
+                animation.Completed -= onAnimationCompleted;
             }
-            FadeOutAnimation.Completed += onAnimationCompleted;
-            FadeOutAnimation.Begin();
+            animation.Completed += onAnimationCompleted;
+            animation.Begin();
         }
     }
 }

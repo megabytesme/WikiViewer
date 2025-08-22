@@ -127,6 +127,7 @@ namespace WikiViewer.Core.Models
     {
         public string status { get; set; }
         public string username { get; set; }
+
         [JsonProperty("requests")]
         public List<AuthRequest> Requests { get; set; }
     }
@@ -318,11 +319,18 @@ namespace WikiViewer.Core.Models
                 OnPropertyChanged();
             }
         }
+
         public string DisplayTitle { get; set; }
         public string ArticlePageTitle { get; set; }
         public string TalkPageTitle { get; set; }
         public bool IsArticleAvailable => !string.IsNullOrEmpty(ArticlePageTitle);
         public bool IsTalkAvailable => !string.IsNullOrEmpty(TalkPageTitle);
+
+        [JsonIgnore]
+        public Guid WikiId { get; set; }
+
+        [JsonIgnore]
+        public string WikiName { get; set; }
 
         public FavouriteItem(string baseTitle)
         {

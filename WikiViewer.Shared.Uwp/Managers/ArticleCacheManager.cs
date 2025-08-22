@@ -72,22 +72,33 @@ namespace WikiViewer.Shared.Uwp.Managers
             }
         }
 
-        private static string GetHashedFileName(string pageTitle)
+        private static string GetHashedFileName(string pageTitle, Guid wikiId)
         {
-            string sanitizedTitle = string.Join(
+            string uniqueCacheKey = $"{wikiId.ToString()}_{pageTitle.ToLowerInvariant()}";
+            string sanitizedKey = string.Join(
                 "_",
-                pageTitle.Split(Path.GetInvalidFileNameChars())
+                uniqueCacheKey.Split(Path.GetInvalidFileNameChars())
             );
             var hash = System
                 .Security.Cryptography.SHA1.Create()
-                .ComputeHash(Encoding.UTF8.GetBytes(sanitizedTitle.ToLowerInvariant()));
+                .ComputeHash(Encoding.UTF8.GetBytes(sanitizedKey));
             return hash.Aggregate("", (s, b) => s + b.ToString("x2"));
         }
 
-        public static async Task<ArticleCacheItem> GetCacheMetadataAsync(string pageTitle)
+        public static async Task<bool> IsArticleCachedAsync(string pageTitle, Guid wikiId)
         {
             await InitializeAsync();
-            string fileName = GetHashedFileName(pageTitle) + ".json";
+            string fileName = GetHashedFileName(pageTitle, wikiId) + ".html";
+            return await _cacheFolder.TryGetItemAsync(fileName) is StorageFile;
+        }
+
+        public static async Task<ArticleCacheItem> GetCacheMetadataAsync(
+            string pageTitle,
+            Guid wikiId
+        )
+        {
+            await InitializeAsync();
+            string fileName = GetHashedFileName(pageTitle, wikiId) + ".json";
             var item = await _cacheFolder.TryGetItemAsync(fileName);
             if (item is StorageFile file)
             {
@@ -105,10 +116,10 @@ namespace WikiViewer.Shared.Uwp.Managers
             return null;
         }
 
-        public static async Task<string> GetCachedArticleHtmlAsync(string pageTitle)
+        public static async Task<string> GetCachedArticleHtmlAsync(string pageTitle, Guid wikiId)
         {
             await InitializeAsync();
-            string fileName = GetHashedFileName(pageTitle) + ".html";
+            string fileName = GetHashedFileName(pageTitle, wikiId) + ".html";
             var item = await _cacheFolder.TryGetItemAsync(fileName);
             return item is StorageFile file ? await FileIO.ReadTextAsync(file) : null;
         }
@@ -116,11 +127,12 @@ namespace WikiViewer.Shared.Uwp.Managers
         public static async Task SaveArticleToCacheAsync(
             string pageTitle,
             string htmlContent,
-            DateTime lastUpdated
+            DateTime lastUpdated,
+            Guid wikiId
         )
         {
             await InitializeAsync();
-            string baseFileName = GetHashedFileName(pageTitle);
+            string baseFileName = GetHashedFileName(pageTitle, wikiId);
             var metadata = new ArticleCacheItem { Title = pageTitle, LastUpdated = lastUpdated };
             StorageFile metadataFile = await _cacheFolder.CreateFileAsync(
                 baseFileName + ".json",
@@ -134,10 +146,10 @@ namespace WikiViewer.Shared.Uwp.Managers
             await FileIO.WriteTextAsync(htmlFile, htmlContent);
         }
 
-        public static async Task ClearCacheForItemAsync(string pageTitle)
+        public static async Task ClearCacheForItemAsync(string pageTitle, Guid wikiId)
         {
             await InitializeAsync();
-            string baseFileName = GetHashedFileName(pageTitle);
+            string baseFileName = GetHashedFileName(pageTitle, wikiId);
             try
             {
                 if (

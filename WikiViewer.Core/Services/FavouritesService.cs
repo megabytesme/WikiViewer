@@ -1,18 +1,18 @@
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
 using Windows.Storage;
 
 namespace WikiViewer.Core.Services
 {
     public static class FavouritesService
     {
-        private const string FavouritesFileName = "Favourites.json";
-        private const string PendingAddsFileName = "PendingAdds.json";
-        private const string PendingDeletesFileName = "PendingDeletes.json";
+        private const string FavouritesFileName = "favourites_v2.json";
+        private const string PendingAddsFileName = "pending_adds_v2.json";
+        private const string PendingDeletesFileName = "pending_deletes_v2.json";
 
         private static Dictionary<Guid, HashSet<string>> _favouritesByWiki;
         private static Dictionary<Guid, HashSet<string>> _pendingAddsByWiki;
@@ -24,30 +24,22 @@ namespace WikiViewer.Core.Services
 
         public static async Task InitializeAsync()
         {
-            if (_isInitialized)
-                return;
-
+            if (_isInitialized) return;
             _favouritesByWiki = await LoadDictionaryFromFileAsync(FavouritesFileName);
             _pendingAddsByWiki = await LoadDictionaryFromFileAsync(PendingAddsFileName);
             _pendingDeletesByWiki = await LoadDictionaryFromFileAsync(PendingDeletesFileName);
-
             _isInitialized = true;
         }
 
-        private static async Task<Dictionary<Guid, HashSet<string>>> LoadDictionaryFromFileAsync(
-            string fileName
-        )
+        private static async Task<Dictionary<Guid, HashSet<string>>> LoadDictionaryFromFileAsync(string fileName)
         {
             try
             {
-                var file =
-                    await ApplicationData.Current.LocalFolder.TryGetItemAsync(fileName)
-                    as StorageFile;
+                var file = await ApplicationData.Current.LocalFolder.TryGetItemAsync(fileName) as StorageFile;
                 if (file != null)
                 {
                     string json = await FileIO.ReadTextAsync(file);
-                    return JsonConvert.DeserializeObject<Dictionary<Guid, HashSet<string>>>(json)
-                        ?? new Dictionary<Guid, HashSet<string>>();
+                    return JsonConvert.DeserializeObject<Dictionary<Guid, HashSet<string>>>(json) ?? new Dictionary<Guid, HashSet<string>>();
                 }
             }
             catch (Exception ex)
@@ -65,62 +57,42 @@ namespace WikiViewer.Core.Services
             FavouritesChanged?.Invoke(null, EventArgs.Empty);
         }
 
-        private static async Task SaveDictionaryToFileAsync(
-            Dictionary<Guid, HashSet<string>> data,
-            string fileName
-        )
+        private static async Task SaveDictionaryToFileAsync(Dictionary<Guid, HashSet<string>> data, string fileName)
         {
-            var file = await ApplicationData.Current.LocalFolder.CreateFileAsync(
-                fileName,
-                CreationCollisionOption.ReplaceExisting
-            );
+            var file = await ApplicationData.Current.LocalFolder.CreateFileAsync(fileName, CreationCollisionOption.ReplaceExisting);
             string json = JsonConvert.SerializeObject(data, Formatting.Indented);
             await FileIO.WriteTextAsync(file, json);
         }
 
         public static List<string> GetFavourites(Guid wikiId)
         {
-            return _favouritesByWiki.TryGetValue(wikiId, out var favourites)
-                ? favourites.OrderBy(f => f).ToList()
-                : new List<string>();
+            return _favouritesByWiki.TryGetValue(wikiId, out var favourites) ? favourites.OrderBy(f => f).ToList() : new List<string>();
         }
 
         public static bool IsFavourite(string pageTitle, Guid wikiId)
         {
-            return _favouritesByWiki.TryGetValue(wikiId, out var favourites)
-                && favourites.Contains(pageTitle.Replace('_', ' '));
+            return _favouritesByWiki.TryGetValue(wikiId, out var favourites) && favourites.Contains(pageTitle.Replace('_', ' '));
         }
 
         private static List<string> GetAssociatedTitles(string pageTitle)
         {
             var titles = new HashSet<string>();
             string normalizedTitle = pageTitle.Replace('_', ' ');
-            if (normalizedTitle.StartsWith("Talk:"))
-                titles.Add(normalizedTitle.Substring("Talk:".Length));
-            else if (normalizedTitle.StartsWith("User talk:"))
-                titles.Add($"User:{normalizedTitle.Substring("User talk:".Length)}");
-            else if (normalizedTitle.StartsWith("User:"))
-                titles.Add($"User talk:{normalizedTitle.Substring("User:".Length)}");
-            else
-                titles.Add($"Talk:{normalizedTitle}");
+            if (normalizedTitle.StartsWith("Talk:")) titles.Add(normalizedTitle.Substring("Talk:".Length));
+            else if (normalizedTitle.StartsWith("User talk:")) titles.Add($"User:{normalizedTitle.Substring("User talk:".Length)}");
+            else if (normalizedTitle.StartsWith("User:")) titles.Add($"User talk:{normalizedTitle.Substring("User:".Length)}");
+            else titles.Add($"Talk:{normalizedTitle}");
             titles.Add(normalizedTitle);
             return titles.ToList();
         }
 
-        public static async Task AddFavoriteAsync(
-            string pageTitle,
-            Guid wikiId,
-            AuthenticationService authService
-        )
+        public static async Task AddFavoriteAsync(string pageTitle, Guid wikiId, AuthenticationService authService)
         {
             var associatedTitles = GetAssociatedTitles(pageTitle);
 
-            if (!_favouritesByWiki.ContainsKey(wikiId))
-                _favouritesByWiki[wikiId] = new HashSet<string>();
-            if (!_pendingAddsByWiki.ContainsKey(wikiId))
-                _pendingAddsByWiki[wikiId] = new HashSet<string>();
-            if (!_pendingDeletesByWiki.ContainsKey(wikiId))
-                _pendingDeletesByWiki[wikiId] = new HashSet<string>();
+            if (!_favouritesByWiki.ContainsKey(wikiId)) _favouritesByWiki[wikiId] = new HashSet<string>();
+            if (!_pendingAddsByWiki.ContainsKey(wikiId)) _pendingAddsByWiki[wikiId] = new HashSet<string>();
+            if (!_pendingDeletesByWiki.ContainsKey(wikiId)) _pendingDeletesByWiki[wikiId] = new HashSet<string>();
 
             bool wasChanged = false;
             foreach (var title in associatedTitles)
@@ -128,7 +100,7 @@ namespace WikiViewer.Core.Services
                 if (_favouritesByWiki[wikiId].Add(title))
                 {
                     wasChanged = true;
-                    if (authService == null || !SessionManager.IsLoggedIn) // Check global session state
+                    if (authService == null || !SessionManager.IsLoggedIn)
                     {
                         _pendingDeletesByWiki[wikiId].Remove(title);
                         _pendingAddsByWiki[wikiId].Add(title);
@@ -140,32 +112,29 @@ namespace WikiViewer.Core.Services
             {
                 if (authService != null && SessionManager.IsLoggedIn)
                 {
-                    await authService.SyncMultipleFavouritesToServerAsync(
-                        associatedTitles,
-                        add: true
-                    );
+                    await authService.SyncMultipleFavouritesToServerAsync(associatedTitles, add: true);
                 }
                 await SaveAllAsync();
             }
         }
 
-        public static async Task RemoveFavoriteAsync(
-            string pageTitle,
-            Guid wikiId,
-            AuthenticationService authService
-        )
+        public static async Task RemoveFavoriteAsync(string pageTitle, Guid wikiId, AuthenticationService authService)
         {
-            var associatedTitles = GetAssociatedTitles(pageTitle);
+            await RemoveMultipleFavoritesAsync(new List<string> { pageTitle }, wikiId, authService);
+        }
 
-            if (!_favouritesByWiki.ContainsKey(wikiId))
-                return;
-            if (!_pendingAddsByWiki.ContainsKey(wikiId))
-                _pendingAddsByWiki[wikiId] = new HashSet<string>();
-            if (!_pendingDeletesByWiki.ContainsKey(wikiId))
-                _pendingDeletesByWiki[wikiId] = new HashSet<string>();
+        public static async Task RemoveMultipleFavoritesAsync(List<string> pageTitles, Guid wikiId, AuthenticationService authService)
+        {
+            if (!_favouritesByWiki.ContainsKey(wikiId)) return;
+
+            var allAssociatedTitles = pageTitles.SelectMany(GetAssociatedTitles).Distinct().ToList();
+            if (!allAssociatedTitles.Any()) return;
+
+            if (!_pendingAddsByWiki.ContainsKey(wikiId)) _pendingAddsByWiki[wikiId] = new HashSet<string>();
+            if (!_pendingDeletesByWiki.ContainsKey(wikiId)) _pendingDeletesByWiki[wikiId] = new HashSet<string>();
 
             bool wasChanged = false;
-            foreach (var title in associatedTitles)
+            foreach (var title in allAssociatedTitles)
             {
                 if (_favouritesByWiki[wikiId].Remove(title))
                 {
@@ -182,10 +151,7 @@ namespace WikiViewer.Core.Services
             {
                 if (authService != null && SessionManager.IsLoggedIn)
                 {
-                    await authService.SyncMultipleFavouritesToServerAsync(
-                        associatedTitles,
-                        add: false
-                    );
+                    await authService.SyncMultipleFavouritesToServerAsync(allAssociatedTitles, add: false);
                 }
                 await SaveAllAsync();
             }
@@ -213,16 +179,11 @@ namespace WikiViewer.Core.Services
             return new List<string>();
         }
 
-        public static async Task OverwriteLocalFavouritesAsync(
-            Guid wikiId,
-            HashSet<string> serverFavourites
-        )
+        public static async Task OverwriteLocalFavouritesAsync(Guid wikiId, HashSet<string> serverFavourites)
         {
             _favouritesByWiki[wikiId] = serverFavourites;
-            if (_pendingAddsByWiki.ContainsKey(wikiId))
-                _pendingAddsByWiki[wikiId].Clear();
-            if (_pendingDeletesByWiki.ContainsKey(wikiId))
-                _pendingDeletesByWiki[wikiId].Clear();
+            if (_pendingAddsByWiki.ContainsKey(wikiId)) _pendingAddsByWiki[wikiId].Clear();
+            if (_pendingDeletesByWiki.ContainsKey(wikiId)) _pendingDeletesByWiki[wikiId].Clear();
             await SaveAllAsync();
         }
 

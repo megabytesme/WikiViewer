@@ -5,18 +5,18 @@
     xmlns:models="using:WikiViewer.Core.Models"
     xmlns:local="using:WikiViewer.Shared.Uwp.Pages"
     xmlns:helpers="using:WikiViewer.Shared.Uwp.Helpers"
-    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+    Background="Transparent">
     <Page.Resources>
         <Storyboard x:Name="FadeInAnimation">
-            <DoubleAnimation Storyboard.TargetName="LoadingOverlay" Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.250" EnableDependentAnimation="True"/>
+            <DoubleAnimation Storyboard.TargetName="LoadingOverlayControl" Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.250" EnableDependentAnimation="True"/>
         </Storyboard>
         <Storyboard x:Name="FadeOutAnimation">
-            <DoubleAnimation Storyboard.TargetName="LoadingOverlay" Storyboard.TargetProperty="Opacity" From="1" To="0" Duration="0:0:0.350" EnableDependentAnimation="True"/>
+            <DoubleAnimation Storyboard.TargetName="LoadingOverlayControl" Storyboard.TargetProperty="Opacity" From="1" To="0" Duration="0:0:0.350" EnableDependentAnimation="True"/>
         </Storyboard>
     </Page.Resources>
     <Grid>
-        <ScrollViewer x:Name="GridViewScrollViewer" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Visible">
-            <GridView x:Name="FavouritesGridView" Padding="24,52,24,48" IsItemClickEnabled="False" SelectionMode="Multiple" SelectionChanged="FavouritesGridView_SelectionChanged" HorizontalAlignment="Center">
+        <ScrollViewer x:Name="GridViewScrollViewerControl" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Visible">
+            <GridView x:Name="FavouritesGridViewControl" Padding="24,52,24,48" IsItemClickEnabled="False" SelectionMode="Multiple" SelectionChanged="FavouritesGridView_SelectionChanged" HorizontalAlignment="Center">
                 <GridView.ItemContainerStyle>
                     <Style TargetType="GridViewItem">
                         <Setter Property="Margin" Value="8"/>
@@ -31,15 +31,16 @@
                             </Grid.RowDefinitions>
                             <WebView Grid.Row="0" DefaultBackgroundColor="Transparent"
                                      helpers:AnimatedImageLoader.SourceObject="{x:Bind ImageUrl, Mode=OneWay, Converter={StaticResource GlobalUrlToImageConverter}}"/>
-                            <StackPanel Grid.Row="1" Padding="12" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}">
+                            <StackPanel Grid.Row="1" Padding="12" Spacing="4" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}">
                                 <TextBlock Text="{x:Bind DisplayTitle}" Style="{ThemeResource SubtitleTextBlockStyle}" TextWrapping="Wrap"/>
-                                <Grid Margin="0,8,0,0">
+                                <TextBlock Text="{x:Bind WikiName}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource SystemAccentColor}" FontWeight="SemiBold"/>
+                                <Grid Margin="0,4,0,0">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <Button Grid.Column="0" Content="Article" Click="ArticleButton_Click" Tag="{x:Bind}" Visibility="{x:Bind IsArticleAvailable, Converter={StaticResource GlobalBoolToVisibility}}"/>
-                                    <Button Grid.Column="1" Content="Talk" Margin="8,0,0,0" Click="TalkButton_Click" Tag="{x:Bind}" Visibility="{x:Bind IsTalkAvailable, Converter={StaticResource GlobalBoolToVisibility}}"/>
+                                    <Button Grid.Column="0" Content="Article" Click="ArticleButton_Click" DataContext="{x:Bind}" Visibility="{x:Bind IsArticleAvailable, Converter={StaticResource GlobalBoolToVisibility}}"/>
+                                    <Button Grid.Column="1" Content="Talk" Margin="8,0,0,0" Click="TalkButton_Click" DataContext="{x:Bind}" Visibility="{x:Bind IsTalkAvailable, Converter={StaticResource GlobalBoolToVisibility}}"/>
                                 </Grid>
                             </StackPanel>
                         </Grid>
@@ -47,8 +48,8 @@
                 </GridView.ItemTemplate>
             </GridView>
         </ScrollViewer>
-        <ScrollViewer x:Name="ListViewScrollViewer" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Visible" Visibility="Collapsed">
-            <ListView x:Name="FavouritesListView" Padding="12,52,12,48" SelectionMode="Multiple" SelectionChanged="FavouritesListView_SelectionChanged">
+        <ScrollViewer x:Name="ListViewScrollViewerControl" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Visible" Visibility="Collapsed">
+            <ListView x:Name="FavouritesListViewControl" Padding="12,52,12,48" SelectionMode="Multiple" SelectionChanged="FavouritesListView_SelectionChanged">
                 <ListView.ItemContainerStyle>
                     <Style TargetType="ListViewItem">
                         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -62,20 +63,17 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-
                             <Grid Grid.Column="0" Width="64" Height="64" CornerRadius="4" VerticalAlignment="Center">
                                 <WebView DefaultBackgroundColor="Transparent"
                                          helpers:AnimatedImageLoader.SourceObject="{x:Bind ImageUrl, Mode=OneWay, Converter={StaticResource GlobalUrlToImageConverter}}"/>
                             </Grid>
-
                             <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0">
                                 <TextBlock Text="{x:Bind DisplayTitle}" Style="{ThemeResource BodyStrongTextBlockStyle}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
-                                <TextBlock Text="{x:Bind ArticlePageTitle}" Style="{ThemeResource CaptionTextBlockStyle}" Opacity="0.7"/>
+                                <TextBlock Text="{x:Bind WikiName}" Style="{ThemeResource CaptionTextBlockStyle}" Opacity="0.7"/>
                             </StackPanel>
-
                             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                <Button Content="Article" Click="ArticleButton_Click" Tag="{x:Bind}" Visibility="{x:Bind IsArticleAvailable, Converter={StaticResource GlobalBoolToVisibility}}"/>
-                                <Button Content="Talk" Click="TalkButton_Click" Tag="{x:Bind}" Visibility="{x:Bind IsTalkAvailable, Converter={StaticResource GlobalBoolToVisibility}}"/>
+                                <Button Content="Article" Click="ArticleButton_Click" DataContext="{x:Bind}" Visibility="{x:Bind IsArticleAvailable, Converter={StaticResource GlobalBoolToVisibility}}"/>
+                                <Button Content="Talk" Click="TalkButton_Click" DataContext="{x:Bind}" Visibility="{x:Bind IsTalkAvailable, Converter={StaticResource GlobalBoolToVisibility}}"/>
                             </StackPanel>
                         </Grid>
                     </DataTemplate>
@@ -86,11 +84,11 @@
         <Grid VerticalAlignment="Top" Style="{StaticResource PageTitleBarGridStyle}" Margin="0,0,15,0">
             <TextBlock Text="Favourites" Style="{StaticResource PageTitleBarTextStyle}"/>
         </Grid>
-        <CommandBar x:Name="PageBottomCommandBar" VerticalAlignment="Bottom" Background="{StaticResource PageTitleBarAcrylicBrush}" Margin="0,0,15,0">
-            <AppBarButton x:Name="DeleteButton" Icon="Delete" Label="Delete" Click="DeleteButton_Click" Visibility="Collapsed"/>
-            <AppBarButton x:Name="ViewToggleButton" Icon="List" Label="List View" Click="ViewToggleButton_Click"/>
+        <CommandBar x:Name="BottomCommandBarControl" VerticalAlignment="Bottom" Background="{StaticResource PageTitleBarAcrylicBrush}" Margin="0,0,15,0">
+            <AppBarButton x:Name="DeleteButtonControl" Icon="Delete" Label="Delete" Click="DeleteButton_Click" Visibility="Collapsed"/>
+            <AppBarButton x:Name="ViewToggleButtonControl" Icon="List" Label="List View" Click="ViewToggleButton_Click"/>
         </CommandBar>
-        <Grid x:Name="LoadingOverlay" Opacity="0" IsHitTestVisible="False" Background="{StaticResource PageTitleBarAcrylicBrush}">
+        <Grid x:Name="LoadingOverlayControl" Opacity="0" IsHitTestVisible="False" Background="{StaticResource PageTitleBarAcrylicBrush}">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
                 <ProgressRing IsActive="True" Width="60" Height="60"/>
             </StackPanel>

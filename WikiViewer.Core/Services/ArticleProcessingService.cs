@@ -23,9 +23,19 @@ namespace WikiViewer.Core.Services
             Stopwatch stopwatch,
             IApiWorker worker,
             bool forceRefresh = false,
-            SemaphoreSlim semaphore = null
+            SemaphoreSlim semaphore = null,
+            Guid? wikiId = null
         )
         {
+            var currentWiki = SessionManager.CurrentWiki;
+            if (wikiId == null && currentWiki == null)
+            {
+                throw new InvalidOperationException(
+                    "wikiId must be provided if there is no current wiki in session."
+                );
+            }
+            Guid contextWikiId = wikiId ?? currentWiki.Id;
+
             if (worker == null)
                 throw new ArgumentNullException(nameof(worker));
 
@@ -66,7 +76,10 @@ namespace WikiViewer.Core.Services
             bool isConnected = NetworkInterface.GetIsNetworkAvailable();
             if (AppSettings.IsCachingEnabled && !forceRefresh)
             {
-                var cachedMetadata = await ArticleCacheManager.GetCacheMetadataAsync(resolvedTitle);
+                var cachedMetadata = await ArticleCacheManager.GetCacheMetadataAsync(
+                    resolvedTitle,
+                    contextWikiId
+                );
                 DateTime? remoteTimestamp = isConnected
                     ? await FetchLastUpdatedTimestampAsync(resolvedTitle, worker)
                     : null;
@@ -81,7 +94,8 @@ namespace WikiViewer.Core.Services
                 )
                 {
                     string cachedHtml = await ArticleCacheManager.GetCachedArticleHtmlAsync(
-                        resolvedTitle
+                        resolvedTitle,
+                        contextWikiId
                     );
                     if (!string.IsNullOrEmpty(cachedHtml))
                         return (cachedHtml, resolvedTitle);
@@ -100,7 +114,8 @@ namespace WikiViewer.Core.Services
                 await ArticleCacheManager.SaveArticleToCacheAsync(
                     resolvedTitle,
                     processedHtml,
-                    lastUpdated.Value
+                    lastUpdated.Value,
+                    contextWikiId
                 );
             }
             return (processedHtml, resolvedTitle);

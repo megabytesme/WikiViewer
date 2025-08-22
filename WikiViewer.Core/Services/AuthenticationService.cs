@@ -311,7 +311,7 @@ namespace WikiViewer.Core.Services
             var result = JObject.Parse(resultJson);
             if (result?["edit"]?["result"]?.ToString() == "Success")
             {
-                await ArticleCacheManager.ClearCacheForItemAsync(title);
+                await ArticleCacheManager.ClearCacheForItemAsync(title, _wiki.Id);
                 return true;
             }
 

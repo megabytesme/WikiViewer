@@ -14,53 +14,59 @@ namespace WikiViewer.Shared.Uwp.Services
     {
         public static event EventHandler<ArticleCachedEventArgs> ArticleCached;
 
-        public static async Task CacheFavouritesAsync(IEnumerable<string> titles)
+        public static async Task CacheArticlesAsync(
+            Dictionary<string, WikiInstance> articlesToCache
+        )
         {
+            if (articlesToCache == null || !articlesToCache.Any())
+                return;
+
             await App.UIReady;
-
-            var titlesToCache = titles
-                .Where(t => !t.StartsWith("Talk:") && !t.StartsWith("User talk:"))
-                .ToList();
-            if (!titlesToCache.Any())
-                return;
-
-            if (SessionManager.CurrentWiki == null)
-            {
-                Debug.WriteLine("[BG CACHE] Aborting: No current wiki in session.");
-                return;
-            }
 
             int maxConcurrency = AppSettings.MaxConcurrentDownloads;
             var semaphore = new SemaphoreSlim(maxConcurrency);
 
-            var cachingTasks = titlesToCache.Select(async title =>
-            {
-                using (
-                    var tempWorker = App.ApiWorkerFactory.CreateApiWorker(
-                        SessionManager.CurrentWiki.PreferredConnectionMethod
-                    )
-                )
+            var cachingTasks = articlesToCache.Select(
+                async (kvp) =>
                 {
+                    string title = kvp.Key;
+                    WikiInstance wiki = kvp.Value;
+
+                    await semaphore.WaitAsync();
                     try
                     {
-                        await tempWorker.InitializeAsync(SessionManager.CurrentWiki.BaseUrl);
+                        using (
+                            var tempWorker = App.ApiWorkerFactory.CreateApiWorker(
+                                wiki.PreferredConnectionMethod
+                            )
+                        )
+                        {
+                            await tempWorker.InitializeAsync(wiki.BaseUrl);
 
-                        var stopwatch = Stopwatch.StartNew();
-                        await ArticleProcessingService.FetchAndCacheArticleAsync(
-                            title,
-                            stopwatch,
-                            tempWorker,
-                            forceRefresh: true,
-                            semaphore
-                        );
-                        ArticleCached?.Invoke(null, new ArticleCachedEventArgs(title));
+                            var stopwatch = Stopwatch.StartNew();
+                            await ArticleProcessingService.FetchAndCacheArticleAsync(
+                                title,
+                                stopwatch,
+                                tempWorker,
+                                forceRefresh: true,
+                                semaphore,
+                                wiki.Id
+                            );
+                            ArticleCached?.Invoke(null, new ArticleCachedEventArgs(title));
+                        }
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine($"[BG CACHE] Failed to cache '{title}': {ex.Message}");
+                        Debug.WriteLine(
+                            $"[BG CACHE] Failed to cache '{title}' from '{wiki.Name}': {ex.Message}"
+                        );
+                    }
+                    finally
+                    {
+                        semaphore.Release();
                     }
                 }
-            });
+            );
 
             await Task.WhenAll(cachingTasks);
         }
