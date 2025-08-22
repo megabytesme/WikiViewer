@@ -41,21 +41,14 @@
                 <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
                     <StackPanel Spacing="12">
                         <TextBlock Text="Connection" Style="{ThemeResource SubtitleTextBlockStyle}"/>
-                        <Grid Margin="0,12,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <Slider x:Name="ConcurrentDownloadsSlider" Header="Maximum concurrent downloads per page" StepFrequency="1" ValueChanged="ConcurrentDownloadsSlider_ValueChanged" VerticalAlignment="Center">
-                                <Slider.Minimum>
-                                    <x:Double>1</x:Double>
-                                </Slider.Minimum>
-                                <Slider.Maximum>
-                                    <x:Double>16</x:Double>
-                                </Slider.Maximum>
-                            </Slider>
-                            <TextBlock x:Name="ConcurrentDownloadsValueText" Grid.Column="1" Text="4" Margin="12,0,0,0" VerticalAlignment="Center" Style="{ThemeResource BodyStrongTextBlockStyle}"/>
-                        </Grid>
+                        <ComboBox x:Name="ConcurrencyComboBox"
+                                  Header="Concurrent downloads per page"
+                                  SelectionChanged="ConcurrencyComboBox_SelectionChanged"
+                                  Margin="0,12,0,0"/>
+                        <TextBlock x:Name="ConcurrencyDescriptionText"
+                                   Style="{ThemeResource CaptionTextBlockStyle}"
+                                   TextWrapping="Wrap"
+                                   Opacity="0.7"/>
                     </StackPanel>
                 </Border>
 

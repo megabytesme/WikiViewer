@@ -11,10 +11,10 @@ namespace _1809_UWP.Pages
         }
 
         protected override ToggleSwitch CachingToggleControl => this.CachingToggle;
-        protected override Slider ConcurrentDownloadsSliderControl => this.ConcurrentDownloadsSlider;
-        protected override TextBlock ConcurrentDownloadsValueTextControl => this.ConcurrentDownloadsValueText;
+        protected override ComboBox ConcurrencyComboBoxControl => this.ConcurrencyComboBox;
         protected override TextBlock CacheSizeTextControl => this.CacheSizeText;
         protected override Button ClearCacheButtonControl => this.ClearCacheButton;
         protected override ListView WikiListViewControl => this.WikiListView;
+        protected override TextBlock ConcurrencyDescriptionTextControl => this.ConcurrencyDescriptionText;
     }
 }

@@ -18,11 +18,11 @@ namespace WikiViewer.Shared.Uwp.Pages
             new ObservableCollection<WikiInstance>();
 
         protected abstract ToggleSwitch CachingToggleControl { get; }
-        protected abstract Slider ConcurrentDownloadsSliderControl { get; }
-        protected abstract TextBlock ConcurrentDownloadsValueTextControl { get; }
+        protected abstract ComboBox ConcurrencyComboBoxControl { get; }
         protected abstract TextBlock CacheSizeTextControl { get; }
         protected abstract Button ClearCacheButtonControl { get; }
         protected abstract ListView WikiListViewControl { get; }
+        protected abstract TextBlock ConcurrencyDescriptionTextControl { get; }
 
         public SettingsPageBase()
         {
@@ -32,12 +32,22 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
-            CachingToggleControl.IsOn = AppSettings.IsCachingEnabled;
-            ConcurrentDownloadsSliderControl.Value = AppSettings.MaxConcurrentDownloads;
-            ConcurrentDownloadsValueTextControl.Text =
-                AppSettings.MaxConcurrentDownloads.ToString();
-            _ = UpdateCacheSizeAsync();
+            PopulateConcurrencyComboBox();
 
+            var savedLevel = AppSettings.DownloadConcurrencyLevel;
+
+            var match = ConcurrencyComboBoxControl.Items
+                .OfType<ComboBoxItem>()
+                .FirstOrDefault(i => Equals(i.Tag, savedLevel));
+
+            if (match != null)
+            {
+                ConcurrencyComboBoxControl.SelectedItem = match;
+                UpdateConcurrencyDescription(savedLevel);
+            }
+
+            CachingToggleControl.IsOn = AppSettings.IsCachingEnabled;
+            _ = UpdateCacheSizeAsync();
             LoadWikis();
             WikiListViewControl.ItemsSource = Wikis;
             WikiManager.WikisChanged += OnWikisChanged;
@@ -46,6 +56,82 @@ namespace WikiViewer.Shared.Uwp.Pages
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
             WikiManager.WikisChanged -= OnWikisChanged;
+        }
+
+        private void PopulateConcurrencyComboBox()
+        {
+            var mediumCores = Math.Max(2, Environment.ProcessorCount / 2);
+            var highCores = Math.Max(2, Environment.ProcessorCount);
+            var doubleCores = highCores * 2;
+
+            ConcurrencyComboBoxControl.Items.Clear();
+            ConcurrencyComboBoxControl.Items.Add(
+                new ComboBoxItem { Content = $"Low (2 downloads)", Tag = ConcurrencyLevel.Low }
+            );
+            ConcurrencyComboBoxControl.Items.Add(
+                new ComboBoxItem
+                {
+                    Content = $"Medium ({mediumCores} downloads)",
+                    Tag = ConcurrencyLevel.Medium,
+                }
+            );
+            ConcurrencyComboBoxControl.Items.Add(
+                new ComboBoxItem
+                {
+                    Content = $"High ({highCores} downloads)",
+                    Tag = ConcurrencyLevel.High,
+                }
+            );
+            ConcurrencyComboBoxControl.Items.Add(
+                new ComboBoxItem
+                {
+                    Content = $"Double ({doubleCores} downloads)",
+                    Tag = ConcurrencyLevel.Double,
+                }
+            );
+            ConcurrencyComboBoxControl.Items.Add(
+                new ComboBoxItem
+                {
+                    Content = $"Extreme (256 downloads)",
+                    Tag = ConcurrencyLevel.Extreme,
+                }
+            );
+            ConcurrencyComboBoxControl.Items.Add(
+                new ComboBoxItem { Content = "Unlimited", Tag = ConcurrencyLevel.Unlimited }
+            );
+
+            ConcurrencyComboBoxControl.SelectedValuePath = "Tag";
+        }
+
+        private void UpdateConcurrencyDescription(ConcurrencyLevel level)
+        {
+            string description = "";
+            switch (level)
+            {
+                case ConcurrencyLevel.Low:
+                    description = "Recommended for slow or metered connections (2 threads).";
+                    break;
+                case ConcurrencyLevel.Medium:
+                    description = "Balanced performance. Recommended for most devices (1/2 CPU Core count).";
+                    break;
+                case ConcurrencyLevel.High:
+                    description =
+                        "Uses all available processor cores for faster loading on powerful devices (All CPU core count).";
+                    break;
+                case ConcurrencyLevel.Double:
+                    description =
+                        "Aggressive loading. May impact system responsiveness on some devices (Double core count).";
+                    break;
+                case ConcurrencyLevel.Extreme:
+                    description =
+                        "Warning: High values can lead to increased memory usage and may cause instability or rate-limiting by the wiki server (256 threads).";
+                    break;
+                case ConcurrencyLevel.Unlimited:
+                    description =
+                        "Warning: High values can lead to increased memory usage and may cause instability or rate-limiting by the wiki server (Unlimited).";
+                    break;
+            }
+            ConcurrencyDescriptionTextControl.Text = description;
         }
 
         private void OnWikisChanged(object sender, EventArgs e)
@@ -75,16 +161,15 @@ namespace WikiViewer.Shared.Uwp.Pages
             AppSettings.IsCachingEnabled = toggle.IsOn;
         }
 
-        protected void ConcurrentDownloadsSlider_ValueChanged(
+        protected void ConcurrencyComboBox_SelectionChanged(
             object sender,
-            Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e
+            SelectionChangedEventArgs e
         )
         {
-            int value = (int)e.NewValue;
-            AppSettings.MaxConcurrentDownloads = value;
-            if (ConcurrentDownloadsValueTextControl != null)
+            if (ConcurrencyComboBoxControl.SelectedValue is ConcurrencyLevel level)
             {
-                ConcurrentDownloadsValueTextControl.Text = value.ToString();
+                AppSettings.DownloadConcurrencyLevel = level;
+                UpdateConcurrencyDescription(level);
             }
         }
 
@@ -95,19 +180,6 @@ namespace WikiViewer.Shared.Uwp.Pages
             await ArticleCacheManager.ClearCacheAsync();
             await UpdateCacheSizeAsync();
             button.IsEnabled = true;
-        }
-
-        protected void WikiListView_ItemClick(object sender, ItemClickEventArgs e)
-        {
-            if (e.ClickedItem is WikiInstance wiki)
-            {
-                Frame.Navigate(typeof(WikiDetailPage), wiki.Id);
-            }
-        }
-
-        protected void AddWikiButton_Click(object sender, RoutedEventArgs e)
-        {
-            Frame.Navigate(typeof(WikiDetailPage), true);
         }
 
         protected async void AboutButton_Click(object sender, RoutedEventArgs e) =>
@@ -197,16 +269,36 @@ namespace WikiViewer.Shared.Uwp.Pages
 
             var textBlock = new TextBlock { TextWrapping = TextWrapping.Wrap };
 
-            textBlock.Inlines.Add(new Run { Text = "This is an unofficial, third-party client for browsing MediaWiki sites. This app was created by " });
-            textBlock.Inlines.Add(new Hyperlink
-            {
-                NavigateUri = new Uri("https://github.com/megabytesme"),
-                Inlines = { new Run { Text = "MegaBytesMe" } }
-            });
-            textBlock.Inlines.Add(new Run { Text = " and is not affiliated with, endorsed, or sponsored by the operators of any wiki." });
+            textBlock.Inlines.Add(
+                new Run
+                {
+                    Text =
+                        "This is an unofficial, third-party client for browsing MediaWiki sites. This app was created by ",
+                }
+            );
+            textBlock.Inlines.Add(
+                new Hyperlink
+                {
+                    NavigateUri = new Uri("https://github.com/megabytesme"),
+                    Inlines = { new Run { Text = "MegaBytesMe" } },
+                }
+            );
+            textBlock.Inlines.Add(
+                new Run
+                {
+                    Text =
+                        " and is not affiliated with, endorsed, or sponsored by the operators of any wiki.",
+                }
+            );
             textBlock.Inlines.Add(new LineBreak());
             textBlock.Inlines.Add(new LineBreak());
-            textBlock.Inlines.Add(new Run { Text = $"All article data, content, and trademarks presented from the configured wikis ({hostsList}) are the property of those sites and their respective contributors. This app simply provides a native viewing experience for publicly available content." });
+            textBlock.Inlines.Add(
+                new Run
+                {
+                    Text =
+                        $"All article data, content, and trademarks presented from the configured wikis ({hostsList}) are the property of those sites and their respective contributors. This app simply provides a native viewing experience for publicly available content.",
+                }
+            );
 
             var dialog = new ContentDialog
             {
@@ -215,6 +307,19 @@ namespace WikiViewer.Shared.Uwp.Pages
                 CloseButtonText = "OK",
             };
             await dialog.ShowAsync();
+        }
+
+        protected void WikiListView_ItemClick(object sender, ItemClickEventArgs e)
+        {
+            if (e.ClickedItem is WikiInstance wiki)
+            {
+                Frame.Navigate(typeof(WikiDetailPage), wiki.Id);
+            }
+        }
+
+        protected void AddWikiButton_Click(object sender, RoutedEventArgs e)
+        {
+            Frame.Navigate(typeof(WikiDetailPage), true);
         }
 
         private string GetAppName()

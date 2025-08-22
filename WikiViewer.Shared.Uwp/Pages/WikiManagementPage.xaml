@@ -26,7 +26,7 @@
                   ItemClick="WikiListView_ItemClick">
             <ListView.ItemTemplate>
                 <DataTemplate x:DataType="models:WikiInstance">
-                    <StackPanel Padding="12,8" Spacing="4">
+                    <StackPanel Padding="12,8" Margin="4">
                         <TextBlock Text="{x:Bind Name}" Style="{ThemeResource BodyStrongTextBlockStyle}"/>
                         <TextBlock Text="{x:Bind BaseUrl}" Style="{ThemeResource CaptionTextBlockStyle}" Opacity="0.7"/>
                     </StackPanel>
