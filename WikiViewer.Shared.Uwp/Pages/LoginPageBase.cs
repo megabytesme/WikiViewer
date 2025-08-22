@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
-using WikiViewer.Core;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
-using WikiViewer.Shared.Uwp.Services;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Navigation;
@@ -12,6 +10,8 @@ namespace WikiViewer.Shared.Uwp.Pages
 {
     public abstract class LoginPageBase : Page
     {
+        private WikiInstance _wikiToLogin;
+
         protected abstract TextBlock LoginTitleTextBlock { get; }
         protected abstract TextBox UsernameTextBox { get; }
         protected abstract PasswordBox UserPasswordBox { get; }
@@ -20,15 +20,22 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected abstract ProgressRing LoadingProgressRing { get; }
         protected abstract TextBlock ErrorTextBlockControl { get; }
         protected abstract Type GetCreateAccountPageType();
-        protected abstract Task ShowInteractiveLoginAsync(
-            AuthUiRequiredException authException,
-            Account account
-        );
+        protected abstract Task ShowInteractiveLoginAsync(AuthUiRequiredException authException, Account account);
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
-            LoginTitleTextBlock.Text = $"Log In to {SessionManager.CurrentWiki.Host}";
+            if (e.Parameter is Guid wikiId)
+            {
+                _wikiToLogin = WikiManager.GetWikiById(wikiId);
+            }
+
+            if (_wikiToLogin == null)
+            {
+                _wikiToLogin = SessionManager.CurrentWiki;
+            }
+
+            LoginTitleTextBlock.Text = $"Log In to {_wikiToLogin.Host}";
         }
 
         protected async void LoginButton_Click(object sender, RoutedEventArgs e)
@@ -50,24 +57,18 @@ namespace WikiViewer.Shared.Uwp.Pages
             var account = new Account
             {
                 Username = username,
-                WikiInstanceId = SessionManager.CurrentWiki.Id,
+                WikiInstanceId = _wikiToLogin.Id
             };
 
-            var authService = new AuthenticationService(
-                account,
-                SessionManager.CurrentWiki,
-                App.ApiWorkerFactory
-            );
+            var authService = new AuthenticationService(account, _wikiToLogin, App.ApiWorkerFactory);
 
             try
             {
                 await authService.LoginAsync(password);
 
-                await AccountManager.AddAccountAsync(account, password);
-
-                if (RememberMeCheckBoxControl.IsChecked == false)
+                if (RememberMeCheckBoxControl.IsChecked == true)
                 {
-                    CredentialService.ClearCredentials(account.Id);
+                    await AccountManager.AddAccountAsync(account, password);
                 }
 
                 if (this.Frame.CanGoBack)
@@ -93,7 +94,7 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         protected void CreateAccountButton_Click(object sender, RoutedEventArgs e)
         {
-            Frame.Navigate(GetCreateAccountPageType());
+            Frame.Navigate(GetCreateAccountPageType(), _wikiToLogin.Id);
         }
     }
 }

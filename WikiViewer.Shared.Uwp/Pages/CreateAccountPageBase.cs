@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using WikiViewer.Core;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
 using Windows.UI.Xaml;
@@ -13,6 +12,7 @@ namespace WikiViewer.Shared.Uwp.Pages
 {
     public abstract class CreateAccountPageBase : Page
     {
+        private WikiInstance _wikiForAccountCreation;
         private List<AuthRequest> _requiredFields;
         private readonly Dictionary<string, string> _hiddenFields =
             new Dictionary<string, string>();
@@ -27,7 +27,25 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected override async void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
-            PageTitleTextBlock.Text = $"Create Account on {SessionManager.CurrentWiki.Host}";
+
+            if (e.Parameter is Guid wikiId)
+            {
+                _wikiForAccountCreation = WikiManager.GetWikiById(wikiId);
+            }
+
+            if (_wikiForAccountCreation == null)
+            {
+                _wikiForAccountCreation = SessionManager.CurrentWiki;
+            }
+
+            if (_wikiForAccountCreation == null)
+            {
+                ShowError("Cannot create account: No wiki has been selected.");
+                CreateAccountButton.IsEnabled = false;
+                return;
+            }
+
+            PageTitleTextBlock.Text = $"Create Account on {_wikiForAccountCreation.Host}";
             await LoadRequiredFieldsAsync();
         }
 
@@ -40,15 +58,10 @@ namespace WikiViewer.Shared.Uwp.Pages
 
             try
             {
-                using (
-                    var worker = App.ApiWorkerFactory.CreateApiWorker(
-                        SessionManager.CurrentWiki.PreferredConnectionMethod
-                    )
-                )
+                using (var worker = App.ApiWorkerFactory.CreateApiWorker(_wikiForAccountCreation.PreferredConnectionMethod))
                 {
-                    await worker.InitializeAsync(SessionManager.CurrentWiki.BaseUrl);
-                    string url =
-                        $"{SessionManager.CurrentWiki.ApiEndpoint}?action=query&meta=authmanagerinfo&amirequestsfor=create&format=json";
+                    await worker.InitializeAsync(_wikiForAccountCreation.BaseUrl);
+                    string url = $"{_wikiForAccountCreation.ApiEndpoint}?action=query&meta=authmanagerinfo&amirequestsfor=create&format=json";
                     string json = await worker.GetJsonFromApiAsync(url);
                     var response =
                         Newtonsoft.Json.JsonConvert.DeserializeObject<AuthManagerInfoResponse>(
@@ -168,41 +181,25 @@ namespace WikiViewer.Shared.Uwp.Pages
             try
             {
                 CreateAccountResult result;
-                using (
-                    var worker = App.ApiWorkerFactory.CreateApiWorker(
-                        SessionManager.CurrentWiki.PreferredConnectionMethod
-                    )
-                )
+                using (var worker = App.ApiWorkerFactory.CreateApiWorker(_wikiForAccountCreation.PreferredConnectionMethod))
                 {
-                    await worker.InitializeAsync(SessionManager.CurrentWiki.BaseUrl);
-                    string tokenUrl =
-                        $"{SessionManager.CurrentWiki.ApiEndpoint}?action=query&meta=tokens&type=createaccount&format=json";
+                    await worker.InitializeAsync(_wikiForAccountCreation.BaseUrl);
+                    string tokenUrl = $"{_wikiForAccountCreation.ApiEndpoint}?action=query&meta=tokens&type=createaccount&format=json";
                     string tokenJson = await worker.GetJsonFromApiAsync(tokenUrl);
                     var tokenResponse = Newtonsoft.Json.Linq.JObject.Parse(tokenJson);
-                    string createToken = tokenResponse?["query"]?["tokens"]?[
-                        "createaccounttoken"
-                    ]?.ToString();
-                    if (string.IsNullOrEmpty(createToken))
-                        throw new Exception("Failed to retrieve a createaccount token.");
+                    string createToken = tokenResponse?["query"]?["tokens"]?["createaccounttoken"]?.ToString();
+                    if (string.IsNullOrEmpty(createToken)) throw new Exception("Failed to retrieve a createaccount token.");
 
                     var finalPostData = new Dictionary<string, string>(postData)
                     {
                         { "action", "createaccount" },
                         { "createtoken", createToken },
                         { "format", "json" },
-                        { "createreturnurl", SessionManager.CurrentWiki.BaseUrl },
+                        { "createreturnurl", _wikiForAccountCreation.BaseUrl },
                     };
-                    string resultJson = await worker.PostAndGetJsonFromApiAsync(
-                        SessionManager.CurrentWiki.ApiEndpoint,
-                        finalPostData
-                    );
-                    var resultObj =
-                        Newtonsoft.Json.JsonConvert.DeserializeObject<CreateAccountResponse>(
-                            resultJson
-                        );
-                    result =
-                        resultObj?.CreateAccount
-                        ?? throw new Exception("Received an invalid response from the server.");
+                    string resultJson = await worker.PostAndGetJsonFromApiAsync(_wikiForAccountCreation.ApiEndpoint, finalPostData);
+                    var resultObj = Newtonsoft.Json.JsonConvert.DeserializeObject<CreateAccountResponse>(resultJson);
+                    result = resultObj?.CreateAccount ?? throw new Exception("Received an invalid response from the server.");
                 }
 
                 if (result.Status == "PASS")

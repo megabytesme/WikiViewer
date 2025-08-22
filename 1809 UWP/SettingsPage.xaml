@@ -4,123 +4,103 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
     xmlns:local="using:WikiViewer.Shared.Uwp.Pages"
+    xmlns:models="using:WikiViewer.Core.Models"
     Background="Transparent">
+
     <Grid>
-        <ScrollViewer>
-            <StackPanel Spacing="16" Padding="16,64,16,12" HorizontalAlignment="Center" MaxWidth="500">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="320"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <Grid Grid.Column="0" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,0,1,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="52"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <Grid Grid.Row="0" Style="{StaticResource PageTitleBarGridStyle}">
+                <TextBlock Text="Wikis" Style="{StaticResource PageTitleBarTextStyle}"/>
+            </Grid>
+
+            <ListView x:Name="WikiListViewControl" Grid.Row="1" SelectionChanged="WikiListView_SelectionChanged">
+                <ListView.ItemTemplate>
+                    <DataTemplate x:DataType="models:WikiInstance">
+                        <StackPanel Orientation="Horizontal" Spacing="12" Padding="8">
+                            <FontIcon Glyph="&#xE774;" VerticalAlignment="Center"/>
+                            <TextBlock Text="{x:Bind Name}" VerticalAlignment="Center" Style="{ThemeResource BodyStrongTextBlockStyle}"/>
+                        </StackPanel>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+
+            <CommandBar Grid.Row="2" DefaultLabelPosition="Right" Background="Transparent">
+                <AppBarButton x:Name="AddWikiButtonControl" Icon="Add" Label="Add Wiki" Click="AddWikiButton_Click"/>
+                <AppBarButton x:Name="RemoveWikiButtonControl" Icon="Remove" Label="Remove Wiki" Click="RemoveWikiButton_Click" IsEnabled="False"/>
+            </CommandBar>
+        </Grid>
+
+        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel x:Name="DetailPanelControl" Spacing="16" Padding="24" MaxWidth="600" Visibility="Collapsed">
+
+                <TextBlock Text="Wiki Details" Style="{ThemeResource SubtitleTextBlockStyle}"/>
                 <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
                     <StackPanel Spacing="12">
-                        <TextBlock Text="Account" Style="{ThemeResource SubtitleTextBlockStyle}" HorizontalAlignment="Center"/>
-                        <StackPanel x:Name="LoggedInState" Spacing="16" Orientation="Horizontal" Visibility="Collapsed">
-                            <muxc:PersonPicture x:Name="ProfilePicture" ProfilePicture="/Assets/StoreLogo.png" Width="64" Height="64"/>
-                            <StackPanel VerticalAlignment="Center" Spacing="4">
-                                <TextBlock x:Name="UsernameText" Text="Username" Style="{ThemeResource BodyStrongTextBlockStyle}"/>
-                                <HyperlinkButton Content="Sign out" Click="SignOutButton_Click" Padding="0"/>
-                            </StackPanel>
-                        </StackPanel>
-                        <StackPanel x:Name="LoggedOutState" Spacing="8" Visibility="Collapsed">
-                            <TextBlock x:Name="LoggedOutStateTextBlockControl" Text="You are not signed in." Style="{ThemeResource BodyTextBlockStyle}" TextWrapping="Wrap"/>
-                            <HyperlinkButton x:Name="SignInLink" Content="Sign in" Click="SignInButton_Click" Padding="0"/>
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
-                    <StackPanel Spacing="12">
-                        <TextBlock Text="Wiki Instance" Style="{ThemeResource SubtitleTextBlockStyle}" HorizontalAlignment="Center"/>
+                        <TextBox x:Name="WikiNameTextBoxControl" Header="Wiki Name"/>
+                        <TextBox x:Name="WikiUrlTextBoxControl" Header="MediaWiki Base URL" PlaceholderText="https://en.wikipedia.org/"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBox x:Name="WikiUrlTextBoxControl" Header="MediaWiki Base URL" PlaceholderText="https://en.wikipedia.org/"/>
-                            <Button x:Name="DetectButton" Grid.Column="1" VerticalAlignment="Bottom" Margin="8,0,0,0" Click="DetectButton_Click">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <SymbolIcon Symbol="Find"/>
-                                    <TextBlock Text="Detect"/>
-                                </StackPanel>
-                            </Button>
-                        </Grid>
-                        <TextBox x:Name="ScriptPathTextBoxControl" Header="Script Path (if any)"/>
-                        <TextBox x:Name="ArticlePathTextBoxControl" Header="Article Path (if any)"/>
-                        <TextBlock x:Name="DetectionStatusText" Visibility="Collapsed" TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}"/>
-                        <TextBlock Text="Changing these values will clear all local data (cache, favourites) and log you out." TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}"/>
-                        <Button x:Name="ApplyUrlButton" Content="Apply and Clear Data" Click="ApplyUrlButton_Click" HorizontalAlignment="Stretch"/>
-                    </StackPanel>
-                </Border>
-                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
-                    <StackPanel Spacing="12">
-                        <TextBlock Text="Connection" Style="{ThemeResource SubtitleTextBlockStyle}" HorizontalAlignment="Center"/>
-                        <Grid VerticalAlignment="Center">
-                            <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <StackPanel>
-                                <TextBlock Text="Connection Backend" VerticalAlignment="Center" Style="{ThemeResource BodyStrongTextBlockStyle}"/>
-                                <TextBlock Text="Proxy is designed for devices that cannot pass Cloudflare protection. Usage of proxy may result in some wikis being unavailable - It is recommended to use the WebView2 connection type when possible." TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}"/>
+                            <TextBox x:Name="ScriptPathTextBoxControl" Grid.Column="0" Header="Script Path" Margin="0,0,6,0"/>
+                            <TextBox x:Name="ArticlePathTextBoxControl" Grid.Column="1" Header="Article Path" Margin="6,0,0,0"/>
+                        </Grid>
+                        <Button x:Name="DetectPathsButtonControl" HorizontalAlignment="Left" Click="DetectPathsButton_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <SymbolIcon Symbol="Find"/>
+                                <TextBlock Text="Detect Paths"/>
                             </StackPanel>
-                            <ToggleSwitch x:Name="ConnectionMethodToggle" Toggled="ConnectionMethodToggle_Toggled" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="0,-10,-30,0" OnContent="Proxy" OffContent="WebView2"/>
-                        </Grid>
-                        <Grid Margin="0,12,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <Slider x:Name="ConcurrentDownloadsSlider" Header="Maximum concurrent downloads per page" StepFrequency="1" ValueChanged="ConcurrentDownloadsSlider_ValueChanged" VerticalAlignment="Center">
-                                <Slider.Minimum>
-                                    <x:Double>1</x:Double>
-                                </Slider.Minimum>
-                            </Slider>
-                            <TextBlock x:Name="ConcurrentDownloadsValueText" Grid.Column="1" Text="4" Margin="12,0,0,0" VerticalAlignment="Center" Style="{ThemeResource BodyStrongTextBlockStyle}"/>
-                        </Grid>
-                        <TextBlock x:Name="RamEstimateText" Style="{ThemeResource CaptionTextBlockStyle}" Opacity="0.8" Margin="0,4,0,0" Text="Estimated peak background RAM usage: ~500 MB"/>
+                        </Button>
+                        <TextBlock x:Name="DetectionStatusTextControl" Visibility="Collapsed" TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}"/>
+
+                        <ToggleSwitch x:Name="ConnectionMethodToggleSwitchControl" Header="Connection Backend" OnContent="Proxy" OffContent="WebView2"/>
+
+                        <Button x:Name="ApplyWikiChangesButtonControl" Content="Save Wiki Changes" HorizontalAlignment="Stretch" Style="{ThemeResource AccentButtonStyle}" Click="ApplyWikiChangesButton_Click"/>
                     </StackPanel>
                 </Border>
+
+                <TextBlock Text="Accounts" Style="{ThemeResource SubtitleTextBlockStyle}" Margin="0,16,0,0"/>
                 <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
                     <StackPanel Spacing="12">
-                        <TextBlock Text="Storage" Style="{ThemeResource SubtitleTextBlockStyle}" HorizontalAlignment="Center"/>
-                        <Grid VerticalAlignment="Center">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="Enable Offline Reading" VerticalAlignment="Center" Style="{ThemeResource BodyStrongTextBlockStyle}"/>
-                            <ToggleSwitch x:Name="CachingToggle" Toggled="CachingToggle_Toggled" VerticalAlignment="Center" HorizontalAlignment="Right" OffContent="Disabled" OnContent="Enabled" Margin="0,0,-30,0"/>
-                        </Grid>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                <TextBlock Text="Storage Used" Style="{ThemeResource BodyStrongTextBlockStyle}"/>
-                                <TextBlock x:Name="CacheSizeText" Text="Calculating..." Style="{ThemeResource BodyTextBlockStyle}" Opacity="0.7"/>
-                            </StackPanel>
-                            <Button x:Name="ClearCacheButtonControl" Grid.Column="1" Content="Clear Cache" Click="ClearCacheButton_Click" VerticalAlignment="Center" Style="{ThemeResource AccentButtonStyle}"/>
-                        </Grid>
-                    </StackPanel>
-                </Border>
-                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
-                    <StackPanel Spacing="12">
-                        <TextBlock Text="About" Style="{ThemeResource SubtitleTextBlockStyle}" HorizontalAlignment="Center"/>
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="12">
-                            <Button Content="About This App" Click="AboutButton_Click" VerticalAlignment="Center"/>
-                            <Button Content="Disclaimer" Click="DisclaimerButton_Click" VerticalAlignment="Center"/>
-                        </StackPanel>
+                        <ListView x:Name="AccountListViewControl" SelectionMode="None" IsItemClickEnabled="False">
+                            <ListView.ItemTemplate>
+                                <DataTemplate x:DataType="models:Account">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <muxc:PersonPicture ProfilePicture="/Assets/StoreLogo.png" Width="48" Height="48"/>
+                                        <TextBlock Grid.Column="1" Text="{x:Bind Username}" VerticalAlignment="Center" Margin="12,0" Style="{ThemeResource BodyTextBlockStyle}"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                        <Button x:Name="AddAccountButtonControl" Content="Add Account for this Wiki" HorizontalAlignment="Stretch" Click="AddAccountButton_Click"/>
                     </StackPanel>
                 </Border>
             </StackPanel>
         </ScrollViewer>
-        <Grid Style="{StaticResource PageTitleBarGridStyle}" VerticalAlignment="Top" Margin="0,0,7,0">
-            <TextBlock Text="Settings" Style="{StaticResource PageTitleBarTextStyle}"/>
-        </Grid>
-        <Grid x:Name="LoadingOverlay" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Visibility="Collapsed">
+
+        <Grid x:Name="LoadingOverlayControl" Grid.ColumnSpan="2" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Visibility="Collapsed">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
                 <ProgressRing IsActive="True" Width="60" Height="60"/>
-                <TextBlock x:Name="LoadingOverlayText" Text="Please wait..."/>
+                <TextBlock x:Name="LoadingTextControl" Text="Please wait..."/>
             </StackPanel>
         </Grid>
-        <Grid x:Name="VerificationPanel" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Visibility="Collapsed">
+        <Grid x:Name="VerificationPanelControl" Grid.ColumnSpan="2" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Visibility="Collapsed">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
