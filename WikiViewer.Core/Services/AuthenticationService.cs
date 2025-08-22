@@ -71,9 +71,7 @@ namespace WikiViewer.Core.Services
                 return;
 
             ClientLoginResponse resultResponse;
-            using (
-                var loginWorker = _workerFactory.CreateApiWorker(_wiki.PreferredConnectionMethod)
-            )
+            using (var loginWorker = _workerFactory.CreateApiWorker(_wiki))
             {
                 await loginWorker.InitializeAsync(_wiki.BaseUrl);
 
@@ -122,9 +120,7 @@ namespace WikiViewer.Core.Services
                     );
                 }
 
-                var authenticatedWorker = _workerFactory.CreateApiWorker(
-                    _wiki.PreferredConnectionMethod
-                );
+                var authenticatedWorker = _workerFactory.CreateApiWorker(_wiki);
                 await authenticatedWorker.InitializeAsync(_wiki.BaseUrl);
                 await authenticatedWorker.CopyApiCookiesFromAsync(loginWorker);
                 _account.AuthenticatedApiWorker = authenticatedWorker;

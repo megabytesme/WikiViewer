@@ -1,9 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
-using WikiViewer.Core;
 using WikiViewer.Core.Interfaces;
+using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
 using Windows.UI.Core;
 using Windows.UI.Xaml;
@@ -15,6 +16,7 @@ namespace WikiViewer.Shared.Uwp.Pages
 {
     public abstract class EditPageBase : Page
     {
+        private WikiInstance _pageWikiContext;
         protected string _pageTitle;
         protected string _originalWikitext;
         protected IApiWorker _apiWorker;
@@ -36,17 +38,21 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
-            _pageTitle = e.Parameter as string;
-            if (string.IsNullOrEmpty(_pageTitle))
+            if (e.Parameter is ArticleNavigationParameter navParam)
+            {
+                _pageWikiContext = WikiManager.GetWikiById(navParam.WikiId);
+                _pageTitle = navParam.PageTitle;
+            }
+
+            if (_pageWikiContext == null || string.IsNullOrEmpty(_pageTitle))
             {
                 Frame.GoBack();
                 return;
             }
 
-            PageTitleTextBlock.Text = $"Editing: {_pageTitle.Replace('_', ' ')}";
-            _apiWorker = App.ApiWorkerFactory.CreateApiWorker(
-                SessionManager.CurrentWiki.PreferredConnectionMethod
-            );
+            PageTitleTextBlock.Text =
+                $"Editing: {_pageTitle.Replace('_', ' ')} on {_pageWikiContext.Name}";
+            _apiWorker = App.ApiWorkerFactory.CreateApiWorker(_pageWikiContext);
             _ = LoadContentAsync();
         }
 
@@ -87,9 +93,9 @@ namespace WikiViewer.Shared.Uwp.Pages
         {
             try
             {
-                await _apiWorker.InitializeAsync(SessionManager.CurrentWiki.BaseUrl);
+                await _apiWorker.InitializeAsync(_pageWikiContext.BaseUrl);
                 string url =
-                    $"{SessionManager.CurrentWiki.ApiEndpoint}?action=query&prop=revisions&titles={Uri.EscapeDataString(_pageTitle)}&rvprop=content&format=json";
+                    $"{_pageWikiContext.ApiEndpoint}?action=query&prop=revisions&titles={Uri.EscapeDataString(_pageTitle)}&rvprop=content&format=json";
                 string json = await _apiWorker.GetJsonFromApiAsync(url);
                 var root = JObject.Parse(json);
                 var page = root["query"]["pages"].First.First;
@@ -128,7 +134,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                     { "disablelimitreport", "true" },
                 };
                 string json = await _apiWorker.PostAndGetJsonFromApiAsync(
-                    SessionManager.CurrentWiki.ApiEndpoint,
+                    _pageWikiContext.ApiEndpoint,
                     postData
                 );
                 var root = JObject.Parse(json);
@@ -153,12 +159,15 @@ namespace WikiViewer.Shared.Uwp.Pages
             LoadingTextBlock.Text = "Saving...";
             try
             {
-                if (!SessionManager.IsLoggedIn)
+                var account = AccountManager
+                    .GetAccountsForWiki(_pageWikiContext.Id)
+                    .FirstOrDefault(a => a.IsLoggedIn);
+                if (account == null)
                     throw new InvalidOperationException("User must be logged in to save a page.");
 
                 var authService = new AuthenticationService(
-                    SessionManager.CurrentAccount,
-                    SessionManager.CurrentWiki,
+                    account,
+                    _pageWikiContext,
                     App.ApiWorkerFactory
                 );
                 bool success = await authService.SavePageAsync(

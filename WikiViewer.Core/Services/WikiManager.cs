@@ -14,6 +14,8 @@ namespace WikiViewer.Core.Services
         private const string WikisFileName = "wikis.json";
         private static List<WikiInstance> _wikis;
 
+        public static event EventHandler WikisChanged;
+
         public static async Task InitializeAsync()
         {
             if (_wikis != null)
@@ -59,6 +61,7 @@ namespace WikiViewer.Core.Services
             );
             string json = JsonConvert.SerializeObject(_wikis, Formatting.Indented);
             await FileIO.WriteTextAsync(file, json);
+            WikisChanged?.Invoke(null, EventArgs.Empty);
         }
 
         public static List<WikiInstance> GetWikis() => _wikis;

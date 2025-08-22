@@ -22,6 +22,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Services\ArticleProcessingService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\AuthenticationService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)services\CloudflareDetector.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)services\FaviconService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\FavouritesService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)services\HttpClientApiWorker.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\SessionManager.cs" />

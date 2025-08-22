@@ -217,14 +217,20 @@ namespace WikiViewer.Shared.Uwp.Pages
             ShowLoadingOverlay();
             try
             {
-                var worker = App.ApiWorkerFactory.CreateApiWorker(wiki.PreferredConnectionMethod);
+                var worker = SessionManager.GetAnonymousWorkerForWiki(wiki);
                 await worker.InitializeAsync(wiki.BaseUrl);
-                bool pageExists = await ArticleProcessingService.PageExistsAsync(pageTitle, worker);
+                bool pageExists = await ArticleProcessingService.PageExistsAsync(
+                    pageTitle,
+                    worker,
+                    wiki
+                );
 
                 if (pageExists)
                 {
-                    SessionManager.SetCurrentWiki(wiki);
-                    App.Navigate(GetArticleViewerPageType(), pageTitle);
+                    Frame.Navigate(
+                        GetArticleViewerPageType(),
+                        new ArticleNavigationParameter { WikiId = wiki.Id, PageTitle = pageTitle }
+                    );
                 }
                 else
                 {
@@ -239,7 +245,6 @@ namespace WikiViewer.Shared.Uwp.Pages
                     var result = await dialog.ShowAsync();
                     if (result == ContentDialogResult.Primary)
                     {
-                        SessionManager.SetCurrentWiki(wiki);
                         var accountForWiki = AccountManager
                             .GetAccountsForWiki(wiki.Id)
                             .FirstOrDefault(a => a.IsLoggedIn);
@@ -255,7 +260,14 @@ namespace WikiViewer.Shared.Uwp.Pages
                         }
                         else
                         {
-                            App.Navigate(GetEditPageType(), pageTitle);
+                            Frame.Navigate(
+                                GetEditPageType(),
+                                new ArticleNavigationParameter
+                                {
+                                    WikiId = wiki.Id,
+                                    PageTitle = pageTitle,
+                                }
+                            );
                         }
                     }
                 }
@@ -318,10 +330,7 @@ namespace WikiViewer.Shared.Uwp.Pages
         private void UpdateSelection()
         {
             DeleteButton.Visibility =
-                (
-                    FavouritesGridView.SelectedItems.Any()
-                    || FavouritesListView.SelectedItems.Any()
-                )
+                (FavouritesGridView.SelectedItems.Any() || FavouritesListView.SelectedItems.Any())
                     ? Visibility.Visible
                     : Visibility.Collapsed;
         }
@@ -329,9 +338,7 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected async void DeleteButton_Click(object sender, RoutedEventArgs e)
         {
             var itemsToDelete = (
-                _isGridView
-                    ? FavouritesGridView.SelectedItems
-                    : FavouritesListView.SelectedItems
+                _isGridView ? FavouritesGridView.SelectedItems : FavouritesListView.SelectedItems
             )
                 .Cast<FavouriteItem>()
                 .ToList();
@@ -377,9 +384,7 @@ namespace WikiViewer.Shared.Uwp.Pages
             ListViewScrollViewer.Visibility = _isGridView
                 ? Visibility.Collapsed
                 : Visibility.Visible;
-            ViewToggleButton.Icon = new SymbolIcon(
-                _isGridView ? Symbol.List : Symbol.ViewAll
-            );
+            ViewToggleButton.Icon = new SymbolIcon(_isGridView ? Symbol.List : Symbol.ViewAll);
             ViewToggleButton.Label = _isGridView ? "List View" : "Grid View";
         }
     }

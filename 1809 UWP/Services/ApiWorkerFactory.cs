@@ -1,21 +1,26 @@
 using WikiViewer.Core.Enums;
 using WikiViewer.Core.Interfaces;
+using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
 
 namespace _1809_UWP.Services
 {
     public class ApiWorkerFactory : IApiWorkerFactory
     {
-        public IApiWorker CreateApiWorker(ConnectionMethod method)
+        public IApiWorker CreateApiWorker(WikiInstance wiki)
         {
-            if (method == ConnectionMethod.HttpClientProxy)
+            IApiWorker worker;
+            if (wiki.PreferredConnectionMethod == ConnectionMethod.HttpClientProxy)
             {
-                return new HttpClientApiWorker();
+                worker = new HttpClientApiWorker();
             }
             else
             {
-                return new WebView2ApiWorker();
+                var webView2Worker = new WebView2ApiWorker();
+                webView2Worker.Wiki = wiki;
+                worker = webView2Worker;
             }
+            return worker;
         }
     }
 }

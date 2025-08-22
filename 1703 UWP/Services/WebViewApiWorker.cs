@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using WikiViewer.Core;
 using WikiViewer.Core.Interfaces;
+using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
 using WikiViewer.Shared.Uwp.Services;
 using Windows.ApplicationModel.Core;
@@ -20,6 +21,7 @@ namespace _1703_UWP.Services
     {
         public WebView WebView { get; private set; }
         public bool IsInitialized { get; private set; }
+        public WikiInstance Wiki { get; set; }
         private Task _initializationTask;
 
         public Task InitializeAsync(string baseUrl = null)
@@ -67,7 +69,8 @@ namespace _1703_UWP.Services
                                 tcs.SetResult(e.IsSuccess);
                         };
                         WebView.NavigationCompleted += navHandler;
-                        var urlToNavigate = new Uri(baseUrl ?? SessionManager.CurrentWiki.BaseUrl);
+                        if (baseUrl == null) throw new InvalidOperationException("Cannot initialize WebView worker without a base URL.");
+                        var urlToNavigate = new Uri(baseUrl);
                         WebView.Navigate(urlToNavigate);
                     }
                     catch (Exception ex)
@@ -88,7 +91,7 @@ namespace _1703_UWP.Services
         {
             if (!IsInitialized)
             {
-                await InitializeAsync();
+                await InitializeAsync(Wiki?.BaseUrl);
             }
         }
 

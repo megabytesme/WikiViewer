@@ -3,252 +3,236 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using WikiViewer.Core;
-using WikiViewer.Core.Enums;
-using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
 using WikiViewer.Shared.Uwp.Managers;
-using Windows.UI;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
-using Windows.UI.Xaml.Media;
-using Windows.UI.Xaml.Navigation;
+using Windows.UI.Xaml.Documents;
 
 namespace WikiViewer.Shared.Uwp.Pages
 {
     public abstract class SettingsPageBase : Page
     {
-        private WikiInstance _selectedWiki;
-        protected ObservableCollection<WikiInstance> Wikis { get; } = new ObservableCollection<WikiInstance>();
-        protected ObservableCollection<Account> AccountsForSelectedWiki { get; } = new ObservableCollection<Account>();
+        protected readonly ObservableCollection<WikiInstance> Wikis =
+            new ObservableCollection<WikiInstance>();
 
-        // ---- THE FIX: RE-INTRODUCE ABSTRACT PROPERTIES FOR ALL UI CONTROLS ----
-        protected abstract ListView WikiListView { get; }
-        protected abstract Panel DetailPanel { get; }
-        protected abstract Button AddWikiButton { get; }
-        protected abstract Button RemoveWikiButton { get; }
-        protected abstract TextBox WikiNameTextBox { get; }
-        protected abstract TextBox WikiUrlTextBox { get; }
-        protected abstract TextBox ScriptPathTextBox { get; }
-        protected abstract TextBox ArticlePathTextBox { get; }
-        protected abstract ToggleSwitch ConnectionMethodToggleSwitch { get; }
-        protected abstract TextBlock DetectionStatusTextBlock { get; }
-        protected abstract Button ApplyWikiChangesButton { get; }
-        protected abstract Button DetectPathsButton { get; }
-        protected abstract ListView AccountListView { get; }
-        protected abstract Button AddAccountButton { get; }
-        protected abstract Grid LoadingOverlay { get; }
-        protected abstract TextBlock LoadingText { get; }
-        protected abstract Grid VerificationPanel { get; }
-        protected abstract void ShowVerificationPanel(string url);
-        protected abstract void ResetAppRootFrame();
-        protected abstract Type GetLoginPageType();
+        protected abstract ToggleSwitch CachingToggleControl { get; }
+        protected abstract Slider ConcurrentDownloadsSliderControl { get; }
+        protected abstract TextBlock ConcurrentDownloadsValueTextControl { get; }
+        protected abstract TextBlock CacheSizeTextControl { get; }
+        protected abstract Button ClearCacheButtonControl { get; }
+        protected abstract ListView WikiListViewControl { get; }
 
         public SettingsPageBase()
         {
-            this.Loaded += Page_Loaded;
-            this.Unloaded += Page_Unloaded;
+            this.Loaded += OnLoaded;
+            this.Unloaded += OnUnloaded;
         }
 
-        private void Page_Loaded(object sender, RoutedEventArgs e)
+        private void OnLoaded(object sender, RoutedEventArgs e)
         {
-            AuthenticationService.AuthenticationStateChanged += OnAuthenticationStateChanged;
+            CachingToggleControl.IsOn = AppSettings.IsCachingEnabled;
+            ConcurrentDownloadsSliderControl.Value = AppSettings.MaxConcurrentDownloads;
+            ConcurrentDownloadsValueTextControl.Text =
+                AppSettings.MaxConcurrentDownloads.ToString();
+            _ = UpdateCacheSizeAsync();
+
             LoadWikis();
-            WikiListView.ItemsSource = Wikis;
-            AccountListView.ItemsSource = AccountsForSelectedWiki;
-
-            var wikiToSelect = Wikis.FirstOrDefault(w => w.Id == SessionManager.CurrentWiki?.Id) ?? Wikis.FirstOrDefault();
-            if (wikiToSelect != null)
-            {
-                WikiListView.SelectedItem = wikiToSelect;
-            }
+            WikiListViewControl.ItemsSource = Wikis;
+            WikiManager.WikisChanged += OnWikisChanged;
         }
 
-        private void Page_Unloaded(object sender, RoutedEventArgs e)
+        private void OnUnloaded(object sender, RoutedEventArgs e)
         {
-            AuthenticationService.AuthenticationStateChanged -= OnAuthenticationStateChanged;
+            WikiManager.WikisChanged -= OnWikisChanged;
         }
 
-        private void OnAuthenticationStateChanged(object sender, AuthenticationStateChangedEventArgs e)
+        private void OnWikisChanged(object sender, EventArgs e)
         {
-            if (_selectedWiki != null && e.Wiki.Id == _selectedWiki.Id)
-            {
-                _ = Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, LoadAccountsForSelectedWiki);
-            }
+            _ = Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, LoadWikis);
         }
 
         private void LoadWikis()
         {
             Wikis.Clear();
-            var wikisFromManager = WikiManager.GetWikis();
-            if (wikisFromManager == null) return;
-
-            foreach (var wiki in wikisFromManager.OrderBy(w => w.Name))
+            foreach (var wiki in WikiManager.GetWikis().OrderBy(w => w.Name))
             {
                 Wikis.Add(wiki);
             }
         }
 
-        protected void WikiListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private async Task UpdateCacheSizeAsync()
         {
-            if (e.AddedItems.FirstOrDefault() is WikiInstance selected)
-            {
-                _selectedWiki = selected;
-                PopulateDetailPanel(selected);
-                DetailPanel.Visibility = Visibility.Visible;
-                RemoveWikiButton.IsEnabled = Wikis.Count > 1;
-            }
-            else
-            {
-                _selectedWiki = null;
-                DetailPanel.Visibility = Visibility.Collapsed;
-            }
+            var sizeInBytes = await ArticleCacheManager.GetCacheSizeAsync();
+            var sizeInMb = sizeInBytes / 1024.0 / 1024.0;
+            CacheSizeTextControl.Text = $"{sizeInMb:F2} MB used";
         }
 
-        private void PopulateDetailPanel(WikiInstance wiki)
+        protected void CachingToggle_Toggled(object sender, RoutedEventArgs e)
         {
-            WikiNameTextBox.Text = wiki.Name;
-            WikiUrlTextBox.Text = wiki.BaseUrl;
-            ScriptPathTextBox.Text = wiki.ScriptPath;
-            ArticlePathTextBox.Text = wiki.ArticlePath;
-            ConnectionMethodToggleSwitch.IsOn = wiki.PreferredConnectionMethod == ConnectionMethod.HttpClientProxy;
-            LoadAccountsForSelectedWiki();
+            var toggle = sender as ToggleSwitch;
+            AppSettings.IsCachingEnabled = toggle.IsOn;
         }
 
-        private void LoadAccountsForSelectedWiki()
+        protected void ConcurrentDownloadsSlider_ValueChanged(
+            object sender,
+            Windows.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e
+        )
         {
-            AccountsForSelectedWiki.Clear();
-            if (_selectedWiki == null) return;
-
-            var accounts = AccountManager.GetAccountsForWiki(_selectedWiki.Id);
-            foreach (var account in accounts.OrderBy(a => a.Username))
+            int value = (int)e.NewValue;
+            AppSettings.MaxConcurrentDownloads = value;
+            if (ConcurrentDownloadsValueTextControl != null)
             {
-                AccountsForSelectedWiki.Add(account);
+                ConcurrentDownloadsValueTextControl.Text = value.ToString();
             }
         }
 
-        protected async void AddWikiButton_Click(object sender, RoutedEventArgs e)
+        protected async void ClearCacheButton_Click(object sender, RoutedEventArgs e)
         {
-            var newWiki = new WikiInstance
+            var button = sender as Button;
+            button.IsEnabled = false;
+            await ArticleCacheManager.ClearCacheAsync();
+            await UpdateCacheSizeAsync();
+            button.IsEnabled = true;
+        }
+
+        protected void WikiListView_ItemClick(object sender, ItemClickEventArgs e)
+        {
+            if (e.ClickedItem is WikiInstance wiki)
             {
-                Name = "New Wiki",
-                BaseUrl = "https://www.mediawiki.org/"
-            };
-
-            await WikiManager.AddWikiAsync(newWiki);
-
-            LoadWikis();
-
-            var newlyAddedWiki = Wikis.FirstOrDefault(w => w.Id == newWiki.Id);
-            if (newlyAddedWiki != null)
-            {
-                WikiListView.SelectedItem = newlyAddedWiki;
+                Frame.Navigate(typeof(WikiDetailPage), wiki.Id);
             }
         }
 
-        protected async void RemoveWikiButton_Click(object sender, RoutedEventArgs e)
+        protected void AddWikiButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_selectedWiki == null || Wikis.Count <= 1) return;
+            Frame.Navigate(typeof(WikiDetailPage), true);
+        }
+
+        protected async void AboutButton_Click(object sender, RoutedEventArgs e) =>
+            await new ContentDialog
+            {
+                Title = "About Wiki Viewer",
+                Content = new ScrollViewer()
+                {
+                    Content = new TextBlock()
+                    {
+                        Inlines =
+                        {
+                            new Run() { Text = "Wiki Viewer" },
+                            new LineBreak(),
+                            new Run() { Text = $"Version {GetAppVersion()} ({GetAppName()})" },
+                            new LineBreak(),
+                            new Run() { Text = "Copyright   2025 MegaBytesMe" },
+                            new LineBreak(),
+                            new LineBreak(),
+                            new Run() { Text = "Source code available on " },
+                            new Hyperlink()
+                            {
+                                NavigateUri = new Uri("https://github.com/megabytesme/WikiViewer"),
+                                Inlines = { new Run() { Text = "GitHub" } },
+                            },
+                            new LineBreak(),
+                            new Run() { Text = "Anything wrong? Let me know: " },
+                            new Hyperlink()
+                            {
+                                NavigateUri = new Uri(
+                                    "https://github.com/megabytesme/WikiViewer/issues"
+                                ),
+                                Inlines = { new Run() { Text = "Support" } },
+                            },
+                            new LineBreak(),
+                            new Run() { Text = "Privacy Policy: " },
+                            new Hyperlink()
+                            {
+                                NavigateUri = new Uri(
+                                    "https://github.com/megabytesme/WikiViewer/blob/master/PRIVACYPOLICY.md"
+                                ),
+                                Inlines = { new Run() { Text = "Privacy Policy" } },
+                            },
+                            new LineBreak(),
+                            new LineBreak(),
+                            new Run() { Text = "Like what you see? View my " },
+                            new Hyperlink()
+                            {
+                                NavigateUri = new Uri("https://github.com/megabytesme"),
+                                Inlines = { new Run() { Text = "GitHub" } },
+                            },
+                            new Run() { Text = " and maybe my " },
+                            new Hyperlink()
+                            {
+                                NavigateUri = new Uri(
+                                    "https://apps.microsoft.com/search?query=megabytesme"
+                                ),
+                                Inlines = { new Run() { Text = "Other Apps," } },
+                            },
+                            new Run()
+                            {
+                                Text = " or consider buying me a coffee (supporting me) on ",
+                            },
+                            new Hyperlink()
+                            {
+                                NavigateUri = new Uri("https://ko-fi.com/megabytesme"),
+                                Inlines = { new Run() { Text = "Ko-fi! :-)" } },
+                            },
+                            new LineBreak(),
+                            new LineBreak(),
+                            new Run()
+                            {
+                                Text =
+                                    "WikiViewer is a client for browsing MediaWiki-based wikis without your web browser, online and offline (after caching).",
+                            },
+                        },
+                        TextWrapping = TextWrapping.Wrap,
+                    },
+                },
+                CloseButtonText = "OK",
+            }.ShowAsync();
+
+        protected async void DisclaimerButton_Click(object sender, RoutedEventArgs e)
+        {
+            var wikis = WikiManager.GetWikis();
+            var hostsList = string.Join(", ", wikis.Select(w => w.Host));
+
+            var textBlock = new TextBlock { TextWrapping = TextWrapping.Wrap };
+
+            textBlock.Inlines.Add(new Run { Text = "This is an unofficial, third-party client for browsing MediaWiki sites. This app was created by " });
+            textBlock.Inlines.Add(new Hyperlink
+            {
+                NavigateUri = new Uri("https://github.com/megabytesme"),
+                Inlines = { new Run { Text = "MegaBytesMe" } }
+            });
+            textBlock.Inlines.Add(new Run { Text = " and is not affiliated with, endorsed, or sponsored by the operators of any wiki." });
+            textBlock.Inlines.Add(new LineBreak());
+            textBlock.Inlines.Add(new LineBreak());
+            textBlock.Inlines.Add(new Run { Text = $"All article data, content, and trademarks presented from the configured wikis ({hostsList}) are the property of those sites and their respective contributors. This app simply provides a native viewing experience for publicly available content." });
 
             var dialog = new ContentDialog
             {
-                Title = $"Delete '{_selectedWiki.Name}'?",
-                Content = "This will permanently delete the wiki, all associated accounts, and its favourites from the app. This action cannot be undone.",
-                PrimaryButtonText = "Delete",
-                CloseButtonText = "Cancel"
+                Title = "Disclaimer",
+                Content = new ScrollViewer { Content = textBlock },
+                CloseButtonText = "OK",
             };
-            if (await dialog.ShowAsync() == ContentDialogResult.Primary)
-            {
-                await WikiManager.RemoveWikiAsync(_selectedWiki.Id);
-                LoadWikis();
-            }
+            await dialog.ShowAsync();
         }
 
-        protected async void ApplyWikiChangesButton_Click(object sender, RoutedEventArgs e)
+        private string GetAppName()
         {
-            if (_selectedWiki == null) return;
-
-            _selectedWiki.Name = WikiNameTextBox.Text;
-            _selectedWiki.BaseUrl = WikiUrlTextBox.Text;
-            _selectedWiki.ScriptPath = ScriptPathTextBox.Text;
-            _selectedWiki.ArticlePath = ArticlePathTextBox.Text;
-            _selectedWiki.PreferredConnectionMethod = ConnectionMethodToggleSwitch.IsOn ? ConnectionMethod.HttpClientProxy : ConnectionMethod.WebView;
-
-            await WikiManager.SaveAsync();
-
-            if (SessionManager.CurrentWiki.Id == _selectedWiki.Id)
-            {
-                var dialog = new ContentDialog
-                {
-                    Title = "Reload Required",
-                    Content = "You have modified the currently active wiki. The app needs to reload to apply these changes.",
-                    PrimaryButtonText = "Reload Now"
-                };
-                await dialog.ShowAsync();
-                ResetAppRootFrame();
-            }
-            else
-            {
-                LoadWikis();
-            }
+#if UWP_1703
+            return "1703_UWP";
+#else
+            return "1809_UWP";
+#endif
         }
 
-        protected void AddAccountButton_Click(object sender, RoutedEventArgs e)
+        private string GetAppVersion()
         {
-            if (_selectedWiki == null) return;
-            Frame.Navigate(GetLoginPageType(), _selectedWiki.Id);
-        }
-
-        protected async void DetectPathsButton_Click(object sender, RoutedEventArgs e)
-        {
-            string urlToDetect = WikiUrlTextBox.Text.Trim();
-            if (string.IsNullOrEmpty(urlToDetect))
-            {
-                DetectionStatusTextBlock.Text = "Please enter a Base URL first.";
-                DetectionStatusTextBlock.Foreground = new SolidColorBrush(Colors.Red);
-                DetectionStatusTextBlock.Visibility = Visibility.Visible;
-                return;
-            }
-
-            LoadingOverlay.Visibility = Visibility.Visible;
-            LoadingText.Text = "Detecting paths...";
-            DetectionStatusTextBlock.Visibility = Visibility.Collapsed;
-
-            using (var tempWorker = App.ApiWorkerFactory.CreateApiWorker(ConnectionMethod.WebView))
-            {
-                try
-                {
-                    await tempWorker.InitializeAsync(urlToDetect);
-                    var detectedPaths = await WikiPathDetectorService.DetectPathsAsync(urlToDetect, tempWorker);
-
-                    if (detectedPaths.WasDetectedSuccessfully)
-                    {
-                        ScriptPathTextBox.Text = detectedPaths.ScriptPath;
-                        ArticlePathTextBox.Text = detectedPaths.ArticlePath;
-                        DetectionStatusTextBlock.Text = "Detection successful! Review the paths and click Apply.";
-                        DetectionStatusTextBlock.Foreground = new SolidColorBrush(Colors.Green);
-                    }
-                    else
-                    {
-                        DetectionStatusTextBlock.Text = "Could not automatically detect paths. Please enter them manually.";
-                        DetectionStatusTextBlock.Foreground = new SolidColorBrush(Colors.Red);
-                    }
-                }
-                catch (NeedsUserVerificationException ex)
-                {
-                    ShowVerificationPanel(ex.Url);
-                }
-                catch (Exception ex)
-                {
-                    DetectionStatusTextBlock.Text = $"An error occurred during detection: {ex.Message}";
-                    DetectionStatusTextBlock.Foreground = new SolidColorBrush(Colors.Red);
-                }
-                finally
-                {
-                    DetectionStatusTextBlock.Visibility = Visibility.Visible;
-                    LoadingOverlay.Visibility = Visibility.Collapsed;
-                }
-            }
+#if UWP_1703
+            return "1.0.1.0";
+#else
+            return "2.0.1.0";
+#endif
         }
     }
 }

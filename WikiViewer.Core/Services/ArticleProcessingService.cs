@@ -22,30 +22,24 @@ namespace WikiViewer.Core.Services
             string pageTitle,
             Stopwatch stopwatch,
             IApiWorker worker,
+            WikiInstance wiki,
             bool forceRefresh = false,
-            SemaphoreSlim semaphore = null,
-            Guid? wikiId = null
+            SemaphoreSlim semaphore = null
         )
         {
-            var currentWiki = SessionManager.CurrentWiki;
-            if (wikiId == null && currentWiki == null)
-            {
-                throw new InvalidOperationException(
-                    "wikiId must be provided if there is no current wiki in session."
-                );
-            }
-            Guid contextWikiId = wikiId ?? currentWiki.Id;
-
             if (worker == null)
                 throw new ArgumentNullException(nameof(worker));
+            if (wiki == null)
+                throw new ArgumentNullException(nameof(wiki));
 
             string resolvedTitle = pageTitle;
-            if (string.IsNullOrEmpty(pageTitle))
-                throw new ArgumentNullException(nameof(pageTitle));
-            if (pageTitle.Equals("random", StringComparison.OrdinalIgnoreCase))
+            if (
+                string.IsNullOrEmpty(pageTitle)
+                || pageTitle.Equals("Special:Random", StringComparison.OrdinalIgnoreCase)
+            )
             {
                 string randomTitleJson = await worker.GetJsonFromApiAsync(
-                    $"{AppSettings.ApiEndpoint}?action=query&list=random&rnnamespace=0&rnlimit=1&format=json"
+                    $"{wiki.ApiEndpoint}?action=query&list=random&rnnamespace=0&rnlimit=1&format=json"
                 );
                 if (string.IsNullOrEmpty(randomTitleJson))
                     throw new Exception(
@@ -73,15 +67,16 @@ namespace WikiViewer.Core.Services
                 if (string.IsNullOrEmpty(resolvedTitle))
                     throw new Exception("Failed to get a random title from API response.");
             }
+
             bool isConnected = NetworkInterface.GetIsNetworkAvailable();
             if (AppSettings.IsCachingEnabled && !forceRefresh)
             {
                 var cachedMetadata = await ArticleCacheManager.GetCacheMetadataAsync(
                     resolvedTitle,
-                    contextWikiId
+                    wiki.Id
                 );
                 DateTime? remoteTimestamp = isConnected
-                    ? await FetchLastUpdatedTimestampAsync(resolvedTitle, worker)
+                    ? await FetchLastUpdatedTimestampAsync(resolvedTitle, worker, wiki)
                     : null;
                 if (
                     cachedMetadata != null
@@ -95,7 +90,7 @@ namespace WikiViewer.Core.Services
                 {
                     string cachedHtml = await ArticleCacheManager.GetCachedArticleHtmlAsync(
                         resolvedTitle,
-                        contextWikiId
+                        wiki.Id
                     );
                     if (!string.IsNullOrEmpty(cachedHtml))
                         return (cachedHtml, resolvedTitle);
@@ -105,17 +100,25 @@ namespace WikiViewer.Core.Services
                 throw new Exception(
                     "No network connection and a fresh copy of the article is needed."
                 );
-            string pageUrl = AppSettings.GetWikiPageUrl(resolvedTitle);
+
+            string pageUrl = wiki.GetWikiPageUrl(resolvedTitle);
             var freshHtml = await worker.GetRawHtmlFromUrlAsync(pageUrl);
-            var processedHtml = await ProcessHtmlAsync(freshHtml, resolvedTitle, worker, semaphore);
-            var lastUpdated = await FetchLastUpdatedTimestampAsync(resolvedTitle, worker);
+            var processedHtml = await ProcessHtmlAsync(
+                freshHtml,
+                resolvedTitle,
+                worker,
+                wiki,
+                semaphore
+            );
+            var lastUpdated = await FetchLastUpdatedTimestampAsync(resolvedTitle, worker, wiki);
+
             if (AppSettings.IsCachingEnabled && lastUpdated.HasValue)
             {
                 await ArticleCacheManager.SaveArticleToCacheAsync(
                     resolvedTitle,
                     processedHtml,
                     lastUpdated.Value,
-                    contextWikiId
+                    wiki.Id
                 );
             }
             return (processedHtml, resolvedTitle);
@@ -125,6 +128,7 @@ namespace WikiViewer.Core.Services
             string rawHtml,
             string pageTitle,
             IApiWorker worker,
+            WikiInstance wiki,
             SemaphoreSlim semaphore = null
         )
         {
@@ -133,7 +137,7 @@ namespace WikiViewer.Core.Services
             var contentNode =
                 doc.DocumentNode.SelectSingleNode("//div[@id='mw-content-text']")
                 ?? doc.DocumentNode;
-            await ProcessMediaInDocument(doc, worker, semaphore);
+            await ProcessMediaInDocument(doc, worker, wiki, semaphore);
             string styleBlock = GetCssForTheme();
             return $@"<!DOCTYPE html><html><head><meta charset='UTF-8'><title>{System.Net.WebUtility.HtmlEncode(pageTitle)}</title><meta name='viewport' content='width=device-width, initial-scale=1.0'>{styleBlock}</head><body><div class='mw-parser-output'>{contentNode.InnerHtml}</div></body></html>";
         }
@@ -141,6 +145,7 @@ namespace WikiViewer.Core.Services
         private static async Task ProcessMediaInDocument(
             HtmlDocument doc,
             IApiWorker worker,
+            WikiInstance wiki,
             SemaphoreSlim semaphore = null
         )
         {
@@ -148,12 +153,10 @@ namespace WikiViewer.Core.Services
             if (allImageNodes != null)
             {
                 foreach (var imgNode in allImageNodes)
-                {
                     imgNode.Attributes.Remove("srcset");
-                }
             }
 
-            string fileLinkPrefix = $"/{AppSettings.ArticlePath}File:";
+            string fileLinkPrefix = $"/{wiki.ArticlePath}File:";
             var imageLinks = doc.DocumentNode.SelectNodes(
                 $"//a[starts-with(@href, '{fileLinkPrefix}')]"
             );
@@ -167,7 +170,7 @@ namespace WikiViewer.Core.Services
                     .ToList();
                 var titles = string.Join("|", imageFileNames.Select(Uri.EscapeDataString));
                 var imageUrlApi =
-                    $"{AppSettings.ApiEndpoint}?action=query&prop=imageinfo&iiprop=url&format=json&titles={titles}";
+                    $"{wiki.ApiEndpoint}?action=query&prop=imageinfo&iiprop=url&format=json&titles={titles}";
 
                 try
                 {
@@ -220,17 +223,21 @@ namespace WikiViewer.Core.Services
             );
             if (mediaNodes != null && mediaNodes.Any())
             {
-                var uniqueMediaUrls = mediaNodes
-                    .Select(node =>
-                        node.GetAttributeValue("srcset", null)
-                            ?.Split(',')
-                            .FirstOrDefault()
-                            ?.Trim()
-                            .Split(' ')[0] ?? node.GetAttributeValue("src", null)
+                var uniqueMediaUrls = new List<string>();
+                foreach (var node in mediaNodes)
+                {
+                    string url = node.GetAttributeValue("src", null);
+                    if (
+                        !string.IsNullOrEmpty(url)
+                        && !url.StartsWith("data:")
+                        && !url.Contains("Special:CentralAutoLogin")
                     )
-                    .Where(src => !string.IsNullOrEmpty(src) && !src.StartsWith("data:"))
-                    .Distinct()
-                    .ToList();
+                    {
+                        uniqueMediaUrls.Add(url);
+                    }
+                }
+                uniqueMediaUrls = uniqueMediaUrls.Distinct().ToList();
+
                 var downloadTasks = uniqueMediaUrls
                     .Select(async originalUrl =>
                     {
@@ -240,7 +247,11 @@ namespace WikiViewer.Core.Services
                             return new
                             {
                                 OriginalUrl = originalUrl,
-                                LocalPath = await DownloadAndCacheMediaAsync(originalUrl, worker),
+                                LocalPath = await DownloadAndCacheMediaAsync(
+                                    originalUrl,
+                                    worker,
+                                    wiki
+                                ),
                             };
                         }
                         finally
@@ -249,6 +260,7 @@ namespace WikiViewer.Core.Services
                         }
                     })
                     .ToList();
+
                 var downloadResults = await Task.WhenAll(downloadTasks);
                 var urlToLocalPathMap = downloadResults
                     .Where(r => r.LocalPath != null)
@@ -256,14 +268,11 @@ namespace WikiViewer.Core.Services
 
                 foreach (var node in mediaNodes)
                 {
-                    string originalSrc =
-                        node.GetAttributeValue("srcset", null)
-                            ?.Split(',')
-                            .FirstOrDefault()
-                            ?.Trim()
-                            .Split(' ')[0] ?? node.GetAttributeValue("src", null);
-
-                    if (urlToLocalPathMap.TryGetValue(originalSrc, out string localPath))
+                    string originalSrc = node.GetAttributeValue("src", null);
+                    if (
+                        originalSrc != null
+                        && urlToLocalPathMap.TryGetValue(originalSrc, out string localPath)
+                    )
                     {
 #if UWP_1703
                         string fileName = System.IO.Path.GetFileName(localPath);
@@ -271,7 +280,6 @@ namespace WikiViewer.Core.Services
 #else
                         node.SetAttributeValue("src", localPath);
 #endif
-
                         node.Attributes.Remove("srcset");
                     }
                 }
@@ -280,10 +288,11 @@ namespace WikiViewer.Core.Services
 
         private static async Task<string> DownloadAndCacheMediaAsync(
             string originalUrl,
-            IApiWorker worker
+            IApiWorker worker,
+            WikiInstance wiki
         )
         {
-            if (!Uri.TryCreate(new Uri(AppSettings.BaseUrl), originalUrl, out Uri mediaUrl))
+            if (!Uri.TryCreate(new Uri(wiki.BaseUrl), originalUrl, out Uri mediaUrl))
                 return null;
 
             var extension = Path.GetExtension(mediaUrl.AbsolutePath).ToLowerInvariant();
@@ -340,16 +349,14 @@ namespace WikiViewer.Core.Services
 
         public static async Task<DateTime?> FetchLastUpdatedTimestampAsync(
             string pageTitle,
-            IApiWorker worker
+            IApiWorker worker,
+            WikiInstance wiki
         )
         {
-            if (
-                string.IsNullOrEmpty(pageTitle)
-                || pageTitle.Equals("random", StringComparison.OrdinalIgnoreCase)
-            )
+            if (string.IsNullOrEmpty(pageTitle))
                 return null;
             string url =
-                $"{AppSettings.ApiEndpoint}?action=query&prop=revisions&titles={Uri.EscapeDataString(pageTitle)}&rvprop=timestamp&rvlimit=1&format=json";
+                $"{wiki.ApiEndpoint}?action=query&prop=revisions&titles={Uri.EscapeDataString(pageTitle)}&rvprop=timestamp&rvlimit=1&format=json";
 
             try
             {
@@ -382,12 +389,16 @@ namespace WikiViewer.Core.Services
             }
         }
 
-        public static async Task<bool> PageExistsAsync(string pageTitle, IApiWorker worker)
+        public static async Task<bool> PageExistsAsync(
+            string pageTitle,
+            IApiWorker worker,
+            WikiInstance wiki
+        )
         {
-            if (string.IsNullOrEmpty(pageTitle) || worker == null)
+            if (string.IsNullOrEmpty(pageTitle) || worker == null || wiki == null)
                 return false;
             var escapedTitle = Uri.EscapeDataString(pageTitle);
-            var url = $"{AppSettings.ApiEndpoint}?action=query&titles={escapedTitle}&format=json";
+            var url = $"{wiki.ApiEndpoint}?action=query&titles={escapedTitle}&format=json";
 
             try
             {
@@ -399,9 +410,11 @@ namespace WikiViewer.Core.Services
                 var pages = root?["query"]?["pages"];
                 if (pages == null)
                     return false;
+
                 var firstPage = pages.First as JProperty;
                 if (firstPage?.Value?["missing"] != null || firstPage?.Name == "-1")
                     return false;
+
                 return true;
             }
             catch (JsonReaderException ex)

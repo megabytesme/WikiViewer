@@ -27,7 +27,7 @@ namespace WikiViewer.Core.Services
                 return worker;
             }
 
-            var newWorker = _factory.CreateApiWorker(wiki.PreferredConnectionMethod);
+            var newWorker = _factory.CreateApiWorker(wiki);
             _anonymousWorkers[wiki.Id] = newWorker;
             return newWorker;
         }

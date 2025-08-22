@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
+using WikiViewer.Core.Models;
 using Windows.Storage;
 
 namespace WikiViewer.Core.Services
@@ -95,12 +96,14 @@ namespace WikiViewer.Core.Services
             if (!_pendingDeletesByWiki.ContainsKey(wikiId)) _pendingDeletesByWiki[wikiId] = new HashSet<string>();
 
             bool wasChanged = false;
+            bool isLoggedIn = authService != null;
+
             foreach (var title in associatedTitles)
             {
                 if (_favouritesByWiki[wikiId].Add(title))
                 {
                     wasChanged = true;
-                    if (authService == null || !SessionManager.IsLoggedIn)
+                    if (!isLoggedIn)
                     {
                         _pendingDeletesByWiki[wikiId].Remove(title);
                         _pendingAddsByWiki[wikiId].Add(title);
@@ -110,7 +113,7 @@ namespace WikiViewer.Core.Services
 
             if (wasChanged)
             {
-                if (authService != null && SessionManager.IsLoggedIn)
+                if (isLoggedIn)
                 {
                     await authService.SyncMultipleFavouritesToServerAsync(associatedTitles, add: true);
                 }
@@ -134,12 +137,14 @@ namespace WikiViewer.Core.Services
             if (!_pendingDeletesByWiki.ContainsKey(wikiId)) _pendingDeletesByWiki[wikiId] = new HashSet<string>();
 
             bool wasChanged = false;
+            bool isLoggedIn = authService != null;
+
             foreach (var title in allAssociatedTitles)
             {
                 if (_favouritesByWiki[wikiId].Remove(title))
                 {
                     wasChanged = true;
-                    if (authService == null || !SessionManager.IsLoggedIn)
+                    if (!isLoggedIn)
                     {
                         _pendingAddsByWiki[wikiId].Remove(title);
                         _pendingDeletesByWiki[wikiId].Add(title);
@@ -149,7 +154,7 @@ namespace WikiViewer.Core.Services
 
             if (wasChanged)
             {
-                if (authService != null && SessionManager.IsLoggedIn)
+                if (isLoggedIn)
                 {
                     await authService.SyncMultipleFavouritesToServerAsync(allAssociatedTitles, add: false);
                 }

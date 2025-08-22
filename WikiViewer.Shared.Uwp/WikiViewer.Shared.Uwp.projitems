@@ -9,7 +9,19 @@
     <Import_RootNamespace>WikiViewer.Shared.Uwp</Import_RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)Controls\AccountStatusFlyout.xaml.cs">
+      <DependentUpon>AccountStatusFlyout.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="$(MSBuildThisFileDirectory)Controls\WikiActionsFlyout.xaml.cs">
+      <DependentUpon>WikiActionsFlyout.xaml</DependentUpon>
+    </Compile>
     <Compile Include="$(MSBuildThisFileDirectory)helpers\AnimatedImageLoader.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Pages\WikiDetailPage.xaml.cs">
+      <DependentUpon>WikiDetailPage.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="$(MSBuildThisFileDirectory)Pages\WikiManagementPage.xaml.cs">
+      <DependentUpon>WikiManagementPage.xaml</DependentUpon>
+    </Compile>
     <Compile Include="$(MSBuildThisFileDirectory)Pages\AppBase.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Converters\BooleanToVisibilityConverter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Converters\StringUrlToImageSourceConverter.cs" />
@@ -31,5 +43,16 @@
   <ItemGroup>
     <Folder Include="$(MSBuildThisFileDirectory)Helpers\" />
     <Folder Include="$(MSBuildThisFileDirectory)Services\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Page Include="$(MSBuildThisFileDirectory)Controls\AccountStatusFlyout.xaml">
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="$(MSBuildThisFileDirectory)Controls\WikiActionsFlyout.xaml">
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="$(MSBuildThisFileDirectory)Pages\WikiManagementPage.xaml">
+      <SubType>Designer</SubType>
+    </Page>
   </ItemGroup>
 </Project>

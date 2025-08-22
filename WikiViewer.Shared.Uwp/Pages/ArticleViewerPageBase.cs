@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
 using WikiViewer.Shared.Uwp.Services;
@@ -14,6 +16,7 @@ namespace WikiViewer.Shared.Uwp.Pages
 {
     public abstract class ArticleViewerPageBase : Page
     {
+        protected WikiInstance _pageWikiContext;
         protected string _pageTitleToFetch = "";
         protected string _verificationUrl = null;
         protected bool _isInitialized = false;
@@ -47,14 +50,16 @@ namespace WikiViewer.Shared.Uwp.Pages
             AuthenticationStateChangedEventArgs e
         )
         {
-            if (e.Wiki.Id == SessionManager.CurrentWiki?.Id)
+            if (_pageWikiContext != null && e.Wiki.Id == _pageWikiContext.Id)
             {
                 _ = Dispatcher.RunAsync(
                     Windows.UI.Core.CoreDispatcherPriority.Normal,
                     () =>
+                    {
                         EditAppBarButton.Visibility = e.IsLoggedIn
                             ? Visibility.Visible
-                            : Visibility.Collapsed
+                            : Visibility.Collapsed;
+                    }
                 );
             }
         }
@@ -62,24 +67,56 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
-            if (e.Parameter is string url && (url.StartsWith("http") || url.StartsWith("https")))
+
+            ArticleNavigationParameter navParam = null;
+            if (e.Parameter is string jsonParam)
             {
-                _verificationUrl = url;
-                _pageTitleToFetch = "";
+                try
+                {
+                    navParam = JsonConvert.DeserializeObject<ArticleNavigationParameter>(jsonParam);
+                }
+                catch
+                {
+                    Debug.WriteLine(
+                        "Navigation parameter was not a valid JSON for ArticleNavigationParameter."
+                    );
+                }
             }
-            else if (e.Parameter is string pageTitle && !string.IsNullOrEmpty(pageTitle))
+
+            if (navParam != null)
             {
-                _pageTitleToFetch = pageTitle.Replace(' ', '_');
+                _pageWikiContext = WikiManager.GetWikiById(navParam.WikiId);
+                _pageTitleToFetch = navParam.PageTitle.Replace(' ', '_');
                 if (_articleHistory.Count == 0 || _articleHistory.Peek() != _pageTitleToFetch)
                 {
                     _articleHistory.Clear();
                     _articleHistory.Push(_pageTitleToFetch);
                 }
             }
-            EditAppBarButton.Visibility = SessionManager.IsLoggedIn
-                ? Visibility.Visible
-                : Visibility.Collapsed;
+            else if (
+                e.Parameter is string url
+                && (url.StartsWith("http") || url.StartsWith("https"))
+            )
+            {
+                _verificationUrl = url;
+                _pageTitleToFetch = "";
+                _pageWikiContext = WikiManager.GetWikis().FirstOrDefault();
+            }
+
+            var account =
+                _pageWikiContext != null
+                    ? AccountManager
+                        .GetAccountsForWiki(_pageWikiContext.Id)
+                        .FirstOrDefault(a => a.IsLoggedIn)
+                    : null;
+            EditAppBarButton.Visibility =
+                account != null ? Visibility.Visible : Visibility.Collapsed;
             UpdateFavoriteButton();
+
+            if (_isInitialized)
+            {
+                StartArticleFetch();
+            }
         }
 
         protected void Page_Loaded(object sender, RoutedEventArgs e)
@@ -90,7 +127,13 @@ namespace WikiViewer.Shared.Uwp.Pages
 
             InitializePlatformControls();
             _isInitialized = true;
-            if (!string.IsNullOrEmpty(_pageTitleToFetch) || !string.IsNullOrEmpty(_verificationUrl))
+            if (
+                _pageWikiContext != null
+                && (
+                    !string.IsNullOrEmpty(_pageTitleToFetch)
+                    || !string.IsNullOrEmpty(_verificationUrl)
+                )
+            )
             {
                 StartArticleFetch();
             }
@@ -110,7 +153,11 @@ namespace WikiViewer.Shared.Uwp.Pages
                 ShowVerificationPanel(_verificationUrl);
                 return;
             }
-            if (!_isInitialized || VerificationPanelGrid.Visibility == Visibility.Visible)
+            if (
+                !_isInitialized
+                || _pageWikiContext == null
+                || VerificationPanelGrid.Visibility == Visibility.Visible
+            )
                 return;
 
             ReviewRequestService.IncrementPageLoadCount();
@@ -124,13 +171,15 @@ namespace WikiViewer.Shared.Uwp.Pages
 
             try
             {
+                var worker = SessionManager.GetAnonymousWorkerForWiki(_pageWikiContext);
                 var (processedHtml, resolvedTitle) =
                     await ArticleProcessingService.FetchAndCacheArticleAsync(
                         _pageTitleToFetch,
                         fetchStopwatch,
-                        SessionManager.CurrentApiWorker
+                        worker,
+                        _pageWikiContext
                     );
-                if (_pageTitleToFetch.Equals("random", StringComparison.OrdinalIgnoreCase))
+                if (_pageTitleToFetch.Equals("Special:Random", StringComparison.OrdinalIgnoreCase))
                 {
                     _pageTitleToFetch = resolvedTitle.Replace(' ', '_');
                     _articleHistory.Pop();
@@ -140,7 +189,8 @@ namespace WikiViewer.Shared.Uwp.Pages
                 await DisplayProcessedHtmlAsync(processedHtml);
                 var lastUpdated = await ArticleProcessingService.FetchLastUpdatedTimestampAsync(
                     _pageTitleToFetch,
-                    SessionManager.CurrentApiWorker
+                    worker,
+                    _pageWikiContext
                 );
                 if (lastUpdated.HasValue)
                 {
@@ -181,32 +231,35 @@ namespace WikiViewer.Shared.Uwp.Pages
         {
             if (!string.IsNullOrEmpty(_pageTitleToFetch))
             {
-                App.Navigate(GetEditPageType(), _pageTitleToFetch);
+                App.Navigate(
+                    GetEditPageType(),
+                    new ArticleNavigationParameter
+                    {
+                        WikiId = _pageWikiContext.Id,
+                        PageTitle = _pageTitleToFetch,
+                    }
+                );
             }
         }
 
         protected async void FavoriteButton_Click(object sender, RoutedEventArgs e)
         {
-            if (string.IsNullOrEmpty(_pageTitleToFetch))
+            if (_pageWikiContext == null || string.IsNullOrEmpty(_pageTitleToFetch))
                 return;
 
-            var currentWiki = SessionManager.CurrentWiki;
-            var currentAccount = SessionManager.CurrentAccount;
-            AuthenticationService authService = null;
-            if (currentAccount != null)
-            {
-                authService = new AuthenticationService(
-                    currentAccount,
-                    currentWiki,
-                    App.ApiWorkerFactory
-                );
-            }
+            var account = AccountManager
+                .GetAccountsForWiki(_pageWikiContext.Id)
+                .FirstOrDefault(a => a.IsLoggedIn);
+            var authService =
+                (account != null)
+                    ? new AuthenticationService(account, _pageWikiContext, App.ApiWorkerFactory)
+                    : null;
 
-            if (FavouritesService.IsFavourite(_pageTitleToFetch, currentWiki.Id))
+            if (FavouritesService.IsFavourite(_pageTitleToFetch, _pageWikiContext.Id))
             {
                 await FavouritesService.RemoveFavoriteAsync(
                     _pageTitleToFetch,
-                    currentWiki.Id,
+                    _pageWikiContext.Id,
                     authService
                 );
             }
@@ -214,7 +267,7 @@ namespace WikiViewer.Shared.Uwp.Pages
             {
                 await FavouritesService.AddFavoriteAsync(
                     _pageTitleToFetch,
-                    currentWiki.Id,
+                    _pageWikiContext.Id,
                     authService
                 );
             }
@@ -223,26 +276,28 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         protected void UpdateFavoriteButton()
         {
-            if (FavoriteAppBarButton == null)
+            if (FavoriteAppBarButton == null || _pageWikiContext == null)
                 return;
             if (
                 string.IsNullOrEmpty(_pageTitleToFetch)
-                || _pageTitleToFetch.Equals("random", StringComparison.OrdinalIgnoreCase)
+                || _pageTitleToFetch.Equals("Special:Random", StringComparison.OrdinalIgnoreCase)
             )
             {
                 FavoriteAppBarButton.Visibility = Visibility.Collapsed;
                 return;
             }
             FavoriteAppBarButton.Visibility = Visibility.Visible;
-            if (FavouritesService.IsFavourite(_pageTitleToFetch, SessionManager.CurrentWiki.Id))
+            if (FavouritesService.IsFavourite(_pageTitleToFetch, _pageWikiContext.Id))
             {
                 FavoriteAppBarButton.Label = "Remove from Favourites";
-                (FavoriteAppBarButton.Icon as SymbolIcon).Symbol = Symbol.UnFavorite;
+                if (FavoriteAppBarButton.Icon is SymbolIcon icon)
+                    icon.Symbol = Symbol.UnFavorite;
             }
             else
             {
                 FavoriteAppBarButton.Label = "Add to Favourites";
-                (FavoriteAppBarButton.Icon as SymbolIcon).Symbol = Symbol.Favorite;
+                if (FavoriteAppBarButton.Icon is SymbolIcon icon)
+                    icon.Symbol = Symbol.Favorite;
             }
         }
 
@@ -255,15 +310,16 @@ namespace WikiViewer.Shared.Uwp.Pages
         {
             DataRequest request = args.Request;
             if (
-                !string.IsNullOrEmpty(_pageTitleToFetch)
-                && !_pageTitleToFetch.Equals("random", StringComparison.OrdinalIgnoreCase)
+                _pageWikiContext != null
+                && !string.IsNullOrEmpty(_pageTitleToFetch)
+                && !_pageTitleToFetch.Equals("Special:Random", StringComparison.OrdinalIgnoreCase)
             )
             {
                 request.Data.Properties.Title = ArticleTitleTextBlock.Text;
                 request.Data.Properties.Description =
-                    $"Check out this article on {SessionManager.CurrentWiki.Host}.";
+                    $"Check out this article on {_pageWikiContext.Host}.";
                 request.Data.SetWebLink(
-                    new Uri(SessionManager.CurrentWiki.GetWikiPageUrl(_pageTitleToFetch))
+                    new Uri(_pageWikiContext.GetWikiPageUrl(_pageTitleToFetch))
                 );
             }
             else

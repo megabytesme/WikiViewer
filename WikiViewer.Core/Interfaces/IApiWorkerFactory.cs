@@ -1,9 +1,9 @@
-using WikiViewer.Core.Enums;
+using WikiViewer.Core.Models;
 
 namespace WikiViewer.Core.Interfaces
 {
     public interface IApiWorkerFactory
     {
-        IApiWorker CreateApiWorker(ConnectionMethod method);
+        IApiWorker CreateApiWorker(WikiInstance wiki);
     }
 }

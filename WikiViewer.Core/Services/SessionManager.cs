@@ -12,29 +12,13 @@ namespace WikiViewer.Core.Services
 {
     public static class SessionManager
     {
-        public static WikiInstance CurrentWiki { get; private set; }
-        public static Account CurrentAccount { get; private set; }
         private static ApiWorkerProvider _workerProvider;
         public static bool IsResetPending { get; set; } = false;
 
-        public static bool IsLoggedIn => CurrentAccount?.IsLoggedIn ?? false;
-        public static string Username => CurrentAccount?.Username;
-
-        public static IApiWorker CurrentApiWorker
+        public static IApiWorker GetAnonymousWorkerForWiki(WikiInstance wiki)
         {
-            get
-            {
-                if (CurrentWiki == null) throw new InvalidOperationException("Session not initialized.");
-                if (IsLoggedIn) return CurrentAccount.AuthenticatedApiWorker;
-                return _workerProvider.GetWorkerForWiki(CurrentWiki);
-            }
-        }
-
-        public static void SetCurrentWiki(WikiInstance wiki)
-        {
-            if (wiki == null) throw new ArgumentNullException(nameof(wiki));
-            CurrentWiki = wiki;
-            CurrentAccount = AccountManager.GetAccountsForWiki(wiki.Id).FirstOrDefault(a => a.IsLoggedIn);
+            if (wiki == null) throw new InvalidOperationException("Wiki instance cannot be null.");
+            return _workerProvider.GetWorkerForWiki(wiki);
         }
 
         public static async Task InitializeAsync()
@@ -50,13 +34,6 @@ namespace WikiViewer.Core.Services
             await WikiManager.InitializeAsync();
             await AccountManager.InitializeAsync();
             await FavouritesService.InitializeAsync();
-
-            CurrentWiki = WikiManager.GetWikis().FirstOrDefault();
-            if (CurrentWiki == null)
-            {
-                Debug.WriteLine("[SessionManager] CRITICAL: No wikis configured after initialization.");
-                return;
-            }
 
             var allWikis = WikiManager.GetWikis();
             var loginTasks = new List<Task>();
@@ -81,16 +58,12 @@ namespace WikiViewer.Core.Services
                             catch (Exception ex)
                             {
                                 Debug.WriteLine($"[SessionManager] Auto-login FAILED for '{account.Username}' on '{wiki.Name}': {ex.Message}");
-                                CredentialService.ClearCredentials(account.Id);
                             }
                         }
                     }));
                 }
             }
-
             await Task.WhenAll(loginTasks);
-
-            CurrentAccount = AccountManager.GetAccountsForWiki(CurrentWiki.Id).FirstOrDefault(a => a.IsLoggedIn);
         }
 
         public static void DisposeAndReset()
@@ -102,8 +75,6 @@ namespace WikiViewer.Core.Services
                 account.AuthenticatedApiWorker?.Dispose();
                 account.AuthenticatedApiWorker = null;
             }
-            CurrentWiki = null;
-            CurrentAccount = null;
         }
     }
 }

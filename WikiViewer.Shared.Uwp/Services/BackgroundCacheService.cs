@@ -35,11 +35,7 @@ namespace WikiViewer.Shared.Uwp.Services
                     await semaphore.WaitAsync();
                     try
                     {
-                        using (
-                            var tempWorker = App.ApiWorkerFactory.CreateApiWorker(
-                                wiki.PreferredConnectionMethod
-                            )
-                        )
+                        using (var tempWorker = App.ApiWorkerFactory.CreateApiWorker(wiki))
                         {
                             await tempWorker.InitializeAsync(wiki.BaseUrl);
 
@@ -48,9 +44,9 @@ namespace WikiViewer.Shared.Uwp.Services
                                 title,
                                 stopwatch,
                                 tempWorker,
-                                forceRefresh: true,
-                                semaphore,
-                                wiki.Id
+                                wiki,
+                                true,
+                                semaphore
                             );
                             ArticleCached?.Invoke(null, new ArticleCachedEventArgs(title));
                         }

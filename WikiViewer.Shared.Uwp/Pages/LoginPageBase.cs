@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Threading.Tasks;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
@@ -20,7 +21,10 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected abstract ProgressRing LoadingProgressRing { get; }
         protected abstract TextBlock ErrorTextBlockControl { get; }
         protected abstract Type GetCreateAccountPageType();
-        protected abstract Task ShowInteractiveLoginAsync(AuthUiRequiredException authException, Account account);
+        protected abstract Task ShowInteractiveLoginAsync(
+            AuthUiRequiredException authException,
+            Account account
+        );
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
@@ -32,10 +36,19 @@ namespace WikiViewer.Shared.Uwp.Pages
 
             if (_wikiToLogin == null)
             {
-                _wikiToLogin = SessionManager.CurrentWiki;
+                _wikiToLogin = WikiManager.GetWikis().FirstOrDefault();
             }
 
-            LoginTitleTextBlock.Text = $"Log In to {_wikiToLogin.Host}";
+            if (_wikiToLogin != null)
+            {
+                LoginTitleTextBlock.Text = $"Log In to {_wikiToLogin.Host}";
+            }
+            else
+            {
+                LoginTitleTextBlock.Text = "Log In";
+                LoginButtonControl.IsEnabled = false;
+                ErrorTextBlockControl.Text = "No wikis are configured. Please add one in settings.";
+            }
         }
 
         protected async void LoginButton_Click(object sender, RoutedEventArgs e)
@@ -54,13 +67,13 @@ namespace WikiViewer.Shared.Uwp.Pages
                 return;
             }
 
-            var account = new Account
-            {
-                Username = username,
-                WikiInstanceId = _wikiToLogin.Id
-            };
+            var account = new Account { Username = username, WikiInstanceId = _wikiToLogin.Id };
 
-            var authService = new AuthenticationService(account, _wikiToLogin, App.ApiWorkerFactory);
+            var authService = new AuthenticationService(
+                account,
+                _wikiToLogin,
+                App.ApiWorkerFactory
+            );
 
             try
             {

@@ -12,7 +12,7 @@ namespace WikiViewer.Shared.Uwp.Pages
 {
     public abstract class CreateAccountPageBase : Page
     {
-        private WikiInstance _wikiForAccountCreation;
+        protected WikiInstance _wikiForAccountCreation;
         private List<AuthRequest> _requiredFields;
         private readonly Dictionary<string, string> _hiddenFields =
             new Dictionary<string, string>();
@@ -35,11 +35,6 @@ namespace WikiViewer.Shared.Uwp.Pages
 
             if (_wikiForAccountCreation == null)
             {
-                _wikiForAccountCreation = SessionManager.CurrentWiki;
-            }
-
-            if (_wikiForAccountCreation == null)
-            {
                 ShowError("Cannot create account: No wiki has been selected.");
                 CreateAccountButton.IsEnabled = false;
                 return;
@@ -58,7 +53,7 @@ namespace WikiViewer.Shared.Uwp.Pages
 
             try
             {
-                using (var worker = App.ApiWorkerFactory.CreateApiWorker(_wikiForAccountCreation.PreferredConnectionMethod))
+                using (var worker = App.ApiWorkerFactory.CreateApiWorker(_wikiForAccountCreation))
                 {
                     await worker.InitializeAsync(_wikiForAccountCreation.BaseUrl);
                     string url = $"{_wikiForAccountCreation.ApiEndpoint}?action=query&meta=authmanagerinfo&amirequestsfor=create&format=json";
@@ -181,7 +176,7 @@ namespace WikiViewer.Shared.Uwp.Pages
             try
             {
                 CreateAccountResult result;
-                using (var worker = App.ApiWorkerFactory.CreateApiWorker(_wikiForAccountCreation.PreferredConnectionMethod))
+                using (var worker = App.ApiWorkerFactory.CreateApiWorker(_wikiForAccountCreation))
                 {
                     await worker.InitializeAsync(_wikiForAccountCreation.BaseUrl);
                     string tokenUrl = $"{_wikiForAccountCreation.ApiEndpoint}?action=query&meta=tokens&type=createaccount&format=json";

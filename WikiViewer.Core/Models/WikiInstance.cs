@@ -12,6 +12,7 @@ namespace WikiViewer.Core.Models
         public string ScriptPath { get; set; } = "w/";
         public string ArticlePath { get; set; } = "wiki/";
         public ConnectionMethod PreferredConnectionMethod { get; set; } = ConnectionMethod.WebView;
+        public string IconUrl { get; set; }
 
         [JsonIgnore]
         public string ApiEndpoint => $"{BaseUrl.TrimEnd('/')}/{ScriptPath.Trim('/')}/api.php";

@@ -1,0 +1,30 @@
+﻿<UserControl
+    x:Class="WikiViewer.Shared.Uwp.Controls.WikiActionsFlyout"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:models="using:WikiViewer.Core.Models">
+
+    <StackPanel MinWidth="250" Margin="4">
+        <TextBlock Text="Go to Home Page" Style="{ThemeResource CaptionTextBlockStyle}" Margin="12,8,12,4" FontWeight="Bold"/>
+        <ListView x:Name="HomeListView" SelectionMode="None" IsItemClickEnabled="True" ItemClick="HomeListView_ItemClick">
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="models:WikiInstance">
+                    <TextBlock Text="{x:Bind Name}" Margin="12,8"/>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+
+        <TextBlock Text="Random Article From" Style="{ThemeResource CaptionTextBlockStyle}" Margin="12,8,12,4" FontWeight="Bold"/>
+        <ListView x:Name="RandomListView" SelectionMode="None" IsItemClickEnabled="True" ItemClick="RandomListView_ItemClick">
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="models:WikiInstance">
+                    <TextBlock Text="{x:Bind Name}" Margin="12,8"/>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+        <Button x:Name="SurpriseMeButton" Content="Surprise Me!" HorizontalAlignment="Stretch" Margin="12,4" Click="SurpriseMeButton_Click"/>
+
+        <Rectangle Height="1" Fill="{ThemeResource SystemControlForegroundBaseLowBrush}" Margin="12,8"/>
+        <Button x:Name="ManageButton" Content="Manage Wikis &amp; Accounts" HorizontalAlignment="Stretch" Margin="12,4" Click="ManageButton_Click"/>
+    </StackPanel>
+</UserControl>
