@@ -1,0 +1,136 @@
+﻿<Page
+    x:Class="WikiViewer.Shared.Uwp.Pages.WikiDetailPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
+    mc:Ignorable="d"
+    Background="Transparent">
+
+    <Grid>
+        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <Grid HorizontalAlignment="Stretch"
+                  Margin="0,48,0,0">
+                <StackPanel Spacing="16"
+                            Padding="24"
+                            MaxWidth="500"
+                            HorizontalAlignment="Stretch">
+
+                    <!-- Wiki Info Card -->
+                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            CornerRadius="8"
+                            Padding="16"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1">
+                        <StackPanel Spacing="12">
+                            <TextBox x:Name="WikiNameTextBox"
+                                     Header="Wiki Name"
+                                     PlaceholderText="Enter wiki name"/>
+                            <TextBox x:Name="WikiUrlTextBox"
+                                     Header="MediaWiki Base URL"
+                                     PlaceholderText="https://en.wikipedia.org/"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Paths Card -->
+                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            CornerRadius="8"
+                            Padding="16"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="Paths"
+                                       Style="{ThemeResource SubtitleTextBlockStyle}"/>
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="ScriptPathTextBox"
+                                         Grid.Column="0"
+                                         Header="Script Path"/>
+                                <TextBox x:Name="ArticlePathTextBox"
+                                         Grid.Column="1"
+                                         Header="Article Path"/>
+                            </Grid>
+                            <Button x:Name="DetectPathsButton"
+                                    Style="{StaticResource AccentButtonStyle}"
+                                    Click="DetectPathsButton_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <SymbolIcon Symbol="Find"/>
+                                    <TextBlock Text="Detect Paths"/>
+                                </StackPanel>
+                            </Button>
+                            <TextBlock x:Name="DetectionStatusTextBlock"
+                                       Visibility="Collapsed"
+                                       TextWrapping="Wrap"
+                                       Style="{ThemeResource CaptionTextBlockStyle}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Connection Method Card -->
+                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            CornerRadius="8"
+                            Padding="16"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1">
+                        <ToggleSwitch x:Name="ConnectionMethodToggleSwitch"
+                                      Header="Connection Backend"
+                                      OnContent="Proxy"
+                                      OffContent="WebView2"/>
+                    </Border>
+
+                </StackPanel>
+            </Grid>
+        </ScrollViewer>
+
+        <!-- Overlay title bar -->
+        <Grid Height="48"
+              VerticalAlignment="Top"
+              Background="{ThemeResource PageTitleBarAcrylicBrush}"
+              Style="{StaticResource PageTitleBarGridStyle}">
+            <TextBlock x:Name="PageTitle"
+                       Style="{StaticResource PageTitleBarTextStyle}"
+                       Text="Wiki Details"/>
+        </Grid>
+
+        <!-- Command Bar -->
+        <CommandBar VerticalAlignment="Bottom"
+                    Background="{ThemeResource PageTitleBarAcrylicBrush}">
+            <AppBarButton Icon="Save" Label="Save" Click="SaveButton_Click"/>
+            <AppBarButton Icon="Delete" Label="Delete" Click="DeleteButton_Click"/>
+        </CommandBar>
+
+        <!-- Loading Overlay -->
+        <Grid x:Name="LoadingOverlay"
+              Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
+              Visibility="Collapsed">
+            <StackPanel HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Spacing="12">
+                <ProgressRing IsActive="True" Width="60" Height="60"/>
+                <TextBlock x:Name="LoadingText" Text="Please wait..."/>
+            </StackPanel>
+        </Grid>
+
+        <!-- Verification Panel -->
+        <Grid x:Name="VerificationPanel"
+              Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
+              Visibility="Collapsed">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <StackPanel Margin="12" Spacing="8">
+                <TextBlock Text="Please complete the security check"
+                           Style="{ThemeResource TitleTextBlockStyle}"/>
+                <TextBlock Text="Detection will continue automatically once you finish."
+                           Style="{ThemeResource BodyTextBlockStyle}"
+                           TextWrapping="Wrap"/>
+            </StackPanel>
+            <muxc:WebView2 x:Name="VerificationWebView" Grid.Row="1"/>
+        </Grid>
+    </Grid>
+</Page>

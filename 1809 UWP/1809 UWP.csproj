@@ -148,6 +148,9 @@
       <DependentUpon>MainPage.xaml</DependentUpon>
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="WikiDetailPage.xaml.cs">
+      <DependentUpon>WikiDetailPage.xaml</DependentUpon>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
     <AppxManifest Include="Package.appxmanifest">
@@ -257,6 +260,9 @@
       <SubType>Designer</SubType>
     </Page>
     <Page Include="MainPage.xaml">
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="WikiDetailPage.xaml">
       <SubType>Designer</SubType>
     </Page>
   </ItemGroup>

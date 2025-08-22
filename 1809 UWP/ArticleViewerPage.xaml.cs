@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Microsoft.Web.WebView2.Core;
-using WikiViewer.Core;
+using WikiViewer.Core.Models; // Changed from .Core
 using Windows.Foundation;
 using Windows.Storage;
 using Windows.UI.Xaml.Controls;
@@ -10,6 +10,9 @@ namespace _1809_UWP.Pages
 {
     public sealed partial class ArticleViewerPage
     {
+        // This field is defined in the base class and holds our context
+        // private WikiInstance _pageWikiContext;
+
         public ArticleViewerPage() => this.InitializeComponent();
 
         protected override TextBlock ArticleTitleTextBlock => ArticleTitle;
@@ -21,6 +24,9 @@ namespace _1809_UWP.Pages
         protected override AppBarButton FavoriteAppBarButton => FavoriteButton;
 
         protected override Type GetEditPageType() => typeof(EditPage);
+
+        // NEW: Helper method to get the virtual host name from the current wiki context.
+        private string GetVirtualHostName() => $"local-content.{_pageWikiContext.Host}";
 
         protected override void ShowLoadingOverlay()
         {
@@ -48,8 +54,9 @@ namespace _1809_UWP.Pages
                 CreationCollisionOption.ReplaceExisting
             );
             await FileIO.WriteTextAsync(articleFile, html);
+            // FIX: Use the helper method
             ArticleDisplayWebView.CoreWebView2.Navigate(
-                $"https://{AppSettings.GetVirtualHostName()}/article.html"
+                $"https://{GetVirtualHostName()}/article.html"
             );
         }
 
@@ -101,8 +108,9 @@ namespace _1809_UWP.Pages
         {
             await ArticleDisplayWebView.EnsureCoreWebView2Async();
             var tempFolder = ApplicationData.Current.LocalFolder.Path;
+            // FIX: Use the helper method
             ArticleDisplayWebView.CoreWebView2.SetVirtualHostNameToFolderMapping(
-                AppSettings.GetVirtualHostName(),
+                GetVirtualHostName(),
                 tempFolder,
                 CoreWebView2HostResourceAccessKind.Allow
             );
@@ -111,9 +119,9 @@ namespace _1809_UWP.Pages
         }
 
         private async void ArticleDisplayWebView_NavigationStarting(
-    CoreWebView2 sender,
-    CoreWebView2NavigationStartingEventArgs args
-)
+            CoreWebView2 sender,
+            CoreWebView2NavigationStartingEventArgs args
+        )
         {
             if (args.Uri.EndsWith("/article.html", StringComparison.OrdinalIgnoreCase))
             {
@@ -125,14 +133,17 @@ namespace _1809_UWP.Pages
             if (string.IsNullOrEmpty(args.Uri)) return;
             var uri = new Uri(args.Uri);
 
-            if (uri.Host.Equals(AppSettings.GetVirtualHostName(), StringComparison.OrdinalIgnoreCase))
+            // FIX: Use the helper method
+            if (uri.Host.Equals(GetVirtualHostName(), StringComparison.OrdinalIgnoreCase))
             {
                 string clickedPath = uri.AbsolutePath;
                 string newTitle = null;
-                string articlePathPrefix = $"/{AppSettings.ArticlePath}";
+                // FIX: Use the wiki instance's ArticlePath
+                string articlePathPrefix = $"/{_pageWikiContext.ArticlePath}";
 
                 if (
-                    !string.IsNullOrEmpty(AppSettings.ArticlePath)
+                    // FIX: Use the wiki instance's ArticlePath
+                    !string.IsNullOrEmpty(_pageWikiContext.ArticlePath)
                     && clickedPath.StartsWith(articlePathPrefix)
                 )
                     newTitle = clickedPath.Substring(articlePathPrefix.Length);

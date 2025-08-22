@@ -1,6 +1,5 @@
 ﻿using System;
 using Microsoft.UI.Xaml.Controls;
-using WikiViewer.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 
@@ -87,7 +86,7 @@ namespace _1809_UWP.Pages
                             Text = linkParts.Length > 1 ? linkParts[1] : linkParts[0],
                         }
                     );
-                    hyperlink.NavigateUri = new Uri(AppSettings.GetWikiPageUrl(linkParts[0]));
+                    hyperlink.NavigateUri = new Uri(_wikiForAccountCreation.GetWikiPageUrl(linkParts[0]));
                     hyperlink.Click += async (s, ev) =>
                         await Windows.System.Launcher.LaunchUriAsync(s.NavigateUri);
                     textBlock.Inlines.Add(hyperlink);
@@ -105,7 +104,7 @@ namespace _1809_UWP.Pages
             string bodyContent = text;
             if (bodyContent.StartsWith("/w/index.php?") && bodyContent.Contains("Captcha/image"))
                 bodyContent =
-                    $"<img src='{AppSettings.BaseUrl.TrimEnd('/') + bodyContent}' alt='CAPTCHA Image' />";
+                    $"<img src='{_wikiForAccountCreation.BaseUrl.TrimEnd('/') + bodyContent}' alt='CAPTCHA Image' />";
             else
             {
                 bodyContent = System.Net.WebUtility.HtmlDecode(bodyContent);
@@ -120,7 +119,7 @@ namespace _1809_UWP.Pages
                     match =>
                     {
                         var parts = match.Groups[1].Value.Split('|');
-                        return $"<a href='{AppSettings.GetWikiPageUrl(parts[0])}'>{(parts.Length > 1 ? parts[1] : parts[0])}</a>";
+                        return $"<a href='{_wikiForAccountCreation.GetWikiPageUrl(parts[0])}'>{(parts.Length > 1 ? parts[1] : parts[0])}</a>";
                     }
                 );
             }

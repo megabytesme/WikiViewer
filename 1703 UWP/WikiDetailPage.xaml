@@ -1,0 +1,68 @@
+﻿<local:WikiDetailPage
+    x:Class="_1703_UWP.WikiDetailPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:WikiViewer.Shared.Uwp.Pages"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Grid Style="{StaticResource PageTitleBarGridStyle}">
+            <TextBlock x:Name="PageTitle" Style="{StaticResource PageTitleBarTextStyle}"/>
+        </Grid>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="12" Padding="24" MaxWidth="600">
+                <TextBox x:Name="WikiNameTextBox" Header="Wiki Name"/>
+                <TextBox x:Name="WikiUrlTextBox" Header="MediaWiki Base URL" PlaceholderText="https://en.wikipedia.org/"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="ScriptPathTextBox" Grid.Column="0" Header="Script Path" Margin="0,0,6,0"/>
+                    <TextBox x:Name="ArticlePathTextBox" Grid.Column="1" Header="Article Path" Margin="6,0,0,0"/>
+                </Grid>
+                <Button x:Name="DetectPathsButton" HorizontalAlignment="Left" Click="DetectPathsButton_Click">
+                    <StackPanel Orientation="Horizontal" Margin="8">
+                        <SymbolIcon Symbol="Find"/>
+                        <TextBlock Text="Detect Paths"/>
+                    </StackPanel>
+                </Button>
+                <TextBlock x:Name="DetectionStatusTextBlock" Visibility="Collapsed" TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}"/>
+                <ToggleSwitch x:Name="ConnectionMethodToggleSwitch" Header="Connection Backend" OnContent="Proxy" OffContent="WebView"/>
+            </StackPanel>
+        </ScrollViewer>
+
+        <CommandBar Grid.Row="1" VerticalAlignment="Bottom">
+            <AppBarButton Icon="Save" Label="Save" Click="SaveButton_Click"/>
+            <AppBarButton Icon="Delete" Label="Delete" Click="DeleteButton_Click"/>
+        </CommandBar>
+
+        <Grid x:Name="LoadingOverlay" Grid.RowSpan="2" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Visibility="Collapsed">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="12">
+                <ProgressRing IsActive="True" Width="60" Height="60"/>
+                <TextBlock x:Name="LoadingText" Text="Please wait..."/>
+            </StackPanel>
+        </Grid>
+
+        <Grid x:Name="VerificationPanel" Grid.RowSpan="2" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Visibility="Collapsed">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <StackPanel Margin="12" Padding="8">
+                <TextBlock Text="Please complete the security check" Style="{ThemeResource TitleTextBlockStyle}"/>
+                <TextBlock Text="Detection will continue automatically once you finish." Style="{ThemeResource BodyTextBlockStyle}" TextWrapping="Wrap"/>
+            </StackPanel>
+            <WebView x:Name="VerificationWebView" Grid.Row="1"/>
+        </Grid>
+    </Grid>
+</local:WikiDetailPage>

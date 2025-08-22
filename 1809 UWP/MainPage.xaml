@@ -3,7 +3,8 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
-    xmlns:local="using:WikiViewer.Shared.Uwp.Pages">
+    xmlns:local="using:WikiViewer.Shared.Uwp.Pages"
+    muxc:BackdropMaterial.ApplyToRootOrPageBackground="True">
     <Grid>
         <VisualStateManager.VisualStateGroups>
             <VisualStateGroup x:Name="WindowStates">
@@ -30,15 +31,11 @@
             <TextBlock Text="WikiViewer" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="16,0,0,0" Grid.Column="1" Style="{StaticResource CaptionTextBlockStyle}"/>
         </Grid>
         <muxc:NavigationView Grid.Row="1" x:Name="NavView" PaneDisplayMode="LeftCompact" IsSettingsVisible="True" IsBackButtonVisible="Collapsed" IsBackEnabled="False" ItemInvoked="NavView_ItemInvoked" Loaded="NavView_Loaded" BackRequested="NavView_BackRequested" IsTitleBarAutoPaddingEnabled="True">
-            <muxc:NavigationView.MenuItems>
-                <muxc:NavigationViewItem Content="Home" Tag="home" Icon="Home"/>
-                <muxc:NavigationViewItem Content="Random Article" Tag="random" Icon="Shuffle"/>
-                <muxc:NavigationViewItem Content="Favourites" Tag="favourites" Icon="Favorite"/>
-                <muxc:NavigationViewItem x:Name="LoginNavItem" Content="Login" Tag="login" Icon="Contact"/>
-            </muxc:NavigationView.MenuItems>
+
             <muxc:NavigationView.AutoSuggestBox>
                 <AutoSuggestBox x:Name="NavSearchBox" QueryIcon="Find" PlaceholderText="Search..." QuerySubmitted="SearchBox_QuerySubmitted" TextChanged="SearchBox_TextChanged"/>
             </muxc:NavigationView.AutoSuggestBox>
+
             <Grid>
                 <Frame x:Name="PageContentFrame" Navigated="ContentFrame_Navigated"/>
                 <muxc:InfoBar x:Name="ConnectionInfoBar" Grid.Row="0" Title="Connection Issue" Severity="Warning" IsOpen="False" IsClosable="False" Margin="12,12,12,0" VerticalAlignment="Top">

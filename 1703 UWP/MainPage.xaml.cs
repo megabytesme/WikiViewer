@@ -1,10 +1,9 @@
 ﻿using System;
-using System.Linq;
-using WikiViewer.Core.Services;
+using WikiViewer.Core.Models;
 using WikiViewer.Shared.Uwp.Pages;
-using WikiViewer.Shared.Uwp.Services;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Data;
 
 namespace _1703_UWP.Pages
 {
@@ -34,23 +33,6 @@ namespace _1703_UWP.Pages
 
         protected override Type GetSettingsPageType() => typeof(SettingsPage);
 
-        protected override void UpdateUserUI(bool isLoggedIn, string username)
-        {
-            var navItem = this.FindName("LoginNavItem") as RadioButton;
-            if (navItem == null)
-                return;
-            if (isLoggedIn)
-            {
-                navItem.Content = username ?? "User";
-                navItem.Tag = "userpage";
-            }
-            else
-            {
-                navItem.Content = username ?? "Login";
-                navItem.Tag = "login";
-            }
-        }
-
         protected override void ShowConnectionInfoBar(
             string title,
             string message,
@@ -68,50 +50,132 @@ namespace _1703_UWP.Pages
         protected override void HideConnectionInfoBar() =>
             (this.FindName("ConnectionInfoBar") as Border).Visibility = Visibility.Collapsed;
 
-        protected override void NavigateToPage(Type page, string parameter)
+        #region Abstract Method Implementations
+
+        protected override void ClearWikiNavItems()
         {
-            var navSplitView = this.FindName("NavSplitView") as SplitView;
-            string tag = "";
-            if (page == GetArticleViewerPageType())
-            {
-                if (parameter == "Main Page")
-                    tag = "home";
-                else if (parameter == "random")
-                    tag = "random";
-            }
-            else if (page == GetFavouritesPageType())
-                tag = "favourites";
-            else if (page == GetLoginPageType())
-                tag = "login";
-            else if (page == GetSettingsPageType())
-                tag = "settings";
-            else if (page is string && page.ToString().StartsWith("User:"))
-                tag = "userpage";
-
-            if (
-                ContentFrame != null
-                && page != null
-                && (
-                    ContentFrame.SourcePageType != page
-                    || (ContentFrame.GetNavigationState() as string) != parameter
-                )
-            )
-            {
-                ContentFrame.Navigate(page, parameter);
-            }
-
-            if (navSplitView?.Pane is FrameworkElement pane)
-            {
-                foreach (var item in pane.FindChildren<RadioButton>())
-                {
-                    if (item.Tag as string == tag)
-                    {
-                        item.IsChecked = true;
-                        break;
-                    }
-                }
-            }
+            var navListView = this.FindName("NavListView") as ListView;
+            navListView.Items.Clear();
         }
+
+        protected override void AddWikiNavItem(WikiInstance wiki)
+        {
+            var navListView = this.FindName("NavListView") as ListView;
+            var item = new ListViewItem { DataContext = wiki };
+
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(
+                new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }
+            );
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var contentStack = new StackPanel { Orientation = Orientation.Horizontal };
+            var icon = new BitmapIcon();
+            var binding = new Binding
+            {
+                Source = wiki,
+                Path = new PropertyPath("IconUrl"),
+                Mode = BindingMode.OneWay,
+                TargetNullValue = new SymbolIcon(Symbol.Globe),
+            };
+            BindingOperations.SetBinding(icon, BitmapIcon.UriSourceProperty, binding);
+
+            contentStack.Children.Add(icon);
+            contentStack.Children.Add(
+                new TextBlock
+                {
+                    Text = wiki.Name,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(12, 0, 0, 0),
+                }
+            );
+            Grid.SetColumn(contentStack, 0);
+            grid.Children.Add(contentStack);
+
+            item.Content = grid;
+            item.Tapped += (s, e) =>
+                NavigateToPage(
+                    GetArticleViewerPageType(),
+                    new ArticleNavigationParameter { WikiId = wiki.Id, PageTitle = "Main Page" }
+                );
+
+            var flyout = new MenuFlyout();
+            var homeItem = new MenuFlyoutItem
+            {
+                Text = "Home Page",
+                Icon = new SymbolIcon(Symbol.Home),
+            };
+            homeItem.Click += (s, e) =>
+                NavigateToPage(
+                    GetArticleViewerPageType(),
+                    new ArticleNavigationParameter { WikiId = wiki.Id, PageTitle = "Main Page" }
+                );
+            flyout.Items.Add(homeItem);
+
+            var randomItem = new MenuFlyoutItem
+            {
+                Text = "Random Article",
+                Icon = new SymbolIcon(Symbol.Shuffle),
+            };
+            randomItem.Click += (s, e) =>
+                NavigateToPage(
+                    GetArticleViewerPageType(),
+                    new ArticleNavigationParameter
+                    {
+                        WikiId = wiki.Id,
+                        PageTitle = "Special:Random",
+                    }
+                );
+            flyout.Items.Add(randomItem);
+
+            item.ContextFlyout = flyout;
+            item.RightTapped += (s, e) =>
+                flyout.ShowAt(s as UIElement, e.GetPosition(s as UIElement));
+
+            navListView.Items.Add(item);
+        }
+
+        protected override void AddStandardNavItems()
+        {
+            var navListView = this.FindName("NavListView") as ListView;
+
+            navListView.Items.Add(
+                new ListViewItem
+                {
+                    Content = new TextBlock(),
+                    Height = 1,
+                    MinHeight = 1,
+                    Padding = new Thickness(0),
+                    Margin = new Thickness(12, 8, 12, 8),
+                    Background = (Windows.UI.Xaml.Media.Brush)
+                        Resources["SystemControlForegroundBaseLowBrush"],
+                }
+            );
+
+            var favItem = new ListViewItem { Tag = "favourites" };
+            var favStack = new StackPanel { Orientation = Orientation.Horizontal };
+            favStack.Children.Add(
+                new SymbolIcon(Symbol.Favorite) { Margin = new Thickness(0, 0, 12, 0) }
+            );
+            favStack.Children.Add(
+                new TextBlock { Text = "Favourites", VerticalAlignment = VerticalAlignment.Center }
+            );
+            favItem.Content = favStack;
+            navListView.Items.Add(favItem);
+
+            var accountsItem = new ListViewItem { Tag = "accounts" };
+            var accStack = new StackPanel { Orientation = Orientation.Horizontal };
+            accStack.Children.Add(
+                new SymbolIcon(Symbol.Contact) { Margin = new Thickness(0, 0, 12, 0) }
+            );
+            accStack.Children.Add(
+                new TextBlock { Text = "Accounts", VerticalAlignment = VerticalAlignment.Center }
+            );
+            accountsItem.Content = accStack;
+            navListView.Items.Add(accountsItem);
+        }
+
+        #endregion
 
         protected override bool TryGoBack()
         {
@@ -132,44 +196,6 @@ namespace _1703_UWP.Pages
                 navSplitView.IsPaneOpen = !navSplitView.IsPaneOpen;
         }
 
-        private void NavRadioButton_Checked(object sender, RoutedEventArgs e)
-        {
-            if (sender is RadioButton rb && rb.IsChecked == true && rb.Tag is string tag)
-            {
-                Type targetPage = null;
-                string pageParameter = null;
-                switch (tag)
-                {
-                    case "home":
-                        targetPage = GetArticleViewerPageType();
-                        pageParameter = "Main Page";
-                        break;
-                    case "random":
-                        targetPage = GetArticleViewerPageType();
-                        pageParameter = "random";
-                        break;
-                    case "favourites":
-                        targetPage = GetFavouritesPageType();
-                        break;
-                    case "login":
-                        targetPage = GetLoginPageType();
-                        break;
-                    case "settings":
-                        targetPage = GetSettingsPageType();
-                        break;
-                    case "userpage":
-                        if (SessionManager.IsLoggedIn)
-                        {
-                            targetPage = GetArticleViewerPageType();
-                            pageParameter = $"User:{SessionManager.Username}";
-                        }
-                        break;
-                }
-                if (targetPage != null)
-                    NavigateToPage(targetPage, pageParameter);
-            }
-        }
-
         private void ContentFrame_Navigated(
             object sender,
             Windows.UI.Xaml.Navigation.NavigationEventArgs e
@@ -185,6 +211,21 @@ namespace _1703_UWP.Pages
                 .AppViewBackButtonVisibility = canGoBack
                 ? Windows.UI.Core.AppViewBackButtonVisibility.Visible
                 : Windows.UI.Core.AppViewBackButtonVisibility.Collapsed;
+        }
+
+        private void NavListView_ItemClick(object sender, ItemClickEventArgs e)
+        {
+            if (e.ClickedItem is FrameworkElement item && item.Tag is string tag)
+            {
+                if (tag == "favourites")
+                {
+                    NavigateToPage(GetFavouritesPageType(), null);
+                }
+                else if (tag == "accounts")
+                {
+                    ShowUserAccountFlyout(item);
+                }
+            }
         }
     }
 }

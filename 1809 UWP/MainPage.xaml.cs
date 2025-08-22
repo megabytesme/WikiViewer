@@ -1,10 +1,17 @@
 ﻿using System;
 using System.Linq;
+using Microsoft.UI.Xaml.Controls;
+using Newtonsoft.Json;
+using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
 using WikiViewer.Shared.Uwp.Pages;
+using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
-using Windows.UI.Xaml.Media;
-using NavigationViewItem = Microsoft.UI.Xaml.Controls.NavigationViewItem;
+using Windows.UI.Xaml.Data;
+using NavigationView = Microsoft.UI.Xaml.Controls.NavigationView;
+using NavigationViewBackRequestedEventArgs = Microsoft.UI.Xaml.Controls.NavigationViewBackRequestedEventArgs;
+using NavigationViewItemInvokedEventArgs = Microsoft.UI.Xaml.Controls.NavigationViewItemInvokedEventArgs;
+using NavigationViewItemSeparator = Microsoft.UI.Xaml.Controls.NavigationViewItemSeparator;
 
 namespace _1809_UWP.Pages
 {
@@ -32,30 +39,6 @@ namespace _1809_UWP.Pages
 
         protected override Type GetSettingsPageType() => typeof(SettingsPage);
 
-        protected override void UpdateUserUI(bool isLoggedIn, string username)
-        {
-            if (isLoggedIn)
-            {
-                LoginNavItem.Content = username;
-                LoginNavItem.Icon = new FontIcon
-                {
-                    FontFamily = new FontFamily("Segoe MDL2 Assets"),
-                    Glyph = "\uE77B",
-                };
-                LoginNavItem.Tag = "userpage";
-            }
-            else
-            {
-                LoginNavItem.Content = username ?? "Login";
-                LoginNavItem.Icon = new FontIcon
-                {
-                    FontFamily = new FontFamily("Segoe MDL2 Assets"),
-                    Glyph = "\uE77B",
-                };
-                LoginNavItem.Tag = "login";
-            }
-        }
-
         protected override void ShowConnectionInfoBar(
             string title,
             string message,
@@ -64,31 +47,11 @@ namespace _1809_UWP.Pages
         {
             ConnectionInfoBar.Title = title;
             ConnectionInfoBar.Message = message;
-            InfoBarButton.Visibility = showActionButton
-                ? Windows.UI.Xaml.Visibility.Visible
-                : Windows.UI.Xaml.Visibility.Collapsed;
+            InfoBarButton.Visibility = showActionButton ? Visibility.Visible : Visibility.Collapsed;
             ConnectionInfoBar.IsOpen = true;
         }
 
         protected override void HideConnectionInfoBar() => ConnectionInfoBar.IsOpen = false;
-
-        protected override void NavigateToPage(Type page, string parameter)
-        {
-            if (
-                page != null
-                && (
-                    ContentFrame.SourcePageType != page
-                    || (ContentFrame.GetNavigationState() as string) != parameter
-                )
-            )
-            {
-                ContentFrame.Navigate(
-                    page,
-                    parameter,
-                    new Windows.UI.Xaml.Media.Animation.EntranceNavigationTransitionInfo()
-                );
-            }
-        }
 
         protected override bool TryGoBack()
         {
@@ -105,57 +68,137 @@ namespace _1809_UWP.Pages
             return false;
         }
 
-        private void NavView_Loaded(object sender, Windows.UI.Xaml.RoutedEventArgs e)
+        protected override void ClearWikiNavItems()
+        {
+            NavView.MenuItems.Clear();
+        }
+
+        protected override void AddWikiNavItem(WikiInstance wiki)
+        {
+            var navItem = new Microsoft.UI.Xaml.Controls.NavigationViewItem
+            {
+                Content = wiki.Name,
+                Tag = $"home_{wiki.Id}",
+            };
+
+            var icon = new BitmapIcon();
+            var binding = new Binding
+            {
+                Source = wiki,
+                Path = new PropertyPath("IconUrl"),
+                Mode = BindingMode.OneWay,
+                TargetNullValue = new SymbolIcon(Symbol.Globe),
+            };
+            BindingOperations.SetBinding(icon, BitmapIcon.UriSourceProperty, binding);
+            navItem.Icon = icon;
+
+            navItem.MenuItems.Add(
+                new Microsoft.UI.Xaml.Controls.NavigationViewItem
+                {
+                    Content = "Home Page",
+                    Tag = $"home_{wiki.Id}",
+                    Icon = new SymbolIcon(Symbol.Home),
+                }
+            );
+            navItem.MenuItems.Add(
+                new Microsoft.UI.Xaml.Controls.NavigationViewItem
+                {
+                    Content = "Random Article",
+                    Tag = $"random_{wiki.Id}",
+                    Icon = new SymbolIcon(Symbol.Shuffle),
+                }
+            );
+
+            NavView.MenuItems.Add(navItem);
+        }
+
+        protected override void AddStandardNavItems()
+        {
+            NavView.MenuItems.Add(new NavigationViewItemSeparator());
+            NavView.MenuItems.Add(
+                new Microsoft.UI.Xaml.Controls.NavigationViewItem
+                {
+                    Content = "Favourites",
+                    Tag = "favourites",
+                    Icon = new SymbolIcon(Symbol.Favorite),
+                }
+            );
+            NavView.MenuItems.Add(
+                new Microsoft.UI.Xaml.Controls.NavigationViewItem
+                {
+                    Content = "Accounts",
+                    Tag = "accounts",
+                    Icon = new SymbolIcon(Symbol.Contact),
+                }
+            );
+        }
+
+        private void NavView_Loaded(object sender, RoutedEventArgs e)
         {
             if (ContentFrame.Content == null)
-                NavigateToPage(GetArticleViewerPageType(), "Main Page");
+            {
+                var firstWiki = WikiManager.GetWikis().FirstOrDefault();
+                if (firstWiki != null)
+                {
+                    NavigateToPage(
+                        GetArticleViewerPageType(),
+                        new ArticleNavigationParameter
+                        {
+                            WikiId = firstWiki.Id,
+                            PageTitle = "Main Page",
+                        }
+                    );
+                }
+            }
         }
 
         private void NavView_ItemInvoked(
-            Microsoft.UI.Xaml.Controls.NavigationView sender,
-            Microsoft.UI.Xaml.Controls.NavigationViewItemInvokedEventArgs args
+            NavigationView sender,
+            NavigationViewItemInvokedEventArgs args
         )
         {
-            Type targetPage = null;
-            string pageParameter = null;
             if (args.IsSettingsInvoked)
             {
-                targetPage = GetSettingsPageType();
+                NavigateToPage(GetSettingsPageType(), null);
+                return;
             }
-            else if (args.InvokedItemContainer?.Tag is string tag)
+
+            if (
+                args.InvokedItemContainer is Microsoft.UI.Xaml.Controls.NavigationViewItem item
+                && item.Tag is string tag
+            )
             {
-                switch (tag)
+                if (tag.StartsWith("home_") || tag.StartsWith("random_"))
                 {
-                    case "home":
-                        targetPage = GetArticleViewerPageType();
-                        pageParameter = "Main Page";
-                        break;
-                    case "random":
-                        targetPage = GetArticleViewerPageType();
-                        pageParameter = "random";
-                        break;
-                    case "favourites":
-                        targetPage = GetFavouritesPageType();
-                        break;
-                    case "login":
-                        targetPage = GetLoginPageType();
-                        break;
-                    case "userpage":
-                        if (SessionManager.IsLoggedIn)
-                        {
-                            targetPage = GetArticleViewerPageType();
-                            pageParameter = $"User:{SessionManager.Username}";
-                        }
-                        break;
+                    var parts = tag.Split('_');
+                    var action = parts[0];
+                    if (Guid.TryParse(parts[1], out Guid wikiId))
+                    {
+                        var pageTitle = action == "random" ? "Special:Random" : "Main Page";
+                        NavigateToPage(
+                            GetArticleViewerPageType(),
+                            new ArticleNavigationParameter
+                            {
+                                WikiId = wikiId,
+                                PageTitle = pageTitle,
+                            }
+                        );
+                    }
+                }
+                else if (tag == "favourites")
+                {
+                    NavigateToPage(GetFavouritesPageType(), null);
+                }
+                else if (tag == "accounts")
+                {
+                    ShowUserAccountFlyout(item);
                 }
             }
-            if (targetPage != null)
-                NavigateToPage(targetPage, pageParameter);
         }
 
         private void NavView_BackRequested(
-            Microsoft.UI.Xaml.Controls.NavigationView sender,
-            Microsoft.UI.Xaml.Controls.NavigationViewBackRequestedEventArgs args
+            NavigationView sender,
+            NavigationViewBackRequestedEventArgs args
         ) => TryGoBack();
 
         private void ContentFrame_Navigated(
@@ -175,54 +218,42 @@ namespace _1809_UWP.Pages
             if (e.SourcePageType == GetSettingsPageType())
             {
                 NavView.SelectedItem = NavView.SettingsItem;
-                return;
             }
-
-            string tag = null;
-            if (e.SourcePageType == GetFavouritesPageType())
-                tag = "favourites";
-            else if (e.SourcePageType == GetLoginPageType())
-                tag = "login";
-            else if (e.SourcePageType == GetArticleViewerPageType() && e.Parameter is string p)
+            else if (e.SourcePageType == GetFavouritesPageType())
             {
-                if (p.Equals("Main Page", StringComparison.OrdinalIgnoreCase))
-                    tag = "home";
-                else if (p.Equals("random", StringComparison.OrdinalIgnoreCase))
-                    tag = "random";
-                else if (
-                    p.Equals($"User:{SessionManager.Username}", StringComparison.OrdinalIgnoreCase)
-                )
-                    tag = "userpage";
-            }
-            NavView.SelectedItem = NavView
-                .MenuItems.OfType<NavigationViewItem>()
-                .FirstOrDefault(i => (string)i.Tag == tag);
-        }
-
-        private void ApplyBackdropOrAcrylic()
-        {
-            if (
-                Windows.Foundation.Metadata.ApiInformation.IsApiContractPresent(
-                    "Windows.Foundation.UniversalApiContract",
-                    12
-                )
-            )
-            {
-                Microsoft.UI.Xaml.Controls.BackdropMaterial.SetApplyToRootOrPageBackground(
-                    this,
-                    true
-                );
+                NavView.SelectedItem = NavView
+                    .MenuItems.OfType<Microsoft.UI.Xaml.Controls.NavigationViewItem>()
+                    .FirstOrDefault(i => (i.Tag as string) == "favourites");
             }
             else
             {
-                this.Background = new AcrylicBrush
+                if (e.Parameter is string jsonParam && !string.IsNullOrEmpty(jsonParam))
                 {
-                    BackgroundSource = AcrylicBackgroundSource.HostBackdrop,
-                    TintColor = Windows.UI.Colors.Transparent,
-                    TintOpacity = 0.6,
-                    FallbackColor = Windows.UI.Color.FromArgb(255, 40, 40, 40),
-                };
+                    try
+                    {
+                        var navParam = JsonConvert.DeserializeObject<ArticleNavigationParameter>(
+                            jsonParam
+                        );
+                        if (navParam != null)
+                        {
+                            string homeTag = $"home_{navParam.WikiId}";
+                            NavView.SelectedItem = NavView
+                                .MenuItems.OfType<Microsoft.UI.Xaml.Controls.NavigationViewItem>()
+                                .FirstOrDefault(i => (i.Tag as string) == homeTag);
+                        }
+                    }
+                    catch
+                    {
+                        NavView.SelectedItem = null;
+                    }
+                }
+                else
+                {
+                    NavView.SelectedItem = null;
+                }
             }
         }
+
+        private void ApplyBackdropOrAcrylic() { }
     }
 }
