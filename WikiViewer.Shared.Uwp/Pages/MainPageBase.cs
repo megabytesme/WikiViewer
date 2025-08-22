@@ -5,8 +5,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using WikiViewer.Core;
-using WikiViewer.Core.Enums;
-using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
 using WikiViewer.Shared.Uwp.Services;
@@ -24,7 +22,6 @@ namespace WikiViewer.Shared.Uwp.Pages
     public abstract class MainPageBase : Page
     {
         private CancellationTokenSource _suggestionCts;
-        public static IApiWorker ApiWorker { get; set; }
         private string _verificationUrl;
 
         protected abstract Frame ContentFrame { get; }
@@ -55,38 +52,42 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         private void MainPage_Loaded(object sender, RoutedEventArgs e)
         {
-            Debug.WriteLine(
-                $"[Shared.MainPageBase.Loaded] Page Loaded event fired. ContentFrame is {(ContentFrame == null ? "NULL!" : "VALID")}"
-            );
-
             App.UIHost = GetWorkerHost();
+            App.SignalUIReady();
+
             SetupTitleBar();
-            AuthService.AuthenticationStateChanged += AuthService_AuthenticationStateChanged;
+            AuthenticationService.AuthenticationStateChanged +=
+                AuthService_AuthenticationStateChanged;
             _ = InitializeAppAsync();
         }
 
         private void MainPage_Unloaded(object sender, RoutedEventArgs e)
         {
-            AuthService.AuthenticationStateChanged -= AuthService_AuthenticationStateChanged;
+            AuthenticationService.AuthenticationStateChanged -=
+                AuthService_AuthenticationStateChanged;
         }
 
         private async Task InitializeAppAsync()
         {
-            if (ApiWorker == null)
+            if (SessionManager.CurrentWiki == null)
             {
-                ApiWorker = App.ApiWorkerFactory.CreateApiWorker();
-                await ApiWorker.InitializeAsync();
+                ShowConnectionInfoBar(
+                    "Initialization Failed",
+                    "No wiki configurations could be loaded.",
+                    false
+                );
+                return;
             }
 
-            SearchBox.PlaceholderText = $"Search {AppSettings.Host}...";
+            SearchBox.PlaceholderText = $"Search {SessionManager.CurrentWiki.Host}...";
             if (ContentFrame.Content == null)
             {
-                NavigateToPage(GetArticleViewerPageType(), AppSettings.MainPageName);
+                NavigateToPage(GetArticleViewerPageType(), "Main Page");
             }
 
+            UpdateUserUI(SessionManager.IsLoggedIn, SessionManager.Username);
             await CheckAndShowFirstRunDisclaimerAsync();
             await PerformPreflightCheckAsync();
-            await TryAutoLoginAsync();
         }
 
         private async Task PerformPreflightCheckAsync()
@@ -94,7 +95,10 @@ namespace WikiViewer.Shared.Uwp.Pages
             HideConnectionInfoBar();
             try
             {
-                await ArticleProcessingService.PageExistsAsync(AppSettings.MainPageName, ApiWorker);
+                await ArticleProcessingService.PageExistsAsync(
+                    "Main Page",
+                    SessionManager.CurrentApiWorker
+                );
             }
             catch (NeedsUserVerificationException ex)
             {
@@ -122,7 +126,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                 {
                     ShowConnectionInfoBar(
                         "Offline Mode",
-                        $"Could not connect to {AppSettings.Host}. Only cached articles are available.",
+                        $"Could not connect to {SessionManager.CurrentWiki.Host}. Only cached articles are available.",
                         false
                     );
                 }
@@ -135,25 +139,6 @@ namespace WikiViewer.Shared.Uwp.Pages
             {
                 ContentFrame.Navigate(GetArticleViewerPageType(), _verificationUrl);
                 HideConnectionInfoBar();
-            }
-        }
-
-        private async Task TryAutoLoginAsync()
-        {
-            var savedCreds = CredentialService.LoadCredentials();
-            if (savedCreds != null)
-            {
-                UpdateUserUI(false, "Signing in...");
-                try
-                {
-                    await AuthService.PerformLoginAsync(savedCreds.Username, savedCreds.Password);
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[MainPage] Auto-login failed: {ex.Message}");
-                    CredentialService.ClearCredentials();
-                    AuthService_AuthenticationStateChanged(null, null);
-                }
             }
         }
 
@@ -211,12 +196,18 @@ namespace WikiViewer.Shared.Uwp.Pages
             }
         }
 
-        private void AuthService_AuthenticationStateChanged(object sender, EventArgs e)
+        private void AuthService_AuthenticationStateChanged(
+            object sender,
+            AuthenticationStateChangedEventArgs e
+        )
         {
-            _ = Dispatcher.RunAsync(
-                CoreDispatcherPriority.Normal,
-                () => UpdateUserUI(AuthService.IsLoggedIn, AuthService.Username)
-            );
+            if (e.Wiki.Id == SessionManager.CurrentWiki?.Id)
+            {
+                _ = Dispatcher.RunAsync(
+                    CoreDispatcherPriority.Normal,
+                    () => UpdateUserUI(e.IsLoggedIn, e.Account.Username)
+                );
+            }
         }
 
         private void OnNavigationRequested(Type sourcePageType, object parameter)
@@ -267,10 +258,6 @@ namespace WikiViewer.Shared.Uwp.Pages
             AutoSuggestBoxQuerySubmittedEventArgs args
         )
         {
-            Debug.WriteLine(
-                $"[Shared.MainPageBase.SearchBox_QuerySubmitted] Search submitted. Query: '{args.QueryText}'. ContentFrame is {(ContentFrame == null ? "NULL!" : "VALID")}"
-            );
-
             if (!string.IsNullOrEmpty(args.QueryText))
                 ContentFrame.Navigate(GetArticleViewerPageType(), args.QueryText);
         }
@@ -295,8 +282,8 @@ namespace WikiViewer.Shared.Uwp.Pages
             {
                 await Task.Delay(300, token);
                 string url =
-                    $"{AppSettings.ApiEndpoint}?action=opensearch&format=json&limit=10&search={Uri.EscapeDataString(query)}";
-                string json = await ApiWorker.GetJsonFromApiAsync(url);
+                    $"{SessionManager.CurrentWiki.ApiEndpoint}?action=opensearch&format=json&limit=10&search={Uri.EscapeDataString(query)}";
+                string json = await SessionManager.CurrentApiWorker.GetJsonFromApiAsync(url);
                 if (token.IsCancellationRequested)
                     return;
                 if (string.IsNullOrEmpty(json))

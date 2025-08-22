@@ -14,8 +14,11 @@ namespace WikiViewer.Core.Services
         private static readonly HttpClient _gatekeeperClient = new HttpClient();
         private const string GatekeeperEndpoint = "https://wikiflareresolverr.ddns.net";
 
+        public bool IsInitialized { get; private set; }
+
         public Task InitializeAsync(string baseUrl = null)
         {
+            IsInitialized = true;
             return Task.CompletedTask;
         }
 

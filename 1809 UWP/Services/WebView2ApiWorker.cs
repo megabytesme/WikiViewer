@@ -12,6 +12,7 @@ using Newtonsoft.Json;
 using WikiViewer.Core;
 using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
+using WikiViewer.Core.Services;
 using WikiViewer.Shared.Uwp.Services;
 using Windows.ApplicationModel.Core;
 using Windows.Foundation;
@@ -24,11 +25,24 @@ namespace _1809_UWP.Services
     public class WebView2ApiWorker : IApiWorker
     {
         public WebView2 WebView { get; private set; }
+        public bool IsInitialized { get; private set; }
+        private Task _initializationTask;
 
         public Task InitializeAsync(string baseUrl = null)
         {
+            if (IsInitialized)
+                return Task.CompletedTask;
+            if (_initializationTask != null)
+                return _initializationTask;
+
+            _initializationTask = InitializeInternalAsync(baseUrl);
+            return _initializationTask;
+        }
+
+        private async Task InitializeInternalAsync(string baseUrl)
+        {
             var tcs = new TaskCompletionSource<bool>();
-            _ = CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(
+            await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(
                 CoreDispatcherPriority.Normal,
                 async () =>
                 {
@@ -51,11 +65,21 @@ namespace _1809_UWP.Services
                     }
                 }
             );
-            return tcs.Task;
+            await tcs.Task;
+            IsInitialized = true;
+        }
+
+        private async Task EnsureInitializedAsync()
+        {
+            if (!IsInitialized)
+            {
+                await InitializeAsync(SessionManager.CurrentWiki?.BaseUrl);
+            }
         }
 
         public async Task<byte[]> GetRawBytesFromUrlAsync(string url)
         {
+            await EnsureInitializedAsync();
             string extension = Path.GetExtension(new Uri(url).LocalPath).ToLowerInvariant();
 
             if (extension == ".svg")
@@ -118,6 +142,7 @@ namespace _1809_UWP.Services
                                 this.WebView.CoreWebView2,
                                 tempWorker.CoreWebView2
                             );
+
                         var navTcs = new TaskCompletionSource<bool>();
                         TypedEventHandler<
                             CoreWebView2,
@@ -132,6 +157,7 @@ namespace _1809_UWP.Services
                         tempWorker.CoreWebView2.Navigate(url);
                         if (!await navTcs.Task)
                             throw new Exception($"Image navigation failed for {url}");
+
                         const string script =
                             @"(function() { const img = document.querySelector('img'); if (img && img.naturalWidth > 0) { const canvas = document.createElement('canvas'); canvas.width = img.naturalWidth; canvas.height = img.naturalHeight; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0); return canvas.toDataURL('image/png').split(',')[1]; } return null; })();";
                         string scriptResult = await tempWorker.CoreWebView2.ExecuteScriptAsync(
@@ -141,6 +167,7 @@ namespace _1809_UWP.Services
                             throw new Exception(
                                 "Failed to get Base64 data from rasterization script."
                             );
+
                         var base64Data = JsonConvert.DeserializeObject<string>(scriptResult);
                         tcs.SetResult(Convert.FromBase64String(base64Data));
                     }
@@ -184,6 +211,7 @@ namespace _1809_UWP.Services
                         var tempFileName = Guid.NewGuid().ToString() + extension;
                         var tempFilePath = Path.Combine(cacheFolder.Path, tempFileName);
                         var downloadTcs = new TaskCompletionSource<bool>();
+
                         TypedEventHandler<
                             CoreWebView2,
                             CoreWebView2DownloadStartingEventArgs
@@ -195,6 +223,7 @@ namespace _1809_UWP.Services
                             e.ResultFilePath = tempFilePath;
                             e.Handled = true;
                             deferral.Complete();
+
                             TypedEventHandler<
                                 CoreWebView2DownloadOperation,
                                 object
@@ -212,6 +241,7 @@ namespace _1809_UWP.Services
                             e.DownloadOperation.StateChanged += stateChangedHandler;
                         };
                         tempWorker.CoreWebView2.DownloadStarting += downloadHandler;
+
                         var navTcs = new TaskCompletionSource<bool>();
                         TypedEventHandler<
                             CoreWebView2,
@@ -223,18 +253,21 @@ namespace _1809_UWP.Services
                             navTcs.TrySetResult(e.IsSuccess);
                         };
                         tempWorker.CoreWebView2.NavigationCompleted += navHandler;
-                        tempWorker.CoreWebView2.Navigate(AppSettings.BaseUrl);
+                        tempWorker.CoreWebView2.Navigate(SessionManager.CurrentWiki.BaseUrl);
                         if (!await navTcs.Task)
                             throw new Exception(
-                                $"Navigation to base URL '{AppSettings.BaseUrl}' failed, preventing download context setup."
+                                $"Navigation to base URL '{SessionManager.CurrentWiki.BaseUrl}' failed, preventing download context setup."
                             );
+
                         string script =
                             $"(async () => {{ try {{ const response = await fetch('{url}'); if (!response.ok) {{ return `Error: ${{response.status}} ${{response.statusText}}`; }} const blob = await response.blob(); const blobUrl = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = blobUrl; a.download = ''; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(blobUrl); return 'Download initiated'; }} catch (e) {{ return `Error: ${{e.message}}`; }} }})();";
                         await tempWorker.CoreWebView2.ExecuteScriptAsync(script);
+
                         var timeoutTask = Task.Delay(TimeSpan.FromSeconds(30));
                         var completedTask = await Task.WhenAny(downloadTcs.Task, timeoutTask);
                         if (completedTask == timeoutTask || !await downloadTcs.Task)
                             throw new Exception($"Download failed or timed out for {url}");
+
                         var file = await StorageFile.GetFileFromPathAsync(tempFilePath);
                         var buffer = await FileIO.ReadBufferAsync(file);
                         await file.DeleteAsync();
@@ -275,11 +308,14 @@ namespace _1809_UWP.Services
             return JsonConvert.DeserializeObject<string>(scriptResult);
         }
 
-        public Task<string> GetRawHtmlFromUrlAsync(string url) =>
-            GetContentFromUrlCore(
+        public async Task<string> GetRawHtmlFromUrlAsync(string url)
+        {
+            await EnsureInitializedAsync();
+            return await GetContentFromUrlCore(
                 url,
                 (fullHtml) => !string.IsNullOrEmpty(fullHtml) ? fullHtml : null
             );
+        }
 
         private async Task CopyCookiesInternalAsync(CoreWebView2 source, CoreWebView2 destination)
         {
@@ -320,13 +356,15 @@ namespace _1809_UWP.Services
         private async Task<string> GetContentFromUrlCore(
             string url,
             Func<string, string> validationLogic
-        ) =>
-            await DispatcherTaskExtensions.RunTaskAsync(
+        )
+        {
+            return await DispatcherTaskExtensions.RunTaskAsync(
                 CoreApplication.MainView.CoreWindow.Dispatcher,
                 async () =>
                 {
                     if (WebView?.CoreWebView2 == null)
                         throw new InvalidOperationException("CoreWebView2 is not initialized.");
+
                     var navCompleteTcs = new TaskCompletionSource<bool>();
                     TypedEventHandler<
                         CoreWebView2,
@@ -340,6 +378,7 @@ namespace _1809_UWP.Services
                     WebView.CoreWebView2.NavigationCompleted += navHandler;
                     WebView.CoreWebView2.Navigate(url);
                     await navCompleteTcs.Task;
+
                     var stopwatch = Stopwatch.StartNew();
                     while (stopwatch.Elapsed.TotalSeconds < 15)
                     {
@@ -349,9 +388,11 @@ namespace _1809_UWP.Services
                         );
                         if (string.IsNullOrEmpty(scriptResult))
                             continue;
+
                         string fullHtml = JsonConvert.DeserializeObject<string>(scriptResult);
                         if (string.IsNullOrEmpty(fullHtml))
                             continue;
+
                         if (
                             fullHtml.Contains("g-recaptcha")
                             || fullHtml.Contains("Verifying you are human")
@@ -360,6 +401,7 @@ namespace _1809_UWP.Services
                                 "Interactive user verification required.",
                                 url
                             );
+
                         string extractedContent = validationLogic(fullHtml);
                         if (extractedContent != null)
                             return extractedContent;
@@ -367,9 +409,12 @@ namespace _1809_UWP.Services
                     throw new TimeoutException($"Content validation timed out for GET URL: {url}");
                 }
             );
+        }
 
-        public Task<string> GetJsonFromApiAsync(string url) =>
-            GetContentFromUrlCore(
+        public async Task<string> GetJsonFromApiAsync(string url)
+        {
+            await EnsureInitializedAsync();
+            return await GetContentFromUrlCore(
                 url,
                 (fullHtml) =>
                 {
@@ -386,12 +431,15 @@ namespace _1809_UWP.Services
                     return null;
                 }
             );
+        }
 
         public async Task<string> PostAndGetJsonFromApiAsync(
             string url,
             Dictionary<string, string> postData
-        ) =>
-            await DispatcherTaskExtensions.RunTaskAsync(
+        )
+        {
+            await EnsureInitializedAsync();
+            return await DispatcherTaskExtensions.RunTaskAsync(
                 CoreApplication.MainView.CoreWindow.Dispatcher,
                 async () =>
                 {
@@ -399,6 +447,7 @@ namespace _1809_UWP.Services
                         throw new InvalidOperationException(
                             "CoreWebView2 could not be initialized for POST."
                         );
+
                     var content = new FormUrlEncodedContent(postData);
                     string postBody = await content.ReadAsStringAsync();
                     var postBytes = System.Text.Encoding.UTF8.GetBytes(postBody);
@@ -414,6 +463,7 @@ namespace _1809_UWP.Services
                         );
                         WebView.CoreWebView2.NavigateWithWebResourceRequest(request);
                     }
+
                     var stopwatch = Stopwatch.StartNew();
                     while (stopwatch.Elapsed.TotalSeconds < 15)
                     {
@@ -423,9 +473,11 @@ namespace _1809_UWP.Services
                         );
                         if (string.IsNullOrEmpty(scriptResult))
                             continue;
+
                         string fullHtml = JsonConvert.DeserializeObject<string>(scriptResult);
                         if (string.IsNullOrEmpty(fullHtml))
                             continue;
+
                         var doc = new HtmlAgilityPack.HtmlDocument();
                         doc.LoadHtml(fullHtml);
                         string json = doc.DocumentNode.SelectSingleNode("//body/pre")?.InnerText;
@@ -438,6 +490,7 @@ namespace _1809_UWP.Services
                     throw new TimeoutException($"Content validation timed out for POST URL: {url}");
                 }
             );
+        }
 
         public void Dispose()
         {

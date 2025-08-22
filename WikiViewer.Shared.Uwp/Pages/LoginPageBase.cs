@@ -21,15 +21,14 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected abstract TextBlock ErrorTextBlockControl { get; }
         protected abstract Type GetCreateAccountPageType();
         protected abstract Task ShowInteractiveLoginAsync(
-            ClientLoginResult loginResult,
-            string username,
-            string password
+            AuthUiRequiredException authException,
+            Account account
         );
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
-            LoginTitleTextBlock.Text = $"Log In to {AppSettings.Host}";
+            LoginTitleTextBlock.Text = $"Log In to {SessionManager.CurrentWiki.Host}";
         }
 
         protected async void LoginButton_Click(object sender, RoutedEventArgs e)
@@ -48,25 +47,38 @@ namespace WikiViewer.Shared.Uwp.Pages
                 return;
             }
 
+            var account = new Account
+            {
+                Username = username,
+                WikiInstanceId = SessionManager.CurrentWiki.Id,
+            };
+
+            var authService = new AuthenticationService(
+                account,
+                SessionManager.CurrentWiki,
+                App.ApiWorkerFactory
+            );
+
             try
             {
-                await AuthService.PerformLoginAsync(username, password);
-                if (RememberMeCheckBoxControl.IsChecked == true)
-                    CredentialService.SaveCredentials(username, password);
-                else
-                    CredentialService.ClearCredentials();
+                await authService.LoginAsync(password);
+
+                await AccountManager.AddAccountAsync(account, password);
+
+                if (RememberMeCheckBoxControl.IsChecked == false)
+                {
+                    CredentialService.ClearCredentials(account.Id);
+                }
+
                 if (this.Frame.CanGoBack)
+                {
                     this.Frame.GoBack();
+                }
             }
             catch (AuthUiRequiredException ex)
             {
                 ErrorTextBlockControl.Text = "An additional verification step is required.";
-                await ShowInteractiveLoginAsync(ex.LoginResult, username, password);
-            }
-            catch (NeedsUserVerificationException)
-            {
-                ErrorTextBlockControl.Text =
-                    "Verification needed. Please go back and try another action first to solve the security check.";
+                await ShowInteractiveLoginAsync(ex, account);
             }
             catch (Exception ex)
             {

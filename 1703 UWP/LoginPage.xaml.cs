@@ -3,9 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using WikiViewer.Core.Models;
-using WikiViewer.Core.Services;
 using WikiViewer.Shared.Uwp.Pages;
-using WikiViewer.Shared.Uwp.Services;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 
@@ -29,11 +27,12 @@ namespace _1703_UWP
         protected override Type GetCreateAccountPageType() => typeof(Pages.CreateAccountPage);
 
         protected override async Task ShowInteractiveLoginAsync(
-            ClientLoginResult loginResult,
-            string username,
-            string password
+            AuthUiRequiredException authException,
+            Account account
         )
         {
+            var loginResult = authException.LoginResult;
+
             var panel = new StackPanel { Margin = new Thickness(12) };
             var textBoxes = new Dictionary<string, TextBox>();
 
@@ -71,11 +70,11 @@ namespace _1703_UWP
                 LoginButtonControl.IsEnabled = false;
                 try
                 {
-                    await AuthService.ContinueLoginAsync(fieldData);
-                    if (RememberMeCheckBoxControl.IsChecked == true)
-                        CredentialService.SaveCredentials(username, password);
-                    if (Frame.CanGoBack)
-                        Frame.GoBack();
+                    //TODO: implement 2fa - await new AuthenticationService(account, SessionManager.CurrentWiki, App.ApiWorkerFactory).ContinueLoginAsync(fieldData);
+
+                    throw new NotImplementedException(
+                        "Interactive login continuation must be implemented in AuthenticationService."
+                    );
                 }
                 catch (Exception ex)
                 {

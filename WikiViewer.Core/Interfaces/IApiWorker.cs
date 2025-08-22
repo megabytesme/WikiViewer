@@ -6,6 +6,8 @@ namespace WikiViewer.Core.Interfaces
 {
     public interface IApiWorker : IDisposable
     {
+        bool IsInitialized { get; }
+
         Task InitializeAsync(string baseUrl = null);
         Task<string> GetJsonFromApiAsync(string url);
         Task<string> PostAndGetJsonFromApiAsync(string url, Dictionary<string, string> postData);

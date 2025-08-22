@@ -1,5 +1,5 @@
 using System;
-using WikiViewer.Core;
+using System.Threading.Tasks;
 using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Services;
 using WikiViewer.Shared.Uwp.Managers;
@@ -16,6 +16,15 @@ namespace WikiViewer.Shared.Uwp
     {
         public static Panel UIHost { get; set; }
         public static IApiWorkerFactory ApiWorkerFactory { get; private set; }
+        private static readonly TaskCompletionSource<bool> _uiReadySignal =
+            new TaskCompletionSource<bool>();
+        public static Task UIReady => _uiReadySignal.Task;
+
+        public static void SignalUIReady()
+        {
+            _uiReadySignal.TrySetResult(true);
+        }
+
         public static event Action<Type, object> RequestNavigation;
 
         public static void Navigate(Type sourcePageType, object parameter) =>
@@ -23,20 +32,14 @@ namespace WikiViewer.Shared.Uwp
 
         public App()
         {
-            AppSettings.SettingsProvider = new UwpSettingsProvider();
+            WikiViewer.Core.AppSettings.SettingsProvider = new UwpSettingsProvider();
             this.InitializeComponent();
             this.Suspending += OnSuspending;
         }
 
         public static void ResetRootFrame()
         {
-            AuthService.ResetStateForReload();
-
-            if (WikiViewer.Shared.Uwp.Pages.MainPageBase.ApiWorker != null)
-            {
-                WikiViewer.Shared.Uwp.Pages.MainPageBase.ApiWorker.Dispose();
-                WikiViewer.Shared.Uwp.Pages.MainPageBase.ApiWorker = null;
-            }
+            SessionManager.IsResetPending = true;
 
             Frame rootFrame = new Frame();
             Window.Current.Content = rootFrame;
@@ -57,7 +60,8 @@ namespace WikiViewer.Shared.Uwp
 #else
             ApiWorkerFactory = new _1809_UWP.Services.ApiWorkerFactory();
 #endif
-            await FavouritesService.InitializeAsync();
+
+            await SessionManager.InitializeAsync();
             await ArticleCacheManager.InitializeAsync();
 
             Frame rootFrame = Window.Current.Content as Frame;

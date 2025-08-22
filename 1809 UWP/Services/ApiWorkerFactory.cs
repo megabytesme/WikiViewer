@@ -1,3 +1,4 @@
+using WikiViewer.Core.Enums;
 using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Services;
 
@@ -5,9 +6,9 @@ namespace _1809_UWP.Services
 {
     public class ApiWorkerFactory : IApiWorkerFactory
     {
-        public IApiWorker CreateApiWorker()
+        public IApiWorker CreateApiWorker(ConnectionMethod method)
         {
-            if (WikiViewer.Core.AppSettings.ConnectionBackend == WikiViewer.Core.Enums.ConnectionMethod.HttpClientProxy)
+            if (method == ConnectionMethod.HttpClientProxy)
             {
                 return new HttpClientApiWorker();
             }

@@ -52,33 +52,35 @@ namespace WikiViewer.Shared.Uwp.Pages
             this.Loaded += Page_Loaded;
         }
 
-        protected override async void OnNavigatedTo(NavigationEventArgs e)
+        protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
-            AuthService.AuthenticationStateChanged += AuthService_AuthenticationStateChanged;
+            AuthenticationService.AuthenticationStateChanged +=
+                AuthService_AuthenticationStateChanged;
         }
 
-        private async void Page_Loaded(object sender, RoutedEventArgs e)
+        private void Page_Loaded(object sender, RoutedEventArgs e)
         {
             UpdateUserUI();
             LoadWikiSettings();
             LoadConnectionSettings();
             CachingToggleSwitch.IsOn = AppSettings.IsCachingEnabled;
             SetupConcurrencySlider();
-            await UpdateCacheSizeDisplayAsync();
+            _ = UpdateCacheSizeDisplayAsync();
         }
 
         protected override void OnNavigatedFrom(NavigationEventArgs e)
         {
             base.OnNavigatedFrom(e);
-            AuthService.AuthenticationStateChanged -= AuthService_AuthenticationStateChanged;
+            AuthenticationService.AuthenticationStateChanged -=
+                AuthService_AuthenticationStateChanged;
         }
 
         private void LoadWikiSettings()
         {
-            WikiUrlTextBox.Text = AppSettings.BaseUrl;
-            ScriptPathTextBox.Text = AppSettings.ScriptPath;
-            ArticlePathTextBox.Text = AppSettings.ArticlePath;
+            WikiUrlTextBox.Text = SessionManager.CurrentWiki?.BaseUrl;
+            ScriptPathTextBox.Text = SessionManager.CurrentWiki?.ScriptPath;
+            ArticlePathTextBox.Text = SessionManager.CurrentWiki?.ArticlePath;
         }
 
         private void LoadConnectionSettings()
@@ -93,12 +95,14 @@ namespace WikiViewer.Shared.Uwp.Pages
         {
             if (_isConnectionToggleEvent)
                 return;
-
             var newBackend = ConnectionMethodToggleSwitch.IsOn
                 ? ConnectionMethod.HttpClientProxy
                 : ConnectionMethod.WebView;
 
-            if (newBackend == ConnectionMethod.HttpClientProxy && !AppSettings.HasAcceptedProxyDisclaimer)
+            if (
+                newBackend == ConnectionMethod.HttpClientProxy
+                && !AppSettings.HasAcceptedProxyDisclaimer
+            )
             {
                 var dialog = new ContentDialog
                 {
@@ -108,23 +112,22 @@ namespace WikiViewer.Shared.Uwp.Pages
                         VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                         Content = new TextBlock
                         {
-                            Text = "You are enabling an optional, experimental proxy service. Please read the following carefully:\n\n" +
-                                   "1. Data Transmission: To bypass web restrictions (like Cloudflare), your network requests from this app will be routed through an intermediary server hosted by the developer in the United Kingdom.\n\n" +
-                                   "2. No Logging Policy: This server does not intentionally log or store the content of the pages you visit. Its purpose is only to transmit the request and return the result.\n\n" +
-                                   "3. Security and Data Handling: The connection to the proxy server is secured using HTTPS (SSL/TLS). However, to function, the server must process your requests. This means unencrypted data is momentarily accessible on the server before being forwarded to the destination wiki. For this reason, it is strongly advised that you do not use this service for sensitive accounts or private information.\n\n" +
-                                   "4. Acceptable Use: You agree to use this service only for lawful purposes. You will not use it to access or distribute illegal content. The developer reserves the right to block access to the service in cases of misuse.\n\n" +
-                                   "5. No Warranty: This service is provided 'as is', without any guarantees of availability, speed, or reliability. It may not work for all websites.\n\n" +
-                                   "By clicking 'Agree and Enable', you acknowledge that you have read and understood these points and agree to use this service at your own risk.",
-                            TextWrapping = TextWrapping.Wrap
-                        }
+                            Text =
+                                "You are enabling an optional, experimental proxy service. Please read the following carefully:\n\n"
+                                + "1. Data Transmission: To bypass web restrictions (like Cloudflare), your network requests from this app will be routed through an intermediary server hosted by the developer in the United Kingdom.\n\n"
+                                + "2. No Logging Policy: This server does not intentionally log or store the content of the pages you visit. Its purpose is only to transmit the request and return the result.\n\n"
+                                + "3. Security and Data Handling: The connection to the proxy server is secured using HTTPS (SSL/TLS). However, to function, the server must process your requests. This means unencrypted data is momentarily accessible on the server before being forwarded to the destination wiki. For this reason, it is strongly advised that you do not use this service for sensitive accounts or private information.\n\n"
+                                + "4. Acceptable Use: You agree to use this service only for lawful purposes. You will not use it to access or distribute illegal content. The developer reserves the right to block access to the service in cases of misuse.\n\n"
+                                + "5. No Warranty: This service is provided 'as is', without any guarantees of availability, speed, or reliability. It may not work for all websites.\n\n"
+                                + "By clicking 'Agree and Enable', you acknowledge that you have read and understood these points and agree to use this service at your own risk.",
+                            TextWrapping = TextWrapping.Wrap,
+                        },
                     },
                     PrimaryButtonText = "Agree and Enable",
                     CloseButtonText = "Cancel",
-                    DefaultButton = ContentDialogButton.Close
+                    DefaultButton = ContentDialogButton.Close,
                 };
-
                 var result = await dialog.ShowAsync();
-
                 if (result == ContentDialogResult.Primary)
                 {
                     AppSettings.HasAcceptedProxyDisclaimer = true;
@@ -167,7 +170,10 @@ namespace WikiViewer.Shared.Uwp.Pages
             IApiWorker tempWorker = null;
             try
             {
-                tempWorker = CreateWebViewApiWorker();
+                var connectionMethod = ConnectionMethodToggleSwitch.IsOn
+                    ? ConnectionMethod.HttpClientProxy
+                    : ConnectionMethod.WebView;
+                tempWorker = App.ApiWorkerFactory.CreateApiWorker(connectionMethod);
                 await tempWorker.InitializeAsync(urlToDetect);
                 var detectedPaths = await WikiPathDetectorService.DetectPathsAsync(
                     urlToDetect,
@@ -193,13 +199,12 @@ namespace WikiViewer.Shared.Uwp.Pages
             catch (NeedsUserVerificationException ex)
             {
                 LoadingOverlayGrid.Visibility = Visibility.Collapsed;
-
 #if UWP_1809
-                    ShowVerificationPanel(ex.Url);
+                ShowVerificationPanel(ex.Url);
 #else
                 DetectionStatusTextBlock.Text =
-                    "Detection failed because the site is protected by Cloudflare. " +
-                    "Please switch to the 'Proxy' connection backend in the settings below and try again.";
+                    "Detection failed because the site is protected by Cloudflare. "
+                    + "Please switch to the 'Proxy' connection backend in the settings above and try again.";
                 DetectionStatusTextBlock.Foreground = new SolidColorBrush(Colors.Orange);
                 DetectionStatusTextBlock.Visibility = Visibility.Visible;
 #endif
@@ -224,6 +229,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                 newUrl += "/";
             string newScriptPath = ScriptPathTextBox.Text.Trim();
             string newArticlePath = ArticlePathTextBox.Text.Trim();
+
             if (
                 !Uri.TryCreate(newUrl, UriKind.Absolute, out var uriResult)
                 || (uriResult.Scheme != "http" && uriResult.Scheme != "https")
@@ -238,15 +244,18 @@ namespace WikiViewer.Shared.Uwp.Pages
                 }.ShowAsync();
                 return;
             }
+
+            var currentWiki = SessionManager.CurrentWiki;
             bool hasChanged =
-                !newUrl.Equals(AppSettings.BaseUrl, StringComparison.OrdinalIgnoreCase)
-                || !newScriptPath.Equals(AppSettings.ScriptPath, StringComparison.OrdinalIgnoreCase)
+                !newUrl.Equals(currentWiki.BaseUrl, StringComparison.OrdinalIgnoreCase)
+                || !newScriptPath.Equals(currentWiki.ScriptPath, StringComparison.OrdinalIgnoreCase)
                 || !newArticlePath.Equals(
-                    AppSettings.ArticlePath,
+                    currentWiki.ArticlePath,
                     StringComparison.OrdinalIgnoreCase
                 );
             if (!hasChanged)
                 return;
+
             var dialog = new ContentDialog
             {
                 Title = "Apply New Wiki Settings?",
@@ -260,12 +269,15 @@ namespace WikiViewer.Shared.Uwp.Pages
             {
                 LoadingOverlayGrid.Visibility = Visibility.Visible;
                 LoadingOverlayTextBlock.Text = "Applying settings...";
-                AuthService.Logout();
-                await FavouritesService.ClearAllLocalFavouritesAsync();
+
+                await FavouritesService.RemoveAllFavouritesForWikiAsync(currentWiki.Id);
                 await ArticleCacheManager.ClearCacheAsync();
-                AppSettings.BaseUrl = newUrl;
-                AppSettings.ScriptPath = newScriptPath;
-                AppSettings.ArticlePath = newArticlePath;
+
+                currentWiki.BaseUrl = newUrl;
+                currentWiki.ScriptPath = newScriptPath;
+                currentWiki.ArticlePath = newArticlePath;
+                await WikiManager.SaveAsync();
+
                 ResetAppRootFrame();
             }
         }
@@ -336,29 +348,41 @@ namespace WikiViewer.Shared.Uwp.Pages
             RamEstimateTextBlock.Text = estimateText;
         }
 
-        private void AuthService_AuthenticationStateChanged(object sender, EventArgs e) =>
-            _ = Dispatcher.RunAsync(CoreDispatcherPriority.Normal, UpdateUserUI);
+        private void AuthService_AuthenticationStateChanged(
+            object sender,
+            AuthenticationStateChangedEventArgs e
+        ) => _ = Dispatcher.RunAsync(CoreDispatcherPriority.Normal, UpdateUserUI);
 
         private void UpdateUserUI()
         {
-            if (AuthService.IsLoggedIn)
+            if (SessionManager.IsLoggedIn)
             {
                 LoggedInStatePanel.Visibility = Visibility.Visible;
                 LoggedOutStatePanel.Visibility = Visibility.Collapsed;
-                UsernameTextBlock.Text = AuthService.Username;
+                UsernameTextBlock.Text = SessionManager.Username;
             }
             else
             {
                 LoggedInStatePanel.Visibility = Visibility.Collapsed;
                 LoggedOutStatePanel.Visibility = Visibility.Visible;
                 LoggedOutStateTextBlock.Text =
-                    $"You are not signed in. Sign in to make edits and synchronise favourites on {AppSettings.Host}.";
-                SignInHyperlink.Content = $"Sign in to {AppSettings.Host}";
+                    $"You are not signed in. Sign in to make edits and synchronise favourites on {SessionManager.CurrentWiki?.Host ?? "your wiki"}.";
+                SignInHyperlink.Content =
+                    $"Sign in to {SessionManager.CurrentWiki?.Host ?? "your wiki"}";
             }
         }
 
-        protected void SignOutButton_Click(object sender, RoutedEventArgs e) =>
-            AuthService.Logout();
+        protected void SignOutButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (!SessionManager.IsLoggedIn)
+                return;
+            var authService = new AuthenticationService(
+                SessionManager.CurrentAccount,
+                SessionManager.CurrentWiki,
+                App.ApiWorkerFactory
+            );
+            authService.Logout();
+        }
 
         protected void SignInButton_Click(object sender, RoutedEventArgs e) =>
             this.Frame.Navigate(GetLoginPageType());
@@ -519,11 +543,6 @@ namespace WikiViewer.Shared.Uwp.Pages
                 },
                 CloseButtonText = "OK",
             }.ShowAsync();
-
-        private IApiWorker CreateWebViewApiWorker()
-        {
-            return App.ApiWorkerFactory.CreateApiWorker();
-        }
 
         private string GetAppName()
         {

@@ -13,13 +13,19 @@
     <Compile Include="$(MSBuildThisFileDirectory)Interfaces\IApiWorkerFactory.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Interfaces\IApiWorker.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Interfaces\ISettingsProvider.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)models\Account.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\ApiModels.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)models\WikiInstance.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Repositories\AppSettings.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)services\AccountManager.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)services\ApiWorkerProvider.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\ArticleProcessingService.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Services\AuthService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Services\AuthenticationService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)services\CloudflareDetector.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\FavouritesService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)services\HttpClientApiWorker.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Services\SessionManager.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)services\WikiManager.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\WikiPathDetectorService.cs" />
   </ItemGroup>
 </Project>

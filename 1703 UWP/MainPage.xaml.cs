@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using WikiViewer.Core.Services;
 using WikiViewer.Shared.Uwp.Pages;
 using WikiViewer.Shared.Uwp.Services;
 using Windows.UI.Xaml;
@@ -73,7 +74,7 @@ namespace _1703_UWP.Pages
             string tag = "";
             if (page == GetArticleViewerPageType())
             {
-                if (parameter == WikiViewer.Core.AppSettings.MainPageName)
+                if (parameter == "Main Page")
                     tag = "home";
                 else if (parameter == "random")
                     tag = "random";
@@ -84,6 +85,8 @@ namespace _1703_UWP.Pages
                 tag = "login";
             else if (page == GetSettingsPageType())
                 tag = "settings";
+            else if (page is string && page.ToString().StartsWith("User:"))
+                tag = "userpage";
 
             if (
                 ContentFrame != null
@@ -131,7 +134,7 @@ namespace _1703_UWP.Pages
 
         private void NavRadioButton_Checked(object sender, RoutedEventArgs e)
         {
-            if (sender is RadioButton rb && rb.Tag is string tag)
+            if (sender is RadioButton rb && rb.IsChecked == true && rb.Tag is string tag)
             {
                 Type targetPage = null;
                 string pageParameter = null;
@@ -139,7 +142,7 @@ namespace _1703_UWP.Pages
                 {
                     case "home":
                         targetPage = GetArticleViewerPageType();
-                        pageParameter = WikiViewer.Core.AppSettings.MainPageName;
+                        pageParameter = "Main Page";
                         break;
                     case "random":
                         targetPage = GetArticleViewerPageType();
@@ -155,10 +158,10 @@ namespace _1703_UWP.Pages
                         targetPage = GetSettingsPageType();
                         break;
                     case "userpage":
-                        if (WikiViewer.Core.Services.AuthService.IsLoggedIn)
+                        if (SessionManager.IsLoggedIn)
                         {
                             targetPage = GetArticleViewerPageType();
-                            pageParameter = $"User:{WikiViewer.Core.Services.AuthService.Username}";
+                            pageParameter = $"User:{SessionManager.Username}";
                         }
                         break;
                 }

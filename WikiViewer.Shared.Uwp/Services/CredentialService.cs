@@ -14,50 +14,38 @@ namespace WikiViewer.Shared.Uwp.Services
     {
         private const string ResourceName = "WikiViewerAppCredentials";
 
-        public static void SaveCredentials(string username, string password)
+        public static void SaveCredentials(Guid accountId, string username, string password)
         {
-            try
-            {
-                var vault = new PasswordVault();
-                var credential = new PasswordCredential(ResourceName, username, password);
-                vault.Add(credential);
-            }
-            catch (Exception)
-            {
-                ClearCredentials();
-                SaveCredentials(username, password);
-            }
+            var vault = new PasswordVault();
+            var credential = new PasswordCredential(accountId.ToString(), username, password);
+            vault.Add(credential);
         }
 
-        public static UserCredentials LoadCredentials()
+        public static UserCredentials LoadCredentials(Guid accountId)
         {
             try
             {
                 var vault = new PasswordVault();
-                var credentials = vault.FindAllByResource(ResourceName);
-                if (credentials.Any())
+                var credential = vault.Retrieve(accountId.ToString(), "anything");
+                credential.RetrievePassword();
+                return new UserCredentials
                 {
-                    credentials[0].RetrievePassword();
-                    return new UserCredentials
-                    {
-                        Username = credentials[0].UserName,
-                        Password = credentials[0].Password,
-                    };
-                }
+                    Username = credential.UserName,
+                    Password = credential.Password,
+                };
             }
             catch (Exception)
             {
                 return null;
             }
-            return null;
         }
 
-        public static void ClearCredentials()
+        public static void ClearCredentials(Guid accountId)
         {
             try
             {
                 var vault = new PasswordVault();
-                var credentials = vault.FindAllByResource(ResourceName);
+                var credentials = vault.FindAllByResource(accountId.ToString());
                 foreach (var cred in credentials)
                 {
                     vault.Remove(cred);

@@ -1,10 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Reflection;
 using System.Threading.Tasks;
-using WikiViewer.Core;
-using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
 using WikiViewer.Shared.Uwp.Services;
@@ -40,23 +37,26 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         public ArticleViewerPageBase()
         {
-            AuthService.AuthenticationStateChanged += OnAuthenticationStateChanged;
+            AuthenticationService.AuthenticationStateChanged += OnAuthenticationStateChanged;
             this.Loaded += Page_Loaded;
             this.Unloaded += Page_Unloaded;
         }
 
-        private void OnAuthenticationStateChanged(object sender, EventArgs e)
+        private void OnAuthenticationStateChanged(
+            object sender,
+            AuthenticationStateChangedEventArgs e
+        )
         {
-            _ = Dispatcher.RunAsync(
-                Windows.UI.Core.CoreDispatcherPriority.Normal,
-                () =>
-                {
-                    if (EditAppBarButton != null)
-                        EditAppBarButton.Visibility = AuthService.IsLoggedIn
+            if (e.Wiki.Id == SessionManager.CurrentWiki?.Id)
+            {
+                _ = Dispatcher.RunAsync(
+                    Windows.UI.Core.CoreDispatcherPriority.Normal,
+                    () =>
+                        EditAppBarButton.Visibility = e.IsLoggedIn
                             ? Visibility.Visible
-                            : Visibility.Collapsed;
-                }
-            );
+                            : Visibility.Collapsed
+                );
+            }
         }
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -76,10 +76,9 @@ namespace WikiViewer.Shared.Uwp.Pages
                     _articleHistory.Push(_pageTitleToFetch);
                 }
             }
-            if (EditAppBarButton != null)
-                EditAppBarButton.Visibility = AuthService.IsLoggedIn
-                    ? Visibility.Visible
-                    : Visibility.Collapsed;
+            EditAppBarButton.Visibility = SessionManager.IsLoggedIn
+                ? Visibility.Visible
+                : Visibility.Collapsed;
             UpdateFavoriteButton();
         }
 
@@ -100,7 +99,7 @@ namespace WikiViewer.Shared.Uwp.Pages
         private void Page_Unloaded(object sender, RoutedEventArgs e)
         {
             DataTransferManager.GetForCurrentView().DataRequested -= OnDataRequested;
-            AuthService.AuthenticationStateChanged -= OnAuthenticationStateChanged;
+            AuthenticationService.AuthenticationStateChanged -= OnAuthenticationStateChanged;
             UninitializePlatformControls();
         }
 
@@ -129,7 +128,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                     await ArticleProcessingService.FetchAndCacheArticleAsync(
                         _pageTitleToFetch,
                         fetchStopwatch,
-                        GetApiWorker()
+                        SessionManager.CurrentApiWorker
                     );
                 if (_pageTitleToFetch.Equals("random", StringComparison.OrdinalIgnoreCase))
                 {
@@ -141,7 +140,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                 await DisplayProcessedHtmlAsync(processedHtml);
                 var lastUpdated = await ArticleProcessingService.FetchLastUpdatedTimestampAsync(
                     _pageTitleToFetch,
-                    GetApiWorker()
+                    SessionManager.CurrentApiWorker
                 );
                 if (lastUpdated.HasValue)
                 {
@@ -190,13 +189,34 @@ namespace WikiViewer.Shared.Uwp.Pages
         {
             if (string.IsNullOrEmpty(_pageTitleToFetch))
                 return;
-            if (FavouritesService.IsFavourite(_pageTitleToFetch))
+
+            var currentWiki = SessionManager.CurrentWiki;
+            var currentAccount = SessionManager.CurrentAccount;
+            AuthenticationService authService = null;
+            if (currentAccount != null)
             {
-                await FavouritesService.RemoveFavoriteAsync(_pageTitleToFetch);
+                authService = new AuthenticationService(
+                    currentAccount,
+                    currentWiki,
+                    App.ApiWorkerFactory
+                );
+            }
+
+            if (FavouritesService.IsFavourite(_pageTitleToFetch, currentWiki.Id))
+            {
+                await FavouritesService.RemoveFavoriteAsync(
+                    _pageTitleToFetch,
+                    currentWiki.Id,
+                    authService
+                );
             }
             else
             {
-                await FavouritesService.AddFavoriteAsync(_pageTitleToFetch);
+                await FavouritesService.AddFavoriteAsync(
+                    _pageTitleToFetch,
+                    currentWiki.Id,
+                    authService
+                );
             }
             UpdateFavoriteButton();
         }
@@ -214,7 +234,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                 return;
             }
             FavoriteAppBarButton.Visibility = Visibility.Visible;
-            if (FavouritesService.IsFavourite(_pageTitleToFetch))
+            if (FavouritesService.IsFavourite(_pageTitleToFetch, SessionManager.CurrentWiki.Id))
             {
                 FavoriteAppBarButton.Label = "Remove from Favourites";
                 (FavoriteAppBarButton.Icon as SymbolIcon).Symbol = Symbol.UnFavorite;
@@ -241,18 +261,15 @@ namespace WikiViewer.Shared.Uwp.Pages
             {
                 request.Data.Properties.Title = ArticleTitleTextBlock.Text;
                 request.Data.Properties.Description =
-                    $"Check out this article on {AppSettings.Host}.";
-                request.Data.SetWebLink(new Uri(AppSettings.GetWikiPageUrl(_pageTitleToFetch)));
+                    $"Check out this article on {SessionManager.CurrentWiki.Host}.";
+                request.Data.SetWebLink(
+                    new Uri(SessionManager.CurrentWiki.GetWikiPageUrl(_pageTitleToFetch))
+                );
             }
             else
             {
                 request.FailWithDisplayText("There is no article loaded to share.");
             }
-        }
-
-        private IApiWorker GetApiWorker()
-        {
-            return MainPageBase.ApiWorker;
         }
     }
 }

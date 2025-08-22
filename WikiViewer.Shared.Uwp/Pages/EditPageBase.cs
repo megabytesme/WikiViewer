@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using WikiViewer.Core;
-using WikiViewer.Core.Enums;
 using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Services;
 using Windows.UI.Core;
@@ -45,9 +44,9 @@ namespace WikiViewer.Shared.Uwp.Pages
             }
 
             PageTitleTextBlock.Text = $"Editing: {_pageTitle.Replace('_', ' ')}";
-
-            _apiWorker = App.ApiWorkerFactory.CreateApiWorker();
-
+            _apiWorker = App.ApiWorkerFactory.CreateApiWorker(
+                SessionManager.CurrentWiki.PreferredConnectionMethod
+            );
             _ = LoadContentAsync();
         }
 
@@ -88,9 +87,9 @@ namespace WikiViewer.Shared.Uwp.Pages
         {
             try
             {
-                await _apiWorker.InitializeAsync();
+                await _apiWorker.InitializeAsync(SessionManager.CurrentWiki.BaseUrl);
                 string url =
-                    $"{AppSettings.ApiEndpoint}?action=query&prop=revisions&titles={Uri.EscapeDataString(_pageTitle)}&rvprop=content&format=json";
+                    $"{SessionManager.CurrentWiki.ApiEndpoint}?action=query&prop=revisions&titles={Uri.EscapeDataString(_pageTitle)}&rvprop=content&format=json";
                 string json = await _apiWorker.GetJsonFromApiAsync(url);
                 var root = JObject.Parse(json);
                 var page = root["query"]["pages"].First.First;
@@ -129,7 +128,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                     { "disablelimitreport", "true" },
                 };
                 string json = await _apiWorker.PostAndGetJsonFromApiAsync(
-                    AppSettings.ApiEndpoint,
+                    SessionManager.CurrentWiki.ApiEndpoint,
                     postData
                 );
                 var root = JObject.Parse(json);
@@ -154,7 +153,15 @@ namespace WikiViewer.Shared.Uwp.Pages
             LoadingTextBlock.Text = "Saving...";
             try
             {
-                bool success = await AuthService.SavePageAsync(
+                if (!SessionManager.IsLoggedIn)
+                    throw new InvalidOperationException("User must be logged in to save a page.");
+
+                var authService = new AuthenticationService(
+                    SessionManager.CurrentAccount,
+                    SessionManager.CurrentWiki,
+                    App.ApiWorkerFactory
+                );
+                bool success = await authService.SavePageAsync(
                     _pageTitle,
                     WikitextEditorTextBox.Text,
                     SummaryTextBoxTextBox.Text

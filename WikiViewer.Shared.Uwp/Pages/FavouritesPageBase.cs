@@ -5,7 +5,6 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using HtmlAgilityPack;
-using WikiViewer.Core;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
 using WikiViewer.Shared.Uwp.Managers;
@@ -27,7 +26,6 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected abstract ScrollViewer ListViewScrollViewerControl { get; }
         protected abstract AppBarButton ViewToggleButtonControl { get; }
         protected abstract AppBarButton DeleteButtonControl { get; }
-
         protected abstract GridView FavouritesGridViewControl { get; }
         protected abstract TextBlock NoFavouritesTextBlock { get; }
         protected abstract CommandBar BottomCommandBar { get; }
@@ -66,11 +64,12 @@ namespace WikiViewer.Shared.Uwp.Pages
             {
                 _isCachingInProgress = true;
                 var allFavouriteArticles = FavouritesService
-                    .GetFavourites()
+                    .GetFavourites(SessionManager.CurrentWiki.Id)
                     .Where(t => !t.StartsWith("Talk:") && !t.StartsWith("User talk:"))
                     .ToList();
                 if (!allFavouriteArticles.Any())
                     return;
+
                 var checkTasks = allFavouriteArticles.Select(async title => new
                 {
                     Title = title,
@@ -81,6 +80,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                     .Where(r => !r.IsCached)
                     .Select(r => r.Title)
                     .ToList();
+
                 if (titlesToCache.Any())
                 {
                     await BackgroundCacheService.CacheFavouritesAsync(titlesToCache);
@@ -126,7 +126,7 @@ namespace WikiViewer.Shared.Uwp.Pages
         private void LoadFavourites()
         {
             _favouritesCollection.Clear();
-            var rawFavourites = FavouritesService.GetFavourites();
+            var rawFavourites = FavouritesService.GetFavourites(SessionManager.CurrentWiki.Id);
             if (rawFavourites.Any())
             {
                 var groupedFavourites = new Dictionary<string, FavouriteItem>();
@@ -152,7 +152,7 @@ namespace WikiViewer.Shared.Uwp.Pages
             {
                 FavouritesGridViewControl.Visibility = Visibility.Collapsed;
                 NoFavouritesTextBlock.Visibility = Visibility.Visible;
-                NoFavouritesTextBlock.Text = AuthService.IsLoggedIn
+                NoFavouritesTextBlock.Text = SessionManager.IsLoggedIn
                     ? "Your watchlist is empty."
                     : "You haven't added any Favourites yet.";
             }
@@ -163,7 +163,6 @@ namespace WikiViewer.Shared.Uwp.Pages
             item.ImageUrl = "ms-appx:///Assets/Square150x150Logo.png";
             if (string.IsNullOrEmpty(item.ArticlePageTitle))
                 return;
-
             string cachedHtml = await ArticleCacheManager.GetCachedArticleHtmlAsync(
                 item.ArticlePageTitle
             );
@@ -172,22 +171,16 @@ namespace WikiViewer.Shared.Uwp.Pages
 
             var doc = new HtmlDocument();
             doc.LoadHtml(cachedHtml);
-
             var firstImageNode = doc.DocumentNode.SelectSingleNode("//img[@src]");
-
             if (firstImageNode != null)
             {
                 string src = firstImageNode.GetAttributeValue("src", "");
                 if (!string.IsNullOrEmpty(src))
                 {
                     if (!src.StartsWith("/"))
-                    {
                         item.ImageUrl = $"ms-appdata:///local/cache/{src}";
-                    }
                     else
-                    {
                         item.ImageUrl = $"ms-appdata:///local{src}";
-                    }
                 }
             }
         }
@@ -197,8 +190,10 @@ namespace WikiViewer.Shared.Uwp.Pages
             ShowLoadingOverlay();
             try
             {
-                var worker = MainPageBase.ApiWorker;
-                bool pageExists = await ArticleProcessingService.PageExistsAsync(pageTitle, worker);
+                bool pageExists = await ArticleProcessingService.PageExistsAsync(
+                    pageTitle,
+                    SessionManager.CurrentApiWorker
+                );
                 if (pageExists)
                 {
                     App.Navigate(GetArticleViewerPageType(), pageTitle);
@@ -216,7 +211,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                     var result = await dialog.ShowAsync();
                     if (result == ContentDialogResult.Primary)
                     {
-                        if (!AuthService.IsLoggedIn)
+                        if (!SessionManager.IsLoggedIn)
                         {
                             await new ContentDialog
                             {
@@ -274,25 +269,38 @@ namespace WikiViewer.Shared.Uwp.Pages
         {
             var gridSelectionCount = FavouritesGridViewControl.SelectedItems.Count;
             var listSelectionCount = FavouritesListViewControl.SelectedItems.Count;
-
-            DeleteButtonControl.Visibility = (gridSelectionCount > 0 || listSelectionCount > 0) ? Visibility.Visible : Visibility.Collapsed;
+            DeleteButtonControl.Visibility =
+                (gridSelectionCount > 0 || listSelectionCount > 0)
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
         }
 
         protected async void DeleteButton_Click(object sender, RoutedEventArgs e)
         {
-            var itemsToDelete = (_isGridView ? FavouritesGridViewControl.SelectedItems : FavouritesListViewControl.SelectedItems)
-                                .Cast<FavouriteItem>().ToList();
+            var itemsToDelete = (
+                _isGridView
+                    ? FavouritesGridViewControl.SelectedItems
+                    : FavouritesListViewControl.SelectedItems
+            )
+                .Cast<FavouriteItem>()
+                .ToList();
 
-            var titlesToRemove = new HashSet<string>();
+            var authService = SessionManager.IsLoggedIn
+                ? new AuthenticationService(
+                    SessionManager.CurrentAccount,
+                    SessionManager.CurrentWiki,
+                    App.ApiWorkerFactory
+                )
+                : null;
+
             foreach (var item in itemsToDelete)
             {
-                if (item.IsArticleAvailable) titlesToRemove.Add(item.ArticlePageTitle);
-                if (item.IsTalkAvailable) titlesToRemove.Add(item.TalkPageTitle);
-            }
-
-            foreach (var title in titlesToRemove)
-            {
-                await FavouritesService.RemoveFavoriteAsync(title);
+                if (item.IsArticleAvailable)
+                    await FavouritesService.RemoveFavoriteAsync(
+                        item.ArticlePageTitle,
+                        SessionManager.CurrentWiki.Id,
+                        authService
+                    );
             }
 
             FavouritesGridViewControl.SelectedItem = null;

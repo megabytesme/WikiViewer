@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Linq;
-using Microsoft.UI.Xaml.Controls;
+using WikiViewer.Core.Services;
 using WikiViewer.Shared.Uwp.Pages;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Media;
@@ -108,10 +108,7 @@ namespace _1809_UWP.Pages
         private void NavView_Loaded(object sender, Windows.UI.Xaml.RoutedEventArgs e)
         {
             if (ContentFrame.Content == null)
-                NavigateToPage(
-                    GetArticleViewerPageType(),
-                    WikiViewer.Core.AppSettings.MainPageName
-                );
+                NavigateToPage(GetArticleViewerPageType(), "Main Page");
         }
 
         private void NavView_ItemInvoked(
@@ -131,7 +128,7 @@ namespace _1809_UWP.Pages
                 {
                     case "home":
                         targetPage = GetArticleViewerPageType();
-                        pageParameter = WikiViewer.Core.AppSettings.MainPageName;
+                        pageParameter = "Main Page";
                         break;
                     case "random":
                         targetPage = GetArticleViewerPageType();
@@ -144,10 +141,10 @@ namespace _1809_UWP.Pages
                         targetPage = GetLoginPageType();
                         break;
                     case "userpage":
-                        if (WikiViewer.Core.Services.AuthService.IsLoggedIn)
+                        if (SessionManager.IsLoggedIn)
                         {
                             targetPage = GetArticleViewerPageType();
-                            pageParameter = $"User:{WikiViewer.Core.Services.AuthService.Username}";
+                            pageParameter = $"User:{SessionManager.Username}";
                         }
                         break;
                 }
@@ -188,20 +185,12 @@ namespace _1809_UWP.Pages
                 tag = "login";
             else if (e.SourcePageType == GetArticleViewerPageType() && e.Parameter is string p)
             {
-                if (
-                    p.Equals(
-                        WikiViewer.Core.AppSettings.MainPageName,
-                        StringComparison.OrdinalIgnoreCase
-                    )
-                )
+                if (p.Equals("Main Page", StringComparison.OrdinalIgnoreCase))
                     tag = "home";
                 else if (p.Equals("random", StringComparison.OrdinalIgnoreCase))
                     tag = "random";
                 else if (
-                    p.Equals(
-                        $"User:{WikiViewer.Core.Services.AuthService.Username}",
-                        StringComparison.OrdinalIgnoreCase
-                    )
+                    p.Equals($"User:{SessionManager.Username}", StringComparison.OrdinalIgnoreCase)
                 )
                     tag = "userpage";
             }

@@ -27,7 +27,7 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected override async void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
-            PageTitleTextBlock.Text = $"Create Account on {AppSettings.Host}";
+            PageTitleTextBlock.Text = $"Create Account on {SessionManager.CurrentWiki.Host}";
             await LoadRequiredFieldsAsync();
         }
 
@@ -40,7 +40,27 @@ namespace WikiViewer.Shared.Uwp.Pages
 
             try
             {
-                _requiredFields = await AuthService.GetCreateAccountFieldsAsync();
+                using (
+                    var worker = App.ApiWorkerFactory.CreateApiWorker(
+                        SessionManager.CurrentWiki.PreferredConnectionMethod
+                    )
+                )
+                {
+                    await worker.InitializeAsync(SessionManager.CurrentWiki.BaseUrl);
+                    string url =
+                        $"{SessionManager.CurrentWiki.ApiEndpoint}?action=query&meta=authmanagerinfo&amirequestsfor=create&format=json";
+                    string json = await worker.GetJsonFromApiAsync(url);
+                    var response =
+                        Newtonsoft.Json.JsonConvert.DeserializeObject<AuthManagerInfoResponse>(
+                            json
+                        );
+                    _requiredFields =
+                        response?.Query?.AuthManagerInfo?.Requests
+                        ?? throw new Exception(
+                            "Could not retrieve required fields for account creation."
+                        );
+                }
+
                 foreach (var request in _requiredFields)
                 {
                     if (request.Fields == null)
@@ -107,7 +127,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                 }
             }
             catch (Exception ex)
-           {
+            {
                 ShowError($"Failed to load account fields: {ex.Message}");
                 CreateAccountButton.IsEnabled = false;
             }
@@ -147,7 +167,44 @@ namespace WikiViewer.Shared.Uwp.Pages
             }
             try
             {
-                var result = await AuthService.PerformCreateAccountAsync(postData);
+                CreateAccountResult result;
+                using (
+                    var worker = App.ApiWorkerFactory.CreateApiWorker(
+                        SessionManager.CurrentWiki.PreferredConnectionMethod
+                    )
+                )
+                {
+                    await worker.InitializeAsync(SessionManager.CurrentWiki.BaseUrl);
+                    string tokenUrl =
+                        $"{SessionManager.CurrentWiki.ApiEndpoint}?action=query&meta=tokens&type=createaccount&format=json";
+                    string tokenJson = await worker.GetJsonFromApiAsync(tokenUrl);
+                    var tokenResponse = Newtonsoft.Json.Linq.JObject.Parse(tokenJson);
+                    string createToken = tokenResponse?["query"]?["tokens"]?[
+                        "createaccounttoken"
+                    ]?.ToString();
+                    if (string.IsNullOrEmpty(createToken))
+                        throw new Exception("Failed to retrieve a createaccount token.");
+
+                    var finalPostData = new Dictionary<string, string>(postData)
+                    {
+                        { "action", "createaccount" },
+                        { "createtoken", createToken },
+                        { "format", "json" },
+                        { "createreturnurl", SessionManager.CurrentWiki.BaseUrl },
+                    };
+                    string resultJson = await worker.PostAndGetJsonFromApiAsync(
+                        SessionManager.CurrentWiki.ApiEndpoint,
+                        finalPostData
+                    );
+                    var resultObj =
+                        Newtonsoft.Json.JsonConvert.DeserializeObject<CreateAccountResponse>(
+                            resultJson
+                        );
+                    result =
+                        resultObj?.CreateAccount
+                        ?? throw new Exception("Received an invalid response from the server.");
+                }
+
                 if (result.Status == "PASS")
                 {
                     var successDialog = new ContentDialog
