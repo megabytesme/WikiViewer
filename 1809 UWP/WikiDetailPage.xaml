@@ -1,13 +1,13 @@
-﻿<Page
-    x:Class="WikiViewer.Shared.Uwp.Pages.WikiDetailPage"
+﻿<local:WikiDetailPageBase
+    x:Class="_1809_UWP.Pages.WikiDetailPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:WikiViewer.Shared.Uwp.Pages"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
     mc:Ignorable="d"
     Background="Transparent">
-
     <Grid>
         <ScrollViewer VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled">
@@ -133,4 +133,4 @@
             <muxc:WebView2 x:Name="VerificationWebView" Grid.Row="1"/>
         </Grid>
     </Grid>
-</Page>
+</local:WikiDetailPageBase>

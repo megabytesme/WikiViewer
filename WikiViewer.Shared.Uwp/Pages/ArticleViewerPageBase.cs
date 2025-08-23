@@ -153,19 +153,20 @@ namespace WikiViewer.Shared.Uwp.Pages
                 ShowVerificationPanel(_verificationUrl);
                 return;
             }
-            if (
-                !_isInitialized
-                || _pageWikiContext == null
-                || VerificationPanelGrid.Visibility == Visibility.Visible
-            )
-                return;
+            if (!_isInitialized || _pageWikiContext == null || VerificationPanelGrid.Visibility == Visibility.Visible) return;
 
             ReviewRequestService.IncrementPageLoadCount();
             ReviewRequestService.TryRequestReview();
             var fetchStopwatch = Stopwatch.StartNew();
             ShowLoadingOverlay();
             LastUpdatedTextBlock.Visibility = Visibility.Collapsed;
+
+            var mainPage = this.FindParent<MainPageBase>();
             var displayTitle = _pageTitleToFetch.Replace('_', ' ');
+            if (mainPage != null)
+            {
+                mainPage.SetPageTitle(displayTitle);
+            }
             ArticleTitleTextBlock.Text = displayTitle;
             LoadingTextBlock.Text = $"Loading '{displayTitle}'...";
 
@@ -201,7 +202,19 @@ namespace WikiViewer.Shared.Uwp.Pages
             }
             catch (NeedsUserVerificationException ex)
             {
+#if UWP_1809
                 ShowVerificationPanel(ex.Url);
+#else
+                ArticleTitleTextBlock.Text = "Unable to load page";
+                LoadingTextBlock.Text = "A security check is preventing access.";
+                var dialog = new ContentDialog
+                {
+                    Title = "Verification Required",
+                    Content = "This site is protected by a security check that is incompatible with this version of WebView.\n\nPlease go to Settings -> Manage Wikis, edit this wiki, and switch its 'Connection Backend' to 'Proxy' to access this content.",
+                    CloseButtonText = "OK"
+                };
+                await dialog.ShowAsync();
+#endif
             }
             catch (Exception ex)
             {

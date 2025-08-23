@@ -1,4 +1,5 @@
-﻿using WikiViewer.Shared.Uwp.Pages;
+﻿using System;
+using WikiViewer.Shared.Uwp.Pages;
 using Windows.UI.Xaml.Controls;
 
 namespace _1809_UWP.Pages
@@ -16,5 +17,7 @@ namespace _1809_UWP.Pages
         protected override Button ClearCacheButtonControl => this.ClearCacheButton;
         protected override ListView WikiListViewControl => this.WikiListView;
         protected override TextBlock ConcurrencyDescriptionTextControl => this.ConcurrencyDescriptionText;
+
+        protected override Type GetWikiDetailPageType() => typeof(WikiDetailPage);
     }
 }

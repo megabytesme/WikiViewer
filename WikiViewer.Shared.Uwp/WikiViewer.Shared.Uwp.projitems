@@ -16,12 +16,6 @@
       <DependentUpon>WikiActionsFlyout.xaml</DependentUpon>
     </Compile>
     <Compile Include="$(MSBuildThisFileDirectory)helpers\AnimatedImageLoader.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Pages\WikiDetailPage.xaml.cs">
-      <DependentUpon>WikiDetailPage.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="$(MSBuildThisFileDirectory)Pages\WikiManagementPage.xaml.cs">
-      <DependentUpon>WikiManagementPage.xaml</DependentUpon>
-    </Compile>
     <Compile Include="$(MSBuildThisFileDirectory)Pages\AppBase.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Converters\BooleanToVisibilityConverter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Converters\StringUrlToImageSourceConverter.cs" />
@@ -33,6 +27,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Pages\LoginPageBase.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Pages\MainPageBase.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Pages\SettingsPageBase.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Pages\WikiDetailPageBase.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)services\BackgroundCacheService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)services\CredentialService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)services\DispatcherTaskExtensions.cs" />
@@ -49,9 +44,6 @@
       <SubType>Designer</SubType>
     </Page>
     <Page Include="$(MSBuildThisFileDirectory)Controls\WikiActionsFlyout.xaml">
-      <SubType>Designer</SubType>
-    </Page>
-    <Page Include="$(MSBuildThisFileDirectory)Pages\WikiManagementPage.xaml">
       <SubType>Designer</SubType>
     </Page>
   </ItemGroup>

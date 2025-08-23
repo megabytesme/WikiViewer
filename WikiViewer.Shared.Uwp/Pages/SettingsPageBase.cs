@@ -36,8 +36,8 @@ namespace WikiViewer.Shared.Uwp.Pages
 
             var savedLevel = AppSettings.DownloadConcurrencyLevel;
 
-            var match = ConcurrencyComboBoxControl.Items
-                .OfType<ComboBoxItem>()
+            var match = ConcurrencyComboBoxControl
+                .Items.OfType<ComboBoxItem>()
                 .FirstOrDefault(i => Equals(i.Tag, savedLevel));
 
             if (match != null)
@@ -112,7 +112,8 @@ namespace WikiViewer.Shared.Uwp.Pages
                     description = "Recommended for slow or metered connections (2 threads).";
                     break;
                 case ConcurrencyLevel.Medium:
-                    description = "Balanced performance. Recommended for most devices (1/2 CPU Core count).";
+                    description =
+                        "Balanced performance. Recommended for most devices (1/2 CPU Core count).";
                     break;
                 case ConcurrencyLevel.High:
                     description =
@@ -309,17 +310,19 @@ namespace WikiViewer.Shared.Uwp.Pages
             await dialog.ShowAsync();
         }
 
+        protected abstract Type GetWikiDetailPageType();
+
         protected void WikiListView_ItemClick(object sender, ItemClickEventArgs e)
         {
             if (e.ClickedItem is WikiInstance wiki)
             {
-                Frame.Navigate(typeof(WikiDetailPage), wiki.Id);
+                Frame.Navigate(GetWikiDetailPageType(), wiki.Id);
             }
         }
 
         protected void AddWikiButton_Click(object sender, RoutedEventArgs e)
         {
-            Frame.Navigate(typeof(WikiDetailPage), true);
+            Frame.Navigate(GetWikiDetailPageType(), true);
         }
 
         private string GetAppName()
