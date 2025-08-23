@@ -1,18 +1,22 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using HtmlAgilityPack;
+using WikiViewer.Core;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
 using WikiViewer.Shared.Uwp.Managers;
 using WikiViewer.Shared.Uwp.Services;
+using Windows.Storage;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
-using Windows.UI.Xaml.Data;
 using Windows.UI.Xaml.Navigation;
+#if UWP_1809
+using Microsoft.UI.Xaml.Controls;
+#endif
 
 namespace WikiViewer.Shared.Uwp.Pages
 {
@@ -28,6 +32,12 @@ namespace WikiViewer.Shared.Uwp.Pages
         private readonly ObservableCollection<FavouriteItem> _unifiedFavourites =
             new ObservableCollection<FavouriteItem>();
         private bool _isGridView = true;
+
+        private static readonly SemaphoreSlim _imageDownloaderSemaphore = new SemaphoreSlim(
+            AppSettings.MaxConcurrentDownloads
+        );
+        private static readonly HashSet<string> _urlsBeingDownloaded = new HashSet<string>();
+        private static readonly HashSet<Guid> _wikisNeedingVerification = new HashSet<Guid>();
 
         protected abstract ListView FavouritesListView { get; }
         protected abstract GridView FavouritesGridView { get; }
@@ -45,16 +55,21 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         public FavouritesPageBase()
         {
-            this.Loaded += OnLoaded;
+            this.Loaded += FavouritesPage_Loaded;
         }
 
-        private void OnLoaded(object sender, RoutedEventArgs e)
+        private void FavouritesPage_Loaded(object sender, RoutedEventArgs e)
         {
-            FavouritesService.FavouritesChanged += OnFavouritesChanged;
-            BackgroundCacheService.ArticleCached += OnArticleCached;
-
             FavouritesGridView.ItemsSource = _unifiedFavourites;
             FavouritesListView.ItemsSource = _unifiedFavourites;
+        }
+
+        protected override void OnNavigatedTo(NavigationEventArgs e)
+        {
+            base.OnNavigatedTo(e);
+
+            FavouritesService.FavouritesChanged += OnFavouritesChanged;
+            BackgroundCacheService.ArticleCached += OnArticleCached;
 
             LoadAllFavourites();
             _ = CheckAndStartCachingFavouritesAsync();
@@ -63,45 +78,73 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected override void OnNavigatedFrom(NavigationEventArgs e)
         {
             base.OnNavigatedFrom(e);
+
             FavouritesService.FavouritesChanged -= OnFavouritesChanged;
             BackgroundCacheService.ArticleCached -= OnArticleCached;
+
+#if UWP_1809
+            var webView2s = this.FindChildren<WebView2>().ToList();
+            foreach (var webView in webView2s)
+            {
+                webView.Close();
+                if (webView.Parent is Panel panel)
+                    panel.Children.Remove(webView);
+                else if (webView.Parent is ContentControl cc)
+                    cc.Content = null;
+            }
+#else
+            var webViews = this.FindChildren<WebView>().ToList();
+            foreach (var webView in webViews)
+            {
+                webView.NavigateToString("about:blank");
+                if (webView.Parent is Panel panel)
+                    panel.Children.Remove(webView);
+                else if (webView.Parent is ContentControl cc)
+                    cc.Content = null;
+            }
+#endif
+
+            _unifiedFavourites.Clear();
         }
 
         private async Task CheckAndStartCachingFavouritesAsync()
         {
             if (_isCachingInProgress)
                 return;
-            try
+
+            _isCachingInProgress = true;
+            _wikisNeedingVerification.Clear();
+
+            var imageFetchTasks = _unifiedFavourites
+                .Select(item => FindAndSetLeadImage(item, WikiManager.GetWikiById(item.WikiId)))
+                .ToList();
+
+            _ = Task.Run(async () =>
             {
-                _isCachingInProgress = true;
                 var articlesToCache = new Dictionary<string, WikiInstance>();
                 foreach (var item in _unifiedFavourites)
                 {
-                    if (!string.IsNullOrEmpty(item.ArticlePageTitle))
-                    {
-                        if (
-                            !await ArticleCacheManager.IsArticleCachedAsync(
-                                item.ArticlePageTitle,
-                                item.WikiId
-                            )
+                    if (
+                        !string.IsNullOrEmpty(item.ArticlePageTitle)
+                        && !await ArticleCacheManager.IsArticleCachedAsync(
+                            item.ArticlePageTitle,
+                            item.WikiId
                         )
-                        {
-                            articlesToCache[item.ArticlePageTitle] = WikiManager.GetWikiById(
-                                item.WikiId
-                            );
-                        }
+                    )
+                    {
+                        articlesToCache[item.ArticlePageTitle] = WikiManager.GetWikiById(
+                            item.WikiId
+                        );
                     }
                 }
-
                 if (articlesToCache.Any())
                 {
                     await BackgroundCacheService.CacheArticlesAsync(articlesToCache);
                 }
-            }
-            finally
-            {
-                _isCachingInProgress = false;
-            }
+            });
+
+            await Task.WhenAll(imageFetchTasks);
+            _isCachingInProgress = false;
         }
 
         private async void OnArticleCached(object sender, ArticleCachedEventArgs e)
@@ -171,12 +214,14 @@ namespace WikiViewer.Shared.Uwp.Pages
             {
                 _unifiedFavourites.Add(item);
                 var wiki = WikiManager.GetWikiById(item.WikiId);
+
                 _ = FindAndSetLeadImage(item, wiki);
             }
 
             NoFavouritesTextBlock.Visibility = _unifiedFavourites.Any()
                 ? Visibility.Collapsed
                 : Visibility.Visible;
+
             if (!_unifiedFavourites.Any())
             {
                 NoFavouritesTextBlock.Text =
@@ -187,7 +232,12 @@ namespace WikiViewer.Shared.Uwp.Pages
         private async Task FindAndSetLeadImage(FavouriteItem item, WikiInstance wiki)
         {
             item.ImageUrl = "ms-appx:///Assets/Square150x150Logo.png";
-            if (wiki == null || string.IsNullOrEmpty(item.ArticlePageTitle))
+
+            if (
+                wiki == null
+                || string.IsNullOrEmpty(item.ArticlePageTitle)
+                || _wikisNeedingVerification.Contains(wiki.Id)
+            )
                 return;
 
             string cachedHtml = await ArticleCacheManager.GetCachedArticleHtmlAsync(
@@ -197,18 +247,102 @@ namespace WikiViewer.Shared.Uwp.Pages
             if (string.IsNullOrEmpty(cachedHtml))
                 return;
 
-            var doc = new HtmlAgilityPack.HtmlDocument();
+            var doc = new HtmlDocument();
             doc.LoadHtml(cachedHtml);
+
             var firstImageNode = doc.DocumentNode.SelectSingleNode("//img[@src]");
-            if (firstImageNode != null)
+            var imageLinkNode = doc.DocumentNode.SelectSingleNode(
+                $"//a[contains(@href, '/{wiki.ArticlePath}File:')]"
+            );
+
+            if (firstImageNode == null || imageLinkNode == null)
+                return;
+
+            string originalThumbnailSrc = firstImageNode.GetAttributeValue("src", "");
+            if (string.IsNullOrEmpty(originalThumbnailSrc))
+                return;
+            string absoluteThumbnailUrl = new Uri(
+                new Uri(wiki.BaseUrl),
+                originalThumbnailSrc
+            ).AbsoluteUri;
+
+            string knownUpgradePath = ImageUpgradeManager.GetUpgradePath(absoluteThumbnailUrl);
+            if (!string.IsNullOrEmpty(knownUpgradePath))
             {
-                string src = firstImageNode.GetAttributeValue("src", "");
-                if (!string.IsNullOrEmpty(src))
+                item.ImageUrl = $"ms-appdata:///local{knownUpgradePath}";
+                return;
+            }
+
+            string fileHref = imageLinkNode.GetAttributeValue("href", "");
+            string fileTitle = fileHref.Substring(fileHref.IndexOf("File:"));
+            if (string.IsNullOrEmpty(fileTitle))
+                return;
+
+            string finalImageUrl = await Task.Run(async () =>
+            {
+                await _imageDownloaderSemaphore.WaitAsync();
+                try
                 {
-                    item.ImageUrl = src.StartsWith("/")
-                        ? $"ms-appdata:///local{src}"
-                        : $"ms-appdata:///local/cache/{src}";
+                    using (var worker = App.ApiWorkerFactory.CreateApiWorker(wiki))
+                    {
+                        await worker.InitializeAsync(wiki.BaseUrl);
+                        string url =
+                            $"{wiki.ApiEndpoint}?action=query&prop=imageinfo&iiprop=url&format=json&titles={Uri.EscapeDataString(fileTitle)}";
+                        string json = await worker.GetJsonFromApiAsync(url);
+                        if (string.IsNullOrEmpty(json))
+                            return null;
+
+                        var imageResponse =
+                            Newtonsoft.Json.JsonConvert.DeserializeObject<ImageQueryResponse>(json);
+                        string highResUrl = imageResponse
+                            ?.query?.pages?.Values.FirstOrDefault()
+                            ?.imageinfo?.FirstOrDefault()
+                            ?.url;
+
+                        if (!string.IsNullOrEmpty(highResUrl))
+                        {
+                            byte[] imageBytes = await worker.GetRawBytesFromUrlAsync(highResUrl);
+                            if (imageBytes?.Length > 0)
+                            {
+                                var cacheFolder =
+                                    await ApplicationData.Current.LocalFolder.CreateFolderAsync(
+                                        "cache",
+                                        CreationCollisionOption.OpenIfExists
+                                    );
+                                var hash = System
+                                    .Security.Cryptography.SHA1.Create()
+                                    .ComputeHash(System.Text.Encoding.UTF8.GetBytes(highResUrl));
+                                var fileName =
+                                    string.Concat(hash.Select(b => b.ToString("x2")))
+                                    + System.IO.Path.GetExtension(highResUrl);
+                                var file = await cacheFolder.CreateFileAsync(
+                                    fileName,
+                                    CreationCollisionOption.ReplaceExisting
+                                );
+                                await FileIO.WriteBytesAsync(file, imageBytes);
+
+                                string relativePath = $"/cache/{fileName}";
+
+                                ImageUpgradeManager.SetUpgradePath(
+                                    absoluteThumbnailUrl,
+                                    relativePath
+                                );
+
+                                return $"ms-appdata:///local{relativePath}";
+                            }
+                        }
+                    }
                 }
+                finally
+                {
+                    _imageDownloaderSemaphore.Release();
+                }
+                return null;
+            });
+
+            if (!string.IsNullOrEmpty(finalImageUrl))
+            {
+                item.ImageUrl = finalImageUrl;
             }
         }
 

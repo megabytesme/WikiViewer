@@ -223,35 +223,42 @@ namespace WikiViewer.Core.Services
             );
             if (mediaNodes != null && mediaNodes.Any())
             {
-                var uniqueMediaUrls = new List<string>();
-                foreach (var node in mediaNodes)
-                {
-                    string url = node.GetAttributeValue("src", null);
-                    if (
-                        !string.IsNullOrEmpty(url)
-                        && !url.StartsWith("data:")
-                        && !url.Contains("Special:CentralAutoLogin")
-                    )
-                    {
-                        uniqueMediaUrls.Add(url);
-                    }
-                }
-                uniqueMediaUrls = uniqueMediaUrls.Distinct().ToList();
-
-                var downloadTasks = uniqueMediaUrls
-                    .Select(async originalUrl =>
+                var downloadTasks = mediaNodes
+                    .Select(async node =>
                     {
                         await semaphoreToUse.WaitAsync();
                         try
                         {
+                            string originalUrl = node.GetAttributeValue("src", null);
+                            if (
+                                string.IsNullOrEmpty(originalUrl)
+                                || originalUrl.StartsWith("data:")
+                                || originalUrl.Contains("Special:CentralAutoLogin")
+                            )
+                            {
+                                return null;
+                            }
+
+                            var absoluteUrl = new Uri(
+                                new Uri(wiki.BaseUrl),
+                                originalUrl
+                            ).AbsoluteUri;
+
+                            string localPath = ImageUpgradeManager.GetUpgradePath(absoluteUrl);
+                            if (string.IsNullOrEmpty(localPath))
+                            {
+                                localPath = await DownloadAndCacheMediaAsync(
+                                    absoluteUrl,
+                                    worker,
+                                    wiki
+                                );
+                            }
+
                             return new
                             {
                                 OriginalUrl = originalUrl,
-                                LocalPath = await DownloadAndCacheMediaAsync(
-                                    originalUrl,
-                                    worker,
-                                    wiki
-                                ),
+                                Node = node,
+                                LocalPath = localPath,
                             };
                         }
                         finally
@@ -262,37 +269,27 @@ namespace WikiViewer.Core.Services
                     .ToList();
 
                 var downloadResults = await Task.WhenAll(downloadTasks);
-                var urlToLocalPathMap = downloadResults
-                    .Where(r => r.LocalPath != null)
-                    .ToDictionary(r => r.OriginalUrl, r => r.LocalPath);
 
-                foreach (var node in mediaNodes)
+                foreach (var result in downloadResults.Where(r => r?.LocalPath != null))
                 {
-                    string originalSrc = node.GetAttributeValue("src", null);
-                    if (
-                        originalSrc != null
-                        && urlToLocalPathMap.TryGetValue(originalSrc, out string localPath)
-                    )
-                    {
 #if UWP_1703
-                        string fileName = System.IO.Path.GetFileName(localPath);
-                        node.SetAttributeValue("src", fileName);
+                    string fileName = System.IO.Path.GetFileName(result.LocalPath);
+                    result.Node.SetAttributeValue("src", fileName);
 #else
-                        node.SetAttributeValue("src", localPath);
+                    result.Node.SetAttributeValue("src", result.LocalPath);
 #endif
-                        node.Attributes.Remove("srcset");
-                    }
+                    result.Node.Attributes.Remove("srcset");
                 }
             }
         }
 
         private static async Task<string> DownloadAndCacheMediaAsync(
-            string originalUrl,
+            string absoluteMediaUrl,
             IApiWorker worker,
             WikiInstance wiki
         )
         {
-            if (!Uri.TryCreate(new Uri(wiki.BaseUrl), originalUrl, out Uri mediaUrl))
+            if (!Uri.TryCreate(absoluteMediaUrl, UriKind.Absolute, out Uri mediaUrl))
                 return null;
 
             var extension = Path.GetExtension(mediaUrl.AbsolutePath).ToLowerInvariant();

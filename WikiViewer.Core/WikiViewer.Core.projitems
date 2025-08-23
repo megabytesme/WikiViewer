@@ -13,6 +13,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Interfaces\IApiWorkerFactory.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Interfaces\IApiWorker.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Interfaces\ISettingsProvider.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)interfaces\IStorageProvider.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)models\Account.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\ApiModels.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)models\AutoLoginFailedEventArgs.cs" />
@@ -26,6 +27,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)services\FaviconService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\FavouritesService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)services\HttpClientApiWorker.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)services\ImageUpgradeManager.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\SessionManager.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)services\WikiManager.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\WikiPathDetectorService.cs" />

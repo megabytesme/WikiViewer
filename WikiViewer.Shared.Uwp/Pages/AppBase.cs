@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using WikiViewer.Core;
 using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Services;
 using WikiViewer.Shared.Uwp.Managers;
@@ -32,7 +33,8 @@ namespace WikiViewer.Shared.Uwp
 
         public App()
         {
-            WikiViewer.Core.AppSettings.SettingsProvider = new UwpSettingsProvider();
+            AppSettings.SettingsProvider = new UwpSettingsProvider();
+            ImageUpgradeManager.StorageProvider = new UwpStorageProvider();
             this.InitializeComponent();
             this.Suspending += OnSuspending;
         }
@@ -65,6 +67,7 @@ namespace WikiViewer.Shared.Uwp
             await AccountManager.InitializeAsync();
             await FavouritesService.InitializeAsync();
             await ArticleCacheManager.InitializeAsync();
+            await ImageUpgradeManager.InitializeAsync();
 
             Frame rootFrame = Window.Current.Content as Frame;
             if (rootFrame == null)

@@ -315,8 +315,11 @@ namespace WikiViewer.Core.Models
             get => _imageUrl;
             set
             {
-                _imageUrl = value;
-                OnPropertyChanged();
+                if (_imageUrl != value)
+                {
+                    _imageUrl = value;
+                    OnPropertyChanged();
+                }
             }
         }
 
