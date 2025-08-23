@@ -93,13 +93,17 @@ namespace _1809_UWP.Pages
                 Tag = $"home_{wiki.Id}",
             };
 
-            var icon = new BitmapIcon();
+            var icon = new BitmapIcon
+            {
+                ShowAsMonochrome = false,
+                Width = 20,
+                Height = 20
+            };
             var binding = new Binding
             {
                 Source = wiki,
                 Path = new PropertyPath("IconUrl"),
-                Mode = BindingMode.OneWay,
-                TargetNullValue = new SymbolIcon(Symbol.Globe),
+                Mode = BindingMode.OneWay
             };
             BindingOperations.SetBinding(icon, BitmapIcon.UriSourceProperty, binding);
             navItem.Icon = icon;

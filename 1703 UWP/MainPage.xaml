@@ -91,10 +91,10 @@
                                                 HorizontalAlignment="Stretch"
                                                 HorizontalContentAlignment="Left">
                                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                <BitmapIcon UriSource="{x:Bind Wiki.IconUrl, Mode=OneWay}"
-                                                            Width="18" Height="18"
-                                                            VerticalAlignment="Center"
-                                                            Margin="13,0,13,0"/>
+                                                <Image Source="{x:Bind Wiki.IconUrl, Mode=OneWay}"
+                                                        Width="18" Height="18"
+                                                        VerticalAlignment="Center"
+                                                        Margin="13,0,13,0"/>
                                                 <TextBlock Text="{x:Bind Wiki.Name}"
                                                             VerticalAlignment="Center"/>
                                             </StackPanel>
@@ -167,7 +167,7 @@
                         <ListViewItem Tag="accounts">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                 <SymbolIcon Symbol="Contact" Margin="12,0,12,0"/>
-                                <TextBlock Text="Profiles" VerticalAlignment="Center"/>
+                                <TextBlock Text="Accounts" VerticalAlignment="Center"/>
                             </StackPanel>
                         </ListViewItem>
                         <ListViewItem Tag="settings">
