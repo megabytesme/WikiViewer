@@ -24,7 +24,7 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="{x:Bind Name}" Style="{ThemeResource BodyStrongTextBlockStyle}"/>
+                        <TextBlock Text="{x:Bind Name}" Style="{ThemeResource BodyTextBlockStyle}"/>
                         <TextBlock Text="{x:Bind Converter={StaticResource AccountStatusConverter}, ConverterParameter='Username'}" Style="{ThemeResource CaptionTextBlockStyle}" Opacity="0.7"/>
                     </StackPanel>
 
