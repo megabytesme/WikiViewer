@@ -101,6 +101,7 @@ namespace WikiViewer.Shared.Uwp.Pages
         private void MainPage_Loaded(object sender, RoutedEventArgs e)
         {
             App.UIHost = GetWorkerHost();
+            App.SignalUIReady();
             AuthenticationService.AuthenticationStateChanged +=
                 AuthService_AuthenticationStateChanged;
             WikiManager.WikisChanged += OnWikisChanged;
@@ -145,6 +146,7 @@ namespace WikiViewer.Shared.Uwp.Pages
         private async Task InitializeAppAsync()
         {
             await SessionManager.InitializeAsync();
+            _ = SessionManager.PerformAutoLoginAsync();
 
             PopulateWikiNavItems();
             SearchBox.PlaceholderText = "Search all wikis...";

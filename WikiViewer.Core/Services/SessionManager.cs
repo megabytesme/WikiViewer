@@ -34,39 +34,37 @@ namespace WikiViewer.Core.Services
                 _workerProvider = new ApiWorkerProvider(App.ApiWorkerFactory);
             }
 
-            await WikiManager.InitializeAsync();
-            await AccountManager.InitializeAsync();
-            await FavouritesService.InitializeAsync();
+            await Task.CompletedTask;
+        }
+
+        public static async Task PerformAutoLoginAsync()
+        {
+            await App.UIReady;
 
             var allWikis = WikiManager.GetWikis();
-            var loginTasks = new List<Task>();
 
             foreach (var wiki in allWikis)
             {
                 var accountsForWiki = AccountManager.GetAccountsForWiki(wiki.Id);
                 foreach (var account in accountsForWiki)
                 {
-                    loginTasks.Add(Task.Run(async () =>
+                    var credentials = CredentialService.LoadCredentials(account.Id);
+                    if (credentials != null)
                     {
-                        var credentials = CredentialService.LoadCredentials(account.Id);
-                        if (credentials != null)
+                        Debug.WriteLine($"[SessionManager] Attempting auto-login for '{account.Username}' on '{wiki.Name}'...");
+                        var authService = new AuthenticationService(account, wiki, App.ApiWorkerFactory);
+                        try
                         {
-                            Debug.WriteLine($"[SessionManager] Attempting auto-login for '{account.Username}' on '{wiki.Name}'...");
-                            var authService = new AuthenticationService(account, wiki, App.ApiWorkerFactory);
-                            try
-                            {
-                                await authService.LoginAsync(credentials.Password);
-                                Debug.WriteLine($"[SessionManager] Auto-login SUCCESS for '{account.Username}' on '{wiki.Name}'.");
-                            }
-                            catch (Exception ex)
-                            {
-                                Debug.WriteLine($"[SessionManager] Auto-login FAILED for '{account.Username}' on '{wiki.Name}': {ex.Message}");
-                            }
+                            await authService.LoginAsync(credentials.Password);
+                            Debug.WriteLine($"[SessionManager] Auto-login SUCCESS for '{account.Username}' on '{wiki.Name}'.");
                         }
-                    }));
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"[SessionManager] Auto-login FAILED for '{account.Username}' on '{wiki.Name}': {ex.Message}");
+                        }
+                    }
                 }
             }
-            await Task.WhenAll(loginTasks);
         }
 
         public static void DisposeAndReset()
