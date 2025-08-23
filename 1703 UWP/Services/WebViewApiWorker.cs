@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
-using WikiViewer.Core;
 using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
@@ -12,6 +11,7 @@ using Windows.ApplicationModel.Core;
 using Windows.Foundation;
 using Windows.UI.Core;
 using Windows.UI.Xaml.Controls;
+using Windows.Web;
 using Windows.Web.Http;
 using Windows.Web.Http.Filters;
 
@@ -69,7 +69,10 @@ namespace _1703_UWP.Services
                                 tcs.SetResult(e.IsSuccess);
                         };
                         WebView.NavigationCompleted += navHandler;
-                        if (baseUrl == null) throw new InvalidOperationException("Cannot initialize WebView worker without a base URL.");
+                        if (baseUrl == null)
+                            throw new InvalidOperationException(
+                                "Cannot initialize WebView worker without a base URL."
+                            );
                         var urlToNavigate = new Uri(baseUrl);
                         WebView.Navigate(urlToNavigate);
                     }
@@ -165,6 +168,17 @@ namespace _1703_UWP.Services
                             throw new Exception("POST operation resulted in a blank page.");
                         }
 
+                        if (CloudflareDetector.IsCloudflareChallenge(fullHtml))
+                        {
+                            Debug.WriteLine(
+                                $"[WebViewApiWorker] Cloudflare challenge detected on POST to {url}."
+                            );
+                            throw new NeedsUserVerificationException(
+                                "Cloudflare challenge detected.",
+                                url
+                            );
+                        }
+
                         var doc = new HtmlAgilityPack.HtmlDocument();
                         doc.LoadHtml(fullHtml);
                         string json = doc.DocumentNode.SelectSingleNode("//body/pre")?.InnerText;
@@ -224,7 +238,8 @@ namespace _1703_UWP.Services
                     if (WebView == null)
                         throw new InvalidOperationException("WebView is not initialized.");
 
-                    var navTcs = new TaskCompletionSource<bool>();
+                    var navTcs =
+                        new TaskCompletionSource<(bool IsSuccess, WebErrorStatus Status)>();
                     TypedEventHandler<WebView, WebViewNavigationCompletedEventArgs> navHandler =
                         null;
                     navHandler = (s, e) =>
@@ -233,14 +248,25 @@ namespace _1703_UWP.Services
                             $"[WebViewApiWorker] -> NavigationCompleted for {url}. Success: {e.IsSuccess}, Status: {e.WebErrorStatus}"
                         );
                         WebView.NavigationCompleted -= navHandler;
-                        navTcs.TrySetResult(e.IsSuccess);
+                        navTcs.TrySetResult((e.IsSuccess, e.WebErrorStatus));
                     };
                     WebView.NavigationCompleted += navHandler;
 
                     Debug.WriteLine($"[WebViewApiWorker] -> Navigating WebView to: {url}");
                     WebView.Navigate(new Uri(url));
 
-                    await navTcs.Task;
+                    var (isSuccess, status) = await navTcs.Task;
+                    if (!isSuccess && status == WebErrorStatus.Forbidden)
+                    {
+                        Debug.WriteLine(
+                            $"[WebViewApiWorker] -> FAILED: Navigation returned Forbidden status for {url}. Throwing verification exception."
+                        );
+                        throw new NeedsUserVerificationException(
+                            "Navigation was forbidden by the server.",
+                            url
+                        );
+                    }
+
                     var stopwatch = Stopwatch.StartNew();
                     while (stopwatch.Elapsed.TotalSeconds < 15)
                     {
@@ -252,6 +278,18 @@ namespace _1703_UWP.Services
                         Debug.WriteLine(
                             $"[WebViewApiWorker] -> Scraping attempt for {url}. HTML length: {fullHtml?.Length ?? 0}"
                         );
+
+                        if (CloudflareDetector.IsCloudflareChallenge(fullHtml))
+                        {
+                            Debug.WriteLine(
+                                $"[WebViewApiWorker] -> FAILED: Cloudflare challenge detected in content for {url}."
+                            );
+                            throw new NeedsUserVerificationException(
+                                "Cloudflare challenge detected.",
+                                url
+                            );
+                        }
+
                         if (string.IsNullOrEmpty(fullHtml))
                             continue;
 
@@ -404,7 +442,8 @@ namespace _1703_UWP.Services
             var filter = new HttpBaseProtocolFilter();
             var cookieManager = filter.CookieManager;
 
-            if (this.Wiki == null) return Task.CompletedTask;
+            if (this.Wiki == null)
+                return Task.CompletedTask;
             var sourceCookies = cookieManager.GetCookies(new Uri(this.Wiki.BaseUrl));
             if (sourceCookies == null || !sourceCookies.Any())
                 return Task.CompletedTask;
