@@ -1,10 +1,12 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Linq;
-using Microsoft.UI.Xaml.Controls;
-using Newtonsoft.Json;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
 using WikiViewer.Shared.Uwp.Pages;
+using Windows.ApplicationModel.Core;
+using Windows.UI;
+using Windows.UI.ViewManagement;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Data;
@@ -20,7 +22,12 @@ namespace _1809_UWP.Pages
         public MainPage()
         {
             this.InitializeComponent();
-            ApplyBackdropOrAcrylic();
+            this.Loaded += MainPage_Loaded;
+        }
+
+        private void MainPage_Loaded(object sender, RoutedEventArgs e)
+        {
+            SetupTitleBar();
         }
 
         protected override Frame ContentFrame => this.PageContentFrame;
@@ -38,6 +45,11 @@ namespace _1809_UWP.Pages
         protected override Type GetLoginPageType() => typeof(_1809_UWP.LoginPage);
 
         protected override Type GetSettingsPageType() => typeof(SettingsPage);
+
+        protected override void SetPageTitle_Platform(string title)
+        {
+            return;
+        }
 
         protected override void ShowConnectionInfoBar(
             string title,
@@ -130,6 +142,27 @@ namespace _1809_UWP.Pages
                     Tag = "accounts",
                     Icon = new SymbolIcon(Symbol.Contact),
                 }
+            );
+        }
+
+        private void SetupTitleBar()
+        {
+            CoreApplication.GetCurrentView().TitleBar.ExtendViewIntoTitleBar = true;
+            Window.Current.SetTitleBar(AppTitleBarGrid);
+            var titleBar = ApplicationView.GetForCurrentView().TitleBar;
+            titleBar.ButtonBackgroundColor = Colors.Transparent;
+            titleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
+            CoreApplication.GetCurrentView().TitleBar.LayoutMetricsChanged += (s, e) =>
+                UpdateTitleBarLayout();
+        }
+
+        private void UpdateTitleBarLayout()
+        {
+            LeftPaddingColumn.Width = new GridLength(
+                CoreApplication.GetCurrentView().TitleBar.SystemOverlayLeftInset
+            );
+            RightPaddingColumn.Width = new GridLength(
+                CoreApplication.GetCurrentView().TitleBar.SystemOverlayRightInset
             );
         }
 
@@ -253,7 +286,5 @@ namespace _1809_UWP.Pages
                 }
             }
         }
-
-        private void ApplyBackdropOrAcrylic() { }
     }
 }

@@ -1,18 +1,16 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using WikiViewer.Core;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
 using WikiViewer.Shared.Uwp.Controls;
-using Windows.ApplicationModel.Core;
-using Windows.UI;
+using WikiViewer.Shared.Uwp.Services;
 using Windows.UI.Core;
-using Windows.UI.ViewManagement;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Media.Animation;
@@ -53,6 +51,12 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected abstract void AddWikiNavItem(WikiInstance wiki);
         protected abstract void AddStandardNavItems();
 
+        public void SetPageTitle(string title)
+        {
+            SetPageTitle_Platform(title);
+        }
+        protected abstract void SetPageTitle_Platform(string title);
+
         protected void NavigateToPage(
             Type page,
             object parameter,
@@ -92,7 +96,6 @@ namespace WikiViewer.Shared.Uwp.Pages
         private void MainPage_Loaded(object sender, RoutedEventArgs e)
         {
             App.UIHost = GetWorkerHost();
-            SetupTitleBar();
             AuthenticationService.AuthenticationStateChanged +=
                 AuthService_AuthenticationStateChanged;
             WikiManager.WikisChanged += OnWikisChanged;
@@ -276,29 +279,13 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected override void OnNavigatedFrom(NavigationEventArgs e)
         {
             base.OnNavigatedFrom(e);
+            var mainPage = this.FindParent<MainPageBase>();
+            if (mainPage != null)
+            {
+                mainPage.SetPageTitle(string.Empty);
+            }
             SystemNavigationManager.GetForCurrentView().BackRequested -= System_BackRequested;
             App.RequestNavigation -= OnNavigationRequested;
-        }
-
-        private void SetupTitleBar()
-        {
-            CoreApplication.GetCurrentView().TitleBar.ExtendViewIntoTitleBar = true;
-            Window.Current.SetTitleBar(AppTitleBarGrid);
-            var titleBar = ApplicationView.GetForCurrentView().TitleBar;
-            titleBar.ButtonBackgroundColor = Colors.Transparent;
-            titleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
-            CoreApplication.GetCurrentView().TitleBar.LayoutMetricsChanged += (s, e) =>
-                UpdateTitleBarLayout();
-        }
-
-        private void UpdateTitleBarLayout()
-        {
-            LeftPaddingColumn.Width = new GridLength(
-                CoreApplication.GetCurrentView().TitleBar.SystemOverlayLeftInset
-            );
-            RightPaddingColumn.Width = new GridLength(
-                CoreApplication.GetCurrentView().TitleBar.SystemOverlayRightInset
-            );
         }
 
         protected async void SearchBox_TextChanged(
