@@ -91,10 +91,10 @@
                                                 HorizontalAlignment="Stretch"
                                                 HorizontalContentAlignment="Left">
                                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                <Image Source="{x:Bind Wiki.IconUrl, Mode=OneWay}"
-                                                        Width="18" Height="18"
-                                                        VerticalAlignment="Center"
-                                                        Margin="13,0,13,0"/>
+                                                <Image Source="{x:Bind IconUrl, Mode=OneWay}"
+                                                       Width="18" Height="18"
+                                                       VerticalAlignment="Center"
+                                                       Margin="13,0,13,0"/>
                                                 <TextBlock Text="{x:Bind Wiki.Name}"
                                                             VerticalAlignment="Center"/>
                                             </StackPanel>

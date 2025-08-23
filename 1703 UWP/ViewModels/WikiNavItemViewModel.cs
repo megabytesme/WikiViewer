@@ -8,6 +8,9 @@ namespace _1703_UWP.ViewModels
     {
         public WikiInstance Wiki { get; }
 
+        public string IconUrl =>
+            !string.IsNullOrEmpty(Wiki.IconUrl) ? Wiki.IconUrl : "ms-appx:///Assets/Square150x150Logo.png";
+
         private bool _isExpanded;
         public bool IsExpanded
         {
@@ -26,6 +29,7 @@ namespace _1703_UWP.ViewModels
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
+
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

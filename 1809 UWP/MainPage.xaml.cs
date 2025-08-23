@@ -99,6 +99,9 @@ namespace _1809_UWP.Pages
                 Width = 20,
                 Height = 20,
             };
+            var iconUri = !string.IsNullOrEmpty(wiki.IconUrl)
+                ? new Uri(wiki.IconUrl)
+                : new Uri("ms-appx:///Assets/Square150x150Logo.png");
             var binding = new Binding
             {
                 Source = wiki,
