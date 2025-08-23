@@ -26,18 +26,27 @@ namespace WikiViewer.Shared.Uwp.Services
             try
             {
                 var vault = new PasswordVault();
-                var credential = vault.Retrieve(accountId.ToString(), "anything");
-                credential.RetrievePassword();
-                return new UserCredentials
+                var credentialsList = vault.FindAllByResource(accountId.ToString());
+                var credential = credentialsList.FirstOrDefault();
+
+                if (credential != null)
                 {
-                    Username = credential.UserName,
-                    Password = credential.Password,
-                };
+                    credential.RetrievePassword();
+                    return new UserCredentials
+                    {
+                        Username = credential.UserName,
+                        Password = credential.Password,
+                    };
+                }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                return null;
+                System.Diagnostics.Debug.WriteLine(
+                    $"[CredentialService] Failed to load credential for {accountId}: {ex.Message}"
+                );
             }
+
+            return null;
         }
 
         public static void ClearCredentials(Guid accountId)

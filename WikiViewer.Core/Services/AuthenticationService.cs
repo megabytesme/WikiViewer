@@ -70,7 +70,6 @@ namespace WikiViewer.Core.Services
             if (_account.IsLoggedIn)
                 return;
 
-            ClientLoginResponse resultResponse;
             using (var loginWorker = _workerFactory.CreateApiWorker(_wiki))
             {
                 await loginWorker.InitializeAsync(_wiki.BaseUrl);
@@ -104,7 +103,7 @@ namespace WikiViewer.Core.Services
                     loginPostData
                 );
                 string cleanResultJson = ExtractJsonFromHtmlWrapper(resultJson);
-                resultResponse = JsonConvert.DeserializeObject<ClientLoginResponse>(
+                var resultResponse = JsonConvert.DeserializeObject<ClientLoginResponse>(
                     cleanResultJson
                 );
 
