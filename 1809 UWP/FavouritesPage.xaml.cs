@@ -1,6 +1,11 @@
 ﻿using System;
+using System.Numerics;
+using System.Threading.Tasks;
 using WikiViewer.Shared.Uwp.Pages;
+using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Hosting;
+using Windows.UI.Xaml.Media.Imaging;
 
 namespace _1809_UWP.Pages
 {

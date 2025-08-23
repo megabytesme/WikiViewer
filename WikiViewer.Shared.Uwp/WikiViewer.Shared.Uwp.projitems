@@ -1,7 +1,9 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
-    <MSBuildAllProjects Condition="'$(MSBuildVersion)' == '' Or '$(MSBuildVersion)' &lt; '16.0'">$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <MSBuildAllProjects Condition="'$(MSBuildVersion)' == '' Or '$(MSBuildVersion)' &lt; '16.0'">
+      $(MSBuildAllProjects);$(MSBuildThisFileFullPath)
+    </MSBuildAllProjects>
     <HasSharedItems>true</HasSharedItems>
     <SharedGUID>8bb51741-66a8-4f1b-9257-013806b5d9cf</SharedGUID>
   </PropertyGroup>
@@ -9,17 +11,33 @@
     <Import_RootNamespace>WikiViewer.Shared.Uwp</Import_RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <!-- Controls with XAML -->
+    <Compile Include="$(MSBuildThisFileDirectory)helpers\NativeAnimatedImageLoader.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)services\UwpStorageProvider.cs" />
+    <Page Include="$(MSBuildThisFileDirectory)Controls\AccountStatusFlyout.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Compile Include="$(MSBuildThisFileDirectory)Controls\AccountStatusFlyout.xaml.cs">
       <DependentUpon>AccountStatusFlyout.xaml</DependentUpon>
     </Compile>
+    <Page Include="$(MSBuildThisFileDirectory)Controls\WikiActionsFlyout.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Compile Include="$(MSBuildThisFileDirectory)Controls\WikiActionsFlyout.xaml.cs">
       <DependentUpon>WikiActionsFlyout.xaml</DependentUpon>
     </Compile>
-    <Compile Include="$(MSBuildThisFileDirectory)helpers\AnimatedImageLoader.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Pages\AppBase.cs" />
+    <!-- Converters -->
     <Compile Include="$(MSBuildThisFileDirectory)Converters\BooleanToVisibilityConverter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Converters\StringUrlToImageSourceConverter.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Converters\StringToBitmapImageConverter.cs" />
+    <!-- Helpers -->
+    <Compile Include="$(MSBuildThisFileDirectory)Helpers\AnimatedImageLoader.cs" />
+    <!-- Managers -->
     <Compile Include="$(MSBuildThisFileDirectory)Managers\ArticleCacheManager.cs" />
+    <!-- Pages (code-only base classes, no XAML) -->
+    <Compile Include="$(MSBuildThisFileDirectory)Pages\AppBase.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Pages\ArticleViewerPageBase.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Pages\CreateAccountPageBase.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Pages\EditPageBase.cs" />
@@ -28,25 +46,23 @@
     <Compile Include="$(MSBuildThisFileDirectory)Pages\MainPageBase.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Pages\SettingsPageBase.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Pages\WikiDetailPageBase.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)services\BackgroundCacheService.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)services\CredentialService.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)services\DispatcherTaskExtensions.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)services\ReviewRequestService.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)services\UwpSettingsProvider.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)services\VisualTreeHelpers.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)viewmodels\SearchSuggestionViewModel.cs" />
+    <!-- Services -->
+    <Compile Include="$(MSBuildThisFileDirectory)Services\BackgroundCacheService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Services\CredentialService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Services\DispatcherTaskExtensions.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Services\ReviewRequestService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Services\UwpSettingsProvider.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Services\VisualTreeHelpers.cs" />
+    <!-- ViewModels -->
+    <Compile Include="$(MSBuildThisFileDirectory)ViewModels\SearchSuggestionViewModel.cs" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="$(MSBuildThisFileDirectory)Helpers\" />
     <Folder Include="$(MSBuildThisFileDirectory)ViewModels\" />
     <Folder Include="$(MSBuildThisFileDirectory)Services\" />
-  </ItemGroup>
-  <ItemGroup>
-    <Page Include="$(MSBuildThisFileDirectory)Controls\AccountStatusFlyout.xaml">
-      <SubType>Designer</SubType>
-    </Page>
-    <Page Include="$(MSBuildThisFileDirectory)Controls\WikiActionsFlyout.xaml">
-      <SubType>Designer</SubType>
-    </Page>
+    <Folder Include="$(MSBuildThisFileDirectory)Converters\" />
+    <Folder Include="$(MSBuildThisFileDirectory)Controls\" />
+    <Folder Include="$(MSBuildThisFileDirectory)Managers\" />
+    <Folder Include="$(MSBuildThisFileDirectory)Pages\" />
   </ItemGroup>
 </Project>
