@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Threading.Tasks;
-using WikiViewer.Core;
 using Windows.Foundation;
 using Windows.Storage;
 using Windows.UI.ViewManagement;
@@ -15,7 +14,7 @@ namespace _1703_UWP.Pages
 
         public ArticleViewerPage() => this.InitializeComponent();
 
-        protected override TextBlock ArticleTitleTextBlock => ArticleTitle;
+        protected override TextBlock ArticleTitleTextBlock => new TextBlock();
         protected override TextBlock LoadingTextBlock => LoadingText;
         protected override TextBlock LastUpdatedTextBlock => LastUpdatedText;
         protected override Grid LoadingOverlayGrid => LoadingOverlay;
@@ -104,9 +103,9 @@ namespace _1703_UWP.Pages
         }
 
         private async void ArticleDisplayWebView_NavigationStarting(
-    WebView sender,
-    WebViewNavigationStartingEventArgs args
-)
+            WebView sender,
+            WebViewNavigationStartingEventArgs args
+        )
         {
             if (
                 args.Uri != null
@@ -120,7 +119,8 @@ namespace _1703_UWP.Pages
             }
 
             args.Cancel = true;
-            if (args.Uri == null) return;
+            if (args.Uri == null)
+                return;
 
             string path = args.Uri.ToString();
 
@@ -139,7 +139,7 @@ namespace _1703_UWP.Pages
                 string clickedPath = args.Uri.AbsolutePath;
                 string newTitle = null;
 
-                string articlePathPrefix = $"/{AppSettings.ArticlePath}";
+                string articlePathPrefix = $"/{_pageWikiContext.ArticlePath}";
                 int articlePathIndex = clickedPath.IndexOf(articlePathPrefix);
 
                 if (articlePathIndex != -1)

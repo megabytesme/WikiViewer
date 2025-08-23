@@ -1,4 +1,4 @@
-﻿<local:WikiDetailPage
+﻿<local:WikiDetailPageBase
     x:Class="_1703_UWP.WikiDetailPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -7,7 +7,6 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
     Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
-
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -19,10 +18,10 @@
         </Grid>
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <StackPanel Margin="12" Padding="24" MaxWidth="600">
-                <TextBox x:Name="WikiNameTextBox" Header="Wiki Name"/>
-                <TextBox x:Name="WikiUrlTextBox" Header="MediaWiki Base URL" PlaceholderText="https://en.wikipedia.org/"/>
-                <Grid>
+            <StackPanel Padding="24" MaxWidth="600" HorizontalAlignment="Center">
+                <TextBox x:Name="WikiNameTextBox" Header="Wiki Name" Margin="0,0,0,12"/>
+                <TextBox x:Name="WikiUrlTextBox" Header="MediaWiki Base URL" PlaceholderText="https://en.wikipedia.org/" Margin="0,0,0,12"/>
+                <Grid Margin="0,0,0,12">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="*"/>
@@ -30,13 +29,13 @@
                     <TextBox x:Name="ScriptPathTextBox" Grid.Column="0" Header="Script Path" Margin="0,0,6,0"/>
                     <TextBox x:Name="ArticlePathTextBox" Grid.Column="1" Header="Article Path" Margin="6,0,0,0"/>
                 </Grid>
-                <Button x:Name="DetectPathsButton" HorizontalAlignment="Left" Click="DetectPathsButton_Click">
-                    <StackPanel Orientation="Horizontal" Margin="8">
+                <Button x:Name="DetectPathsButton" HorizontalAlignment="Left" Click="DetectPathsButton_Click" Margin="0,0,0,12">
+                    <StackPanel Orientation="Horizontal">
                         <SymbolIcon Symbol="Find"/>
-                        <TextBlock Text="Detect Paths"/>
+                        <TextBlock Text="Detect Paths" Margin="8,0,0,0"/>
                     </StackPanel>
                 </Button>
-                <TextBlock x:Name="DetectionStatusTextBlock" Visibility="Collapsed" TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}"/>
+                <TextBlock x:Name="DetectionStatusTextBlock" Visibility="Collapsed" TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}" Margin="0,0,0,12"/>
                 <ToggleSwitch x:Name="ConnectionMethodToggleSwitch" Header="Connection Backend" OnContent="Proxy" OffContent="WebView"/>
             </StackPanel>
         </ScrollViewer>
@@ -47,7 +46,7 @@
         </CommandBar>
 
         <Grid x:Name="LoadingOverlay" Grid.RowSpan="2" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Visibility="Collapsed">
-            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="12">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                 <ProgressRing IsActive="True" Width="60" Height="60"/>
                 <TextBlock x:Name="LoadingText" Text="Please wait..."/>
             </StackPanel>
@@ -58,11 +57,11 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
-            <StackPanel Margin="12" Padding="8">
+            <StackPanel Margin="12">
                 <TextBlock Text="Please complete the security check" Style="{ThemeResource TitleTextBlockStyle}"/>
                 <TextBlock Text="Detection will continue automatically once you finish." Style="{ThemeResource BodyTextBlockStyle}" TextWrapping="Wrap"/>
             </StackPanel>
             <WebView x:Name="VerificationWebView" Grid.Row="1"/>
         </Grid>
     </Grid>
-</local:WikiDetailPage>
+</local:WikiDetailPageBase>

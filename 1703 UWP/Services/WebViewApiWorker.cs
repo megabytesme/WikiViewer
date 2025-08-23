@@ -404,7 +404,8 @@ namespace _1703_UWP.Services
             var filter = new HttpBaseProtocolFilter();
             var cookieManager = filter.CookieManager;
 
-            var sourceCookies = cookieManager.GetCookies(new Uri(AppSettings.BaseUrl));
+            if (this.Wiki == null) return Task.CompletedTask;
+            var sourceCookies = cookieManager.GetCookies(new Uri(this.Wiki.BaseUrl));
             if (sourceCookies == null || !sourceCookies.Any())
                 return Task.CompletedTask;
 
