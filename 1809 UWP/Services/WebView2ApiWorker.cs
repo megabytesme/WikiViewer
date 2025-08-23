@@ -54,12 +54,25 @@ namespace _1809_UWP.Services
                         WebView = new WebView2();
                         WikiViewer.Shared.Uwp.App.UIHost.Children.Add(WebView);
                         await WebView.EnsureCoreWebView2Async();
+
+                        if (WebView.CoreWebView2 == null)
+                        {
+                            throw new InvalidOperationException("CoreWebView2 could not be initialized. The environment may be unstable.");
+                        }
+
                         if (!string.IsNullOrEmpty(baseUrl))
                             WebView.CoreWebView2.Navigate(baseUrl);
+
                         tcs.SetResult(true);
                     }
                     catch (Exception ex)
                     {
+                        if (WebView != null)
+                        {
+                            WikiViewer.Shared.Uwp.App.UIHost?.Children.Remove(WebView);
+                            WebView.Close();
+                            WebView = null;
+                        }
                         tcs.SetException(ex);
                     }
                 }
