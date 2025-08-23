@@ -10,6 +10,7 @@
                 <ResourceDictionary>
                     <shared:BooleanToVisibilityConverter x:Key="GlobalBoolToVisibility" />
                     <shared:StringUrlToImageSourceConverter x:Key="GlobalUrlToImageConverter" />
+                    <shared:StringToBitmapImageConverter x:Key="StringToBitmapImageConverter" />
                 </ResourceDictionary>
                 <ResourceDictionary>
                     <AcrylicBrush x:Key="PageTitleBarAcrylicBrush"
