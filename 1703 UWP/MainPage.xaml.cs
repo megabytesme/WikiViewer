@@ -14,6 +14,8 @@ namespace _1703_UWP.Pages
         {
             this.InitializeComponent();
             this.SizeChanged += MainPage_SizeChanged;
+            this.PageHeaderControl.SearchTextChanged += base.SearchBox_TextChanged;
+            this.PageHeaderControl.SearchQuerySubmitted += base.SearchBox_QuerySubmitted;
         }
 
         protected override Frame ContentFrame => this.PageContentFrame;

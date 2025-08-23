@@ -34,9 +34,11 @@
     <Compile Include="$(MSBuildThisFileDirectory)services\ReviewRequestService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)services\UwpSettingsProvider.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)services\VisualTreeHelpers.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)viewmodels\SearchSuggestionViewModel.cs" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="$(MSBuildThisFileDirectory)Helpers\" />
+    <Folder Include="$(MSBuildThisFileDirectory)ViewModels\" />
     <Folder Include="$(MSBuildThisFileDirectory)Services\" />
   </ItemGroup>
   <ItemGroup>

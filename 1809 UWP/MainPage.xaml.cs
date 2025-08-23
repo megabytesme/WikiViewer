@@ -1,6 +1,6 @@
-﻿using Newtonsoft.Json;
-using System;
+﻿using System;
 using System.Linq;
+using Newtonsoft.Json;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
 using WikiViewer.Shared.Uwp.Pages;
@@ -97,13 +97,13 @@ namespace _1809_UWP.Pages
             {
                 ShowAsMonochrome = false,
                 Width = 20,
-                Height = 20
+                Height = 20,
             };
             var binding = new Binding
             {
                 Source = wiki,
                 Path = new PropertyPath("IconUrl"),
-                Mode = BindingMode.OneWay
+                Mode = BindingMode.OneWay,
             };
             BindingOperations.SetBinding(icon, BitmapIcon.UriSourceProperty, binding);
             navItem.Icon = icon;
@@ -290,5 +290,10 @@ namespace _1809_UWP.Pages
                 }
             }
         }
+
+        private void SearchBox_QuerySubmitted(
+            AutoSuggestBox sender,
+            AutoSuggestBoxQuerySubmittedEventArgs args
+        ) => base.SearchBox_QuerySubmitted(sender, args);
     }
 }

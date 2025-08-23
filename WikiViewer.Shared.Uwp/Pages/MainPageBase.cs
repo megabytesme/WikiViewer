@@ -1,6 +1,7 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
@@ -10,6 +11,7 @@ using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
 using WikiViewer.Shared.Uwp.Controls;
 using WikiViewer.Shared.Uwp.Services;
+using WikiViewer.Shared.Uwp.ViewModels;
 using Windows.UI.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
@@ -55,7 +57,10 @@ namespace WikiViewer.Shared.Uwp.Pages
         {
             SetPageTitle_Platform(title);
         }
+
         protected abstract void SetPageTitle_Platform(string title);
+
+        private readonly ObservableCollection<SearchSuggestionViewModel> _suggestions = new ObservableCollection<SearchSuggestionViewModel>();
 
         protected void NavigateToPage(
             Type page,
@@ -297,49 +302,82 @@ namespace WikiViewer.Shared.Uwp.Pages
         {
             if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput)
                 return;
+
+            if (sender.ItemsSource == null)
+            {
+                sender.ItemsSource = _suggestions;
+            }
+            _suggestions.Clear();
+
             string query = sender.Text;
             if (string.IsNullOrWhiteSpace(query) || query.Length < 2)
             {
-                sender.ItemsSource = null;
                 return;
             }
+
             _suggestionCts?.Cancel();
             _suggestionCts = new CancellationTokenSource();
             var token = _suggestionCts.Token;
+
             try
             {
-                await Task.Delay(300, token);
                 var allWikis = WikiManager.GetWikis();
-                var suggestionTasks = allWikis.Select(async wiki =>
+
+                var searchTasks = allWikis.Select(async wiki =>
                 {
                     try
                     {
+                        if (token.IsCancellationRequested)
+                            return;
+
                         var worker = SessionManager.GetAnonymousWorkerForWiki(wiki);
                         string url =
                             $"{wiki.ApiEndpoint}?action=opensearch&format=json&limit=5&search={Uri.EscapeDataString(query)}";
                         string json = await worker.GetJsonFromApiAsync(url);
-                        if (string.IsNullOrEmpty(json))
-                            return new System.Collections.Generic.List<string>();
+
+                        if (string.IsNullOrEmpty(json) || token.IsCancellationRequested)
+                            return;
+
                         JArray root = JArray.Parse(json);
-                        return root.Count > 1 && root[1] is JArray suggestionsArray
-                            ? suggestionsArray.ToObject<System.Collections.Generic.List<string>>()
-                            : new System.Collections.Generic.List<string>();
+                        if (root.Count > 1 && root[1] is JArray suggestionsArray)
+                        {
+                            var titles =
+                                suggestionsArray.ToObject<System.Collections.Generic.List<string>>();
+
+                            await Dispatcher.RunAsync(
+                                CoreDispatcherPriority.Normal,
+                                () =>
+                                {
+                                    if (token.IsCancellationRequested)
+                                        return;
+                                    foreach (var title in titles)
+                                    {
+                                        _suggestions.Add(
+                                            new SearchSuggestionViewModel
+                                            {
+                                                Title = title,
+                                                WikiName = wiki.Name,
+                                                IconUrl = wiki.IconUrl,
+                                                WikiId = wiki.Id,
+                                            }
+                                        );
+                                    }
+                                }
+                            );
+                        }
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        return new System.Collections.Generic.List<string>();
+                        Debug.WriteLine($"Suggestion fetch for {wiki.Name} failed: {ex.Message}");
                     }
                 });
-                var results = await Task.WhenAll(suggestionTasks);
-                if (token.IsCancellationRequested)
-                    return;
-                sender.ItemsSource = results.SelectMany(r => r).Distinct().ToList();
+
+                await Task.WhenAll(searchTasks);
             }
             catch (TaskCanceledException) { }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Suggestion fetch failed: {ex.Message}");
-                sender.ItemsSource = null;
+                Debug.WriteLine($"Overall suggestion fetch failed: {ex.Message}");
             }
         }
 
@@ -348,18 +386,32 @@ namespace WikiViewer.Shared.Uwp.Pages
             AutoSuggestBoxQuerySubmittedEventArgs args
         )
         {
-            var wikis = WikiManager.GetWikis();
-            if (wikis.Any())
+            ArticleNavigationParameter navParam = null;
+
+            if (args.ChosenSuggestion is SearchSuggestionViewModel selectedSuggestion)
             {
-                var firstWiki = wikis.First();
-                NavigateToPage(
-                    GetArticleViewerPageType(),
-                    new ArticleNavigationParameter
+                navParam = new ArticleNavigationParameter
+                {
+                    WikiId = selectedSuggestion.WikiId,
+                    PageTitle = selectedSuggestion.Title
+                };
+            }
+            else if (!string.IsNullOrWhiteSpace(args.QueryText))
+            {
+                var firstWiki = WikiManager.GetWikis().FirstOrDefault();
+                if (firstWiki != null)
+                {
+                    navParam = new ArticleNavigationParameter
                     {
                         WikiId = firstWiki.Id,
                         PageTitle = args.QueryText,
-                    }
-                );
+                    };
+                }
+            }
+
+            if (navParam != null)
+            {
+                NavigateToPage(GetArticleViewerPageType(), navParam);
             }
         }
 

@@ -18,6 +18,20 @@
             <TextBlock x:Name="PageTitleTextBlock" Style="{StaticResource PageTitleBarTextStyle}" TextWrapping="Wrap" Visibility="Collapsed"/>
         </StackPanel>
 
-        <AutoSuggestBox x:Name="NavSearchBox" Grid.Column="1" QueryIcon="Find" PlaceholderText="Search..." Width="220" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0"/>
+        <AutoSuggestBox x:Name="NavSearchBox" Grid.Column="1" QueryIcon="Find" PlaceholderText="Search..." 
+              Width="320" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0"
+              UpdateTextOnSelect="False" TextMemberPath="Title">
+            <AutoSuggestBox.ItemTemplate>
+                <DataTemplate xmlns:vm="using:WikiViewer.Shared.Uwp.ViewModels" x:DataType="vm:SearchSuggestionViewModel">
+                    <StackPanel Orientation="Horizontal" Margin="0,4">
+                        <BitmapIcon UriSource="{x:Bind IconUrl}" ShowAsMonochrome="False" Width="16" Height="16" Margin="0,0,8,0"/>
+                        <StackPanel>
+                            <TextBlock Text="{x:Bind Title}"/>
+                            <TextBlock Text="{x:Bind WikiName}" Opacity="0.7" Style="{StaticResource CaptionTextBlockStyle}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </DataTemplate>
+            </AutoSuggestBox.ItemTemplate>
+        </AutoSuggestBox>
     </Grid>
 </UserControl>
