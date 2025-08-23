@@ -139,6 +139,8 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         private async Task InitializeAppAsync()
         {
+            await SessionManager.InitializeAsync();
+
             PopulateWikiNavItems();
             SearchBox.PlaceholderText = "Search all wikis...";
 

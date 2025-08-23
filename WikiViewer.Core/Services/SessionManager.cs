@@ -29,7 +29,10 @@ namespace WikiViewer.Core.Services
                 IsResetPending = false;
             }
 
-            _workerProvider = new ApiWorkerProvider(App.ApiWorkerFactory);
+            if (_workerProvider == null)
+            {
+                _workerProvider = new ApiWorkerProvider(App.ApiWorkerFactory);
+            }
 
             await WikiManager.InitializeAsync();
             await AccountManager.InitializeAsync();
@@ -69,6 +72,8 @@ namespace WikiViewer.Core.Services
         public static void DisposeAndReset()
         {
             _workerProvider?.DisposeAll();
+            _workerProvider = null;
+
             var allAccounts = WikiManager.GetWikis().SelectMany(w => AccountManager.GetAccountsForWiki(w.Id));
             foreach (var account in allAccounts)
             {
