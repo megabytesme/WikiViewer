@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
+using WikiViewer.Core;
 using WikiViewer.Core.Enums;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
@@ -15,6 +16,7 @@ namespace WikiViewer.Shared.Uwp.Pages
     {
         private WikiInstance _currentWiki;
         private bool _isNewWiki = false;
+        private bool _isConnectionToggleEvent = false;
 
         protected abstract TextBlock PageTitleTextBlockControl { get; }
         protected abstract TextBox WikiNameTextBoxControl { get; }
@@ -208,6 +210,51 @@ namespace WikiViewer.Shared.Uwp.Pages
                 {
                     DetectionStatusTextBlockControl.Visibility = Visibility.Visible;
                     LoadingOverlayControl.Visibility = Visibility.Collapsed;
+                }
+            }
+        }
+
+        protected async void ConnectionMethodToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_isConnectionToggleEvent)
+                return;
+
+            if (ConnectionMethodToggleSwitchControl.IsOn && !AppSettings.HasAcceptedProxyDisclaimer)
+            {
+                var dialog = new ContentDialog
+                {
+                    Title = "Important Notice: Proxy Service",
+                    Content = new ScrollViewer
+                    {
+                        VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                        Content = new TextBlock
+                        {
+                            Text = "You are enabling an optional, experimental proxy service. Please read the following carefully:\n\n" +
+                                   "1. Data Transmission: To bypass web restrictions (like Cloudflare), your network requests from this app will be routed through an intermediary server hosted by the developer in the United Kingdom.\n\n" +
+                                   "2. No Logging Policy: This server does not intentionally log or store the content of the pages you visit. Its purpose is only to transmit the request and return the result.\n\n" +
+                                   "3. Security and Data Handling: The connection to the proxy server is secured using HTTPS (SSL/TLS). However, to function, the server must process your requests. This means unencrypted data is momentarily accessible on the server before being forwarded to the destination wiki. For this reason, it is strongly advised that you do not use this service for sensitive accounts or private information.\n\n" +
+                                   "4. Acceptable Use: You agree to use this service only for lawful purposes. You will not use it to access or distribute illegal content. The developer reserves the right to block access to the service in cases of misuse.\n\n" +
+                                   "5. No Warranty: This service is provided 'as is', without any guarantees of availability, speed, or reliability. It may not work for all websites.\n\n" +
+                                   "By clicking 'Agree and Enable', you acknowledge that you have read and understood these points and agree to use this service at your own risk.",
+                            TextWrapping = TextWrapping.Wrap
+                        }
+                    },
+                    PrimaryButtonText = "Agree and Enable",
+                    CloseButtonText = "Cancel",
+                    DefaultButton = ContentDialogButton.Close
+                };
+
+                var result = await dialog.ShowAsync();
+
+                if (result == ContentDialogResult.Primary)
+                {
+                    AppSettings.HasAcceptedProxyDisclaimer = true;
+                }
+                else
+                {
+                    _isConnectionToggleEvent = true;
+                    ConnectionMethodToggleSwitchControl.IsOn = false;
+                    _isConnectionToggleEvent = false;
                 }
             }
         }

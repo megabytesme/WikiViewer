@@ -20,6 +20,7 @@ namespace WikiViewer.Core
         private const string CachingEnabledKey = "IsCachingEnabled";
         private const string DisclaimerShownKey = "HasShownDisclaimer";
         private const string MaxConcurrentDownloadsKey = "MaxConcurrentDownloadsLevel";
+        private const string ProxyDisclaimerKey = "HasAcceptedProxyDisclaimer";
 
         private const string DefaultMainPageName = "Main Page";
 
@@ -33,6 +34,12 @@ namespace WikiViewer.Core
         {
             get => SettingsProvider.GetValue(DisclaimerShownKey, false);
             set => SettingsProvider.SetValue(DisclaimerShownKey, value);
+        }
+
+        public static bool HasAcceptedProxyDisclaimer
+        {
+            get => SettingsProvider.GetValue(ProxyDisclaimerKey, false);
+            set => SettingsProvider.SetValue(ProxyDisclaimerKey, value);
         }
 
         public static ConcurrencyLevel DownloadConcurrencyLevel

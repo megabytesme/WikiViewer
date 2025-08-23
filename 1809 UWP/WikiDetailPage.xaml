@@ -76,10 +76,7 @@
                             Padding="16"
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                             BorderThickness="1">
-                        <ToggleSwitch x:Name="ConnectionMethodToggleSwitch"
-                                      Header="Connection Backend"
-                                      OnContent="Proxy"
-                                      OffContent="WebView2"/>
+                        <ToggleSwitch x:Name="ConnectionMethodToggleSwitch" Header="Connection Backend" OnContent="Proxy" OffContent="WebView2" Toggled="ConnectionMethodToggle_Toggled"/>
                     </Border>
 
                 </StackPanel>
