@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
+using WikiViewer.Shared.Uwp.Pages;
+using WikiViewer.Shared.Uwp.Services;
 using Windows.Foundation;
 using Windows.Storage;
 using Windows.UI.ViewManagement;
@@ -189,7 +191,25 @@ namespace _1703_UWP.Pages
                         {
                             VerificationPanel.Visibility = Visibility.Collapsed;
                             _verificationUrl = null;
-                            StartArticleFetch();
+
+                            if (_isVerificationOnlyFlow)
+                            {
+                                var mainPage = this.FindParent<MainPageBase>();
+                                if (mainPage != null)
+                                {
+                                    _ = mainPage._postVerificationAction?.Invoke();
+                                    mainPage._postVerificationAction = null;
+                                }
+
+                                if (Frame.CanGoBack)
+                                {
+                                    Frame.GoBack();
+                                }
+                            }
+                            else
+                            {
+                                StartArticleFetch();
+                            }
                         }
                     );
                 }

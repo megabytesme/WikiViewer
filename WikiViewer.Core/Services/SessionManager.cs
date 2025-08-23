@@ -1,8 +1,8 @@
 using System;
-using System.Linq;
-using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
+using System.Threading.Tasks;
 using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
 using WikiViewer.Shared.Uwp;
@@ -14,10 +14,12 @@ namespace WikiViewer.Core.Services
     {
         private static ApiWorkerProvider _workerProvider;
         public static bool IsResetPending { get; set; } = false;
+        public static event EventHandler<AutoLoginFailedEventArgs> AutoLoginFailed;
 
         public static IApiWorker GetAnonymousWorkerForWiki(WikiInstance wiki)
         {
-            if (wiki == null) throw new InvalidOperationException("Wiki instance cannot be null.");
+            if (wiki == null)
+                throw new InvalidOperationException("Wiki instance cannot be null.");
             return _workerProvider.GetWorkerForWiki(wiki);
         }
 
@@ -40,7 +42,6 @@ namespace WikiViewer.Core.Services
         public static async Task PerformAutoLoginAsync()
         {
             await App.UIReady;
-
             var allWikis = WikiManager.GetWikis();
 
             foreach (var wiki in allWikis)
@@ -51,17 +52,64 @@ namespace WikiViewer.Core.Services
                     var credentials = CredentialService.LoadCredentials(account.Id);
                     if (credentials != null)
                     {
-                        Debug.WriteLine($"[SessionManager] Attempting auto-login for '{account.Username}' on '{wiki.Name}'...");
-                        var authService = new AuthenticationService(account, wiki, App.ApiWorkerFactory);
+                        Debug.WriteLine(
+                            $"[SessionManager] Attempting auto-login for '{account.Username}' on '{wiki.Name}'..."
+                        );
+                        var authService = new AuthenticationService(
+                            account,
+                            wiki,
+                            App.ApiWorkerFactory
+                        );
                         try
                         {
                             await authService.LoginAsync(credentials.Password);
-                            Debug.WriteLine($"[SessionManager] Auto-login SUCCESS for '{account.Username}' on '{wiki.Name}'.");
+                            Debug.WriteLine(
+                                $"[SessionManager] Auto-login SUCCESS for '{account.Username}' on '{wiki.Name}'."
+                            );
                         }
                         catch (Exception ex)
                         {
-                            Debug.WriteLine($"[SessionManager] Auto-login FAILED for '{account.Username}' on '{wiki.Name}': {ex.Message}");
+                            Debug.WriteLine(
+                                $"[SessionManager] Auto-login FAILED for '{account.Username}' on '{wiki.Name}': {ex.Message}"
+                            );
+                            AutoLoginFailed?.Invoke(null, new AutoLoginFailedEventArgs(wiki, ex));
                         }
+                    }
+                }
+            }
+        }
+
+        public static async Task PerformSingleLoginAsync(WikiInstance wiki)
+        {
+            await App.UIReady;
+
+            var accountsForWiki = AccountManager.GetAccountsForWiki(wiki.Id);
+            foreach (var account in accountsForWiki)
+            {
+                var credentials = CredentialService.LoadCredentials(account.Id);
+                if (credentials != null)
+                {
+                    Debug.WriteLine(
+                        $"[SessionManager] Retrying login for '{account.Username}' on '{wiki.Name}'..."
+                    );
+                    var authService = new AuthenticationService(
+                        account,
+                        wiki,
+                        App.ApiWorkerFactory
+                    );
+                    try
+                    {
+                        await authService.LoginAsync(credentials.Password);
+                        Debug.WriteLine(
+                            $"[SessionManager] Retry-login SUCCESS for '{account.Username}' on '{wiki.Name}'."
+                        );
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine(
+                            $"[SessionManager] Retry-login FAILED for '{account.Username}' on '{wiki.Name}': {ex.Message}"
+                        );
+                        AutoLoginFailed?.Invoke(null, new AutoLoginFailedEventArgs(wiki, ex));
                     }
                 }
             }
@@ -72,7 +120,9 @@ namespace WikiViewer.Core.Services
             _workerProvider?.DisposeAll();
             _workerProvider = null;
 
-            var allAccounts = WikiManager.GetWikis().SelectMany(w => AccountManager.GetAccountsForWiki(w.Id));
+            var allAccounts = WikiManager
+                .GetWikis()
+                .SelectMany(w => AccountManager.GetAccountsForWiki(w.Id));
             foreach (var account in allAccounts)
             {
                 account.AuthenticatedApiWorker?.Dispose();

@@ -16,6 +16,7 @@ namespace WikiViewer.Shared.Uwp.Pages
 {
     public abstract class ArticleViewerPageBase : Page
     {
+        protected bool _isVerificationOnlyFlow = false;
         protected WikiInstance _pageWikiContext;
         protected string _pageTitleToFetch = "";
         protected string _verificationUrl = null;
@@ -67,6 +68,7 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
+            _isVerificationOnlyFlow = false;
 
             ArticleNavigationParameter navParam = null;
             if (e.Parameter is string jsonParam)
@@ -82,25 +84,30 @@ namespace WikiViewer.Shared.Uwp.Pages
                     );
                 }
             }
+            else if (e.Parameter is ArticleNavigationParameter directParam)
+            {
+                navParam = directParam;
+            }
 
             if (navParam != null)
             {
                 _pageWikiContext = WikiManager.GetWikiById(navParam.WikiId);
-                _pageTitleToFetch = navParam.PageTitle.Replace(' ', '_');
-                if (_articleHistory.Count == 0 || _articleHistory.Peek() != _pageTitleToFetch)
+
+                if (navParam.IsVerificationFlow)
                 {
-                    _articleHistory.Clear();
-                    _articleHistory.Push(_pageTitleToFetch);
+                    _isVerificationOnlyFlow = true;
+                    _verificationUrl = navParam.PageTitle;
+                    _pageTitleToFetch = "";
                 }
-            }
-            else if (
-                e.Parameter is string url
-                && (url.StartsWith("http") || url.StartsWith("https"))
-            )
-            {
-                _verificationUrl = url;
-                _pageTitleToFetch = "";
-                _pageWikiContext = WikiManager.GetWikis().FirstOrDefault();
+                else
+                {
+                    _pageTitleToFetch = navParam.PageTitle.Replace(' ', '_');
+                    if (_articleHistory.Count == 0 || _articleHistory.Peek() != _pageTitleToFetch)
+                    {
+                        _articleHistory.Clear();
+                        _articleHistory.Push(_pageTitleToFetch);
+                    }
+                }
             }
 
             var account =
@@ -153,7 +160,12 @@ namespace WikiViewer.Shared.Uwp.Pages
                 ShowVerificationPanel(_verificationUrl);
                 return;
             }
-            if (!_isInitialized || _pageWikiContext == null || VerificationPanelGrid.Visibility == Visibility.Visible) return;
+            if (
+                !_isInitialized
+                || _pageWikiContext == null
+                || VerificationPanelGrid.Visibility == Visibility.Visible
+            )
+                return;
 
             ReviewRequestService.IncrementPageLoadCount();
             ReviewRequestService.TryRequestReview();

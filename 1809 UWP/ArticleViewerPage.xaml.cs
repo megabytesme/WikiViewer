@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Microsoft.Web.WebView2.Core;
-using WikiViewer.Core.Models; // Changed from .Core
+using WikiViewer.Shared.Uwp.Pages;
+using WikiViewer.Shared.Uwp.Services;
 using Windows.Foundation;
 using Windows.Storage;
 using Windows.UI.Xaml.Controls;
@@ -10,8 +11,7 @@ namespace _1809_UWP.Pages
 {
     public sealed partial class ArticleViewerPage
     {
-        // This field is defined in the base class and holds our context
-        // private WikiInstance _pageWikiContext;
+        private bool _isVirtualHostMappingSet = false;
 
         public ArticleViewerPage() => this.InitializeComponent();
 
@@ -25,7 +25,6 @@ namespace _1809_UWP.Pages
 
         protected override Type GetEditPageType() => typeof(EditPage);
 
-        // NEW: Helper method to get the virtual host name from the current wiki context.
         private string GetVirtualHostName() => $"local-content.{_pageWikiContext.Host}";
 
         protected override void ShowLoadingOverlay()
@@ -49,12 +48,23 @@ namespace _1809_UWP.Pages
         {
             if (ArticleDisplayWebView.CoreWebView2 == null)
                 await ArticleDisplayWebView.EnsureCoreWebView2Async();
+
+            if (!_isVirtualHostMappingSet && _pageWikiContext != null)
+            {
+                var tempFolder = ApplicationData.Current.LocalFolder.Path;
+                ArticleDisplayWebView.CoreWebView2.SetVirtualHostNameToFolderMapping(
+                    GetVirtualHostName(),
+                    tempFolder,
+                    CoreWebView2HostResourceAccessKind.Allow
+                );
+                _isVirtualHostMappingSet = true;
+            }
+
             StorageFile articleFile = await ApplicationData.Current.LocalFolder.CreateFileAsync(
                 "article.html",
                 CreationCollisionOption.ReplaceExisting
             );
             await FileIO.WriteTextAsync(articleFile, html);
-            // FIX: Use the helper method
             ArticleDisplayWebView.CoreWebView2.Navigate(
                 $"https://{GetVirtualHostName()}/article.html"
             );
@@ -80,7 +90,25 @@ namespace _1809_UWP.Pages
                         {
                             VerificationPanel.Visibility = Windows.UI.Xaml.Visibility.Collapsed;
                             _verificationUrl = null;
-                            StartArticleFetch();
+
+                            if (_isVerificationOnlyFlow)
+                            {
+                                var mainPage = this.FindParent<MainPageBase>();
+                                if (mainPage != null)
+                                {
+                                    _ = mainPage._postVerificationAction?.Invoke();
+                                    mainPage._postVerificationAction = null;
+                                }
+
+                                if (Frame.CanGoBack)
+                                {
+                                    Frame.GoBack();
+                                }
+                            }
+                            else
+                            {
+                                StartArticleFetch();
+                            }
                         }
                     );
                 }
@@ -107,13 +135,6 @@ namespace _1809_UWP.Pages
         private async Task InitializeWebView2Async()
         {
             await ArticleDisplayWebView.EnsureCoreWebView2Async();
-            var tempFolder = ApplicationData.Current.LocalFolder.Path;
-            // FIX: Use the helper method
-            ArticleDisplayWebView.CoreWebView2.SetVirtualHostNameToFolderMapping(
-                GetVirtualHostName(),
-                tempFolder,
-                CoreWebView2HostResourceAccessKind.Allow
-            );
             ArticleDisplayWebView.CoreWebView2.NavigationStarting +=
                 ArticleDisplayWebView_NavigationStarting;
         }
@@ -130,19 +151,17 @@ namespace _1809_UWP.Pages
 
             args.Cancel = true;
 
-            if (string.IsNullOrEmpty(args.Uri)) return;
+            if (string.IsNullOrEmpty(args.Uri))
+                return;
             var uri = new Uri(args.Uri);
 
-            // FIX: Use the helper method
             if (uri.Host.Equals(GetVirtualHostName(), StringComparison.OrdinalIgnoreCase))
             {
                 string clickedPath = uri.AbsolutePath;
                 string newTitle = null;
-                // FIX: Use the wiki instance's ArticlePath
                 string articlePathPrefix = $"/{_pageWikiContext.ArticlePath}";
 
                 if (
-                    // FIX: Use the wiki instance's ArticlePath
                     !string.IsNullOrEmpty(_pageWikiContext.ArticlePath)
                     && clickedPath.StartsWith(articlePathPrefix)
                 )

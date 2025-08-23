@@ -1,11 +1,11 @@
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using WikiViewer.Core;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
@@ -24,12 +24,15 @@ namespace WikiViewer.Shared.Uwp.Pages
     {
         public Guid WikiId { get; set; }
         public string PageTitle { get; set; }
+        public bool IsVerificationFlow { get; set; } = false;
     }
 
     public abstract class MainPageBase : Page
     {
         private CancellationTokenSource _suggestionCts;
         private string _verificationUrl;
+        private WikiInstance _wikiNeedingVerification;
+        public Func<Task> _postVerificationAction = null;
 
         protected abstract Frame ContentFrame { get; }
         protected abstract AutoSuggestBox SearchBox { get; }
@@ -60,7 +63,8 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         protected abstract void SetPageTitle_Platform(string title);
 
-        private readonly ObservableCollection<SearchSuggestionViewModel> _suggestions = new ObservableCollection<SearchSuggestionViewModel>();
+        private readonly ObservableCollection<SearchSuggestionViewModel> _suggestions =
+            new ObservableCollection<SearchSuggestionViewModel>();
 
         protected void NavigateToPage(
             Type page,
@@ -105,6 +109,9 @@ namespace WikiViewer.Shared.Uwp.Pages
             AuthenticationService.AuthenticationStateChanged +=
                 AuthService_AuthenticationStateChanged;
             WikiManager.WikisChanged += OnWikisChanged;
+
+            SessionManager.AutoLoginFailed += OnAutoLoginFailed;
+
             _ = InitializeAppAsync();
         }
 
@@ -113,6 +120,40 @@ namespace WikiViewer.Shared.Uwp.Pages
             AuthenticationService.AuthenticationStateChanged -=
                 AuthService_AuthenticationStateChanged;
             WikiManager.WikisChanged -= OnWikisChanged;
+
+            SessionManager.AutoLoginFailed -= OnAutoLoginFailed;
+        }
+
+        private void OnAutoLoginFailed(object sender, AutoLoginFailedEventArgs e)
+        {
+            if (e.Exception is NeedsUserVerificationException)
+            {
+                _postVerificationAction = () =>
+                {
+                    Debug.WriteLine(
+                        $"[MainPageBase] Retrying auto-login for '{e.Wiki.Name}' post-verification."
+                    );
+                    return SessionManager.PerformSingleLoginAsync(e.Wiki);
+                };
+
+#if UWP_1809
+                ShowVerificationRequiredBar(e.Wiki);
+#else
+                ShowConnectionInfoBar(
+                    "Verification Recommended",
+                    $"Access to '{e.Wiki.Name}' is restricted by a security check on this WebView version. For the best experience, consider editing this wiki in Settings and switching its 'Connection Backend' to 'Proxy'.",
+                    false
+                );
+#endif
+            }
+            else
+            {
+                ShowConnectionInfoBar(
+                    "Login Failed",
+                    $"Could not automatically sign in to '{e.Wiki.Name}'. Please check your connection or credentials.",
+                    false
+                );
+            }
         }
 
         private void OnWikisChanged(object sender, EventArgs e)
@@ -216,21 +257,21 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         protected void InfoBarButton_Click(object sender, RoutedEventArgs e)
         {
-            if (!string.IsNullOrEmpty(_verificationUrl))
+            if (!string.IsNullOrEmpty(_verificationUrl) && _wikiNeedingVerification != null)
             {
-                var firstWiki = WikiManager.GetWikis().FirstOrDefault();
-                if (firstWiki != null)
-                {
-                    ContentFrame.Navigate(
-                        GetArticleViewerPageType(),
-                        new ArticleNavigationParameter
-                        {
-                            WikiId = firstWiki.Id,
-                            PageTitle = _verificationUrl,
-                        }
-                    );
-                }
+                NavigateToPage(
+                    GetArticleViewerPageType(),
+                    new ArticleNavigationParameter
+                    {
+                        WikiId = _wikiNeedingVerification.Id,
+                        PageTitle = _verificationUrl,
+                        IsVerificationFlow = true,
+                    }
+                );
+
                 HideConnectionInfoBar();
+                _verificationUrl = null;
+                _wikiNeedingVerification = null;
             }
         }
 
@@ -395,7 +436,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                 navParam = new ArticleNavigationParameter
                 {
                     WikiId = selectedSuggestion.WikiId,
-                    PageTitle = selectedSuggestion.Title
+                    PageTitle = selectedSuggestion.Title,
                 };
             }
             else if (!string.IsNullOrWhiteSpace(args.QueryText))
@@ -421,6 +462,20 @@ namespace WikiViewer.Shared.Uwp.Pages
         {
             if (!e.Handled)
                 e.Handled = TryGoBack();
+        }
+
+        public void ShowVerificationRequiredBar(WikiInstance wiki)
+        {
+            if (wiki == null)
+                return;
+            _wikiNeedingVerification = wiki;
+            _verificationUrl = wiki.BaseUrl;
+
+            ShowConnectionInfoBar(
+                "Verification Required",
+                $"Access to '{wiki.Name}' is blocked by a security check. Please click 'Action' to continue.",
+                true
+            );
         }
     }
 }
