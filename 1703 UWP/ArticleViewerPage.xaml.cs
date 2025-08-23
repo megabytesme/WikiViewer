@@ -25,6 +25,8 @@ namespace _1703_UWP.Pages
         protected override AppBarButton FavoriteAppBarButton => FavoriteButton;
 
         protected override Type GetEditPageType() => typeof(EditPage);
+        protected override Type GetLoginPageType() => typeof(LoginPage);
+        protected override Type GetCreateAccountPageType() => typeof(CreateAccountPage);
 
         private async Task UpdateWebViewThemeAsync()
         {
@@ -125,6 +127,30 @@ namespace _1703_UWP.Pages
                 return;
 
             string path = args.Uri.ToString();
+
+            if (_pageWikiContext != null)
+            {
+                string loginPath = $"{_pageWikiContext.IndexEndpoint}?title=Special:UserLogin";
+                string createAccountPath =
+                    $"{_pageWikiContext.IndexEndpoint}?title=Special:CreateAccount";
+
+                if (
+                    path.StartsWith(loginPath, StringComparison.OrdinalIgnoreCase)
+                    || path.EndsWith("Special:UserLogin", StringComparison.OrdinalIgnoreCase)
+                )
+                {
+                    Frame.Navigate(GetLoginPageType(), _pageWikiContext.Id);
+                    return;
+                }
+                if (
+                    path.StartsWith(createAccountPath, StringComparison.OrdinalIgnoreCase)
+                    || path.EndsWith("Special:CreateAccount", StringComparison.OrdinalIgnoreCase)
+                )
+                {
+                    Frame.Navigate(GetCreateAccountPageType(), _pageWikiContext.Id);
+                    return;
+                }
+            }
 
             if (path.Contains("http://") || path.Contains("https://"))
             {

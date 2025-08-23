@@ -25,6 +25,10 @@ namespace _1809_UWP.Pages
 
         protected override Type GetEditPageType() => typeof(EditPage);
 
+        protected override Type GetLoginPageType() => typeof(LoginPage);
+
+        protected override Type GetCreateAccountPageType() => typeof(CreateAccountPage);
+
         private string GetVirtualHostName() => $"local-content.{_pageWikiContext.Host}";
 
         protected override void ShowLoadingOverlay()
@@ -153,30 +157,58 @@ namespace _1809_UWP.Pages
 
             if (string.IsNullOrEmpty(args.Uri))
                 return;
+
             var uri = new Uri(args.Uri);
 
-            if (uri.Host.Equals(GetVirtualHostName(), StringComparison.OrdinalIgnoreCase))
+            if (_pageWikiContext != null)
             {
-                string clickedPath = uri.AbsolutePath;
-                string newTitle = null;
-                string articlePathPrefix = $"/{_pageWikiContext.ArticlePath}";
+                string fullPathAndQuery = uri.PathAndQuery;
 
                 if (
-                    !string.IsNullOrEmpty(_pageWikiContext.ArticlePath)
-                    && clickedPath.StartsWith(articlePathPrefix)
+                    fullPathAndQuery.Contains(
+                        "Special:UserLogin",
+                        StringComparison.OrdinalIgnoreCase
+                    )
                 )
-                    newTitle = clickedPath.Substring(articlePathPrefix.Length);
-                else
-                    newTitle = clickedPath.TrimStart('/');
-
-                if (!string.IsNullOrEmpty(newTitle))
                 {
-                    _pageTitleToFetch = Uri.UnescapeDataString(newTitle);
-                    _articleHistory.Push(_pageTitleToFetch);
-                    StartArticleFetch();
+                    Frame.Navigate(GetLoginPageType(), _pageWikiContext.Id);
                     return;
                 }
+                if (
+                    fullPathAndQuery.Contains(
+                        "Special:CreateAccount",
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
+                {
+                    Frame.Navigate(GetCreateAccountPageType(), _pageWikiContext.Id);
+                    return;
+                }
+
+                if (uri.Host.Equals(GetVirtualHostName(), StringComparison.OrdinalIgnoreCase))
+                {
+                    string clickedPath = uri.AbsolutePath;
+                    string newTitle = null;
+                    string articlePathPrefix = $"/{_pageWikiContext.ArticlePath}";
+
+                    if (
+                        !string.IsNullOrEmpty(_pageWikiContext.ArticlePath)
+                        && clickedPath.StartsWith(articlePathPrefix)
+                    )
+                        newTitle = clickedPath.Substring(articlePathPrefix.Length);
+                    else
+                        newTitle = clickedPath.TrimStart('/');
+
+                    if (!string.IsNullOrEmpty(newTitle))
+                    {
+                        _pageTitleToFetch = Uri.UnescapeDataString(newTitle);
+                        _articleHistory.Push(_pageTitleToFetch);
+                        StartArticleFetch();
+                        return;
+                    }
+                }
             }
+
             await Windows.System.Launcher.LaunchUriAsync(uri);
         }
     }

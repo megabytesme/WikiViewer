@@ -38,6 +38,8 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected abstract void InitializePlatformControls();
         protected abstract void UninitializePlatformControls();
         protected abstract Type GetEditPageType();
+        protected abstract Type GetLoginPageType();
+        protected abstract Type GetCreateAccountPageType();
 
         public ArticleViewerPageBase()
         {
