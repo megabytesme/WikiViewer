@@ -1,9 +1,7 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
-using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
 using Windows.UI.Core;
@@ -19,7 +17,6 @@ namespace WikiViewer.Shared.Uwp.Pages
         private WikiInstance _pageWikiContext;
         protected string _pageTitle;
         protected string _originalWikitext;
-        protected IApiWorker _apiWorker;
         private bool isDragging = false;
         private double initialX;
         private GridLength leftColInitialWidth;
@@ -38,7 +35,30 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
-            if (e.Parameter is ArticleNavigationParameter navParam)
+
+            ArticleNavigationParameter navParam = null;
+            if (e.Parameter is string jsonParam)
+            {
+                try
+                {
+                    navParam =
+                        Newtonsoft.Json.JsonConvert.DeserializeObject<ArticleNavigationParameter>(
+                            jsonParam
+                        );
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[EditPageBase] Failed to deserialize navigation parameter: {ex.Message}"
+                    );
+                }
+            }
+            else if (e.Parameter is ArticleNavigationParameter directParam)
+            {
+                navParam = directParam;
+            }
+
+            if (navParam != null)
             {
                 _pageWikiContext = WikiManager.GetWikiById(navParam.WikiId);
                 _pageTitle = navParam.PageTitle;
@@ -52,7 +72,6 @@ namespace WikiViewer.Shared.Uwp.Pages
 
             PageTitleTextBlock.Text =
                 $"Editing: {_pageTitle.Replace('_', ' ')} on {_pageWikiContext.Name}";
-            _apiWorker = App.ApiWorkerFactory.CreateApiWorker(_pageWikiContext);
             _ = LoadContentAsync();
         }
 
@@ -93,15 +112,20 @@ namespace WikiViewer.Shared.Uwp.Pages
         {
             try
             {
-                await _apiWorker.InitializeAsync(_pageWikiContext.BaseUrl);
+                var worker = SessionManager.GetAnonymousWorkerForWiki(_pageWikiContext);
+                await worker.InitializeAsync(_pageWikiContext.BaseUrl);
+
                 string url =
                     $"{_pageWikiContext.ApiEndpoint}?action=query&prop=revisions&titles={Uri.EscapeDataString(_pageTitle)}&rvprop=content&format=json";
-                string json = await _apiWorker.GetJsonFromApiAsync(url);
+                string json = await worker.GetJsonFromApiAsync(url);
                 var root = JObject.Parse(json);
                 var page = root["query"]["pages"].First.First;
                 var content = page["revisions"][0]["*"].ToString();
-                _originalWikitext = content;
-                WikitextEditorTextBox.Text = content;
+                var decodedContent = System.Net.WebUtility.HtmlDecode(content);
+                var normalizedContent = decodedContent.Replace("\n", Environment.NewLine);
+
+                _originalWikitext = normalizedContent;
+                WikitextEditorTextBox.Text = normalizedContent;
             }
             catch (Exception ex)
             {
@@ -118,29 +142,17 @@ namespace WikiViewer.Shared.Uwp.Pages
             }
         }
 
-        protected async void PreviewButton_Click(object sender, RoutedEventArgs e)
+        protected void PreviewButton_Click(object sender, RoutedEventArgs e)
         {
             PreviewAppBarButton.IsEnabled = false;
             HidePreview("Generating preview...");
             try
             {
-                var postData = new Dictionary<string, string>
-                {
-                    { "action", "parse" },
-                    { "format", "json" },
-                    { "title", _pageTitle },
-                    { "text", WikitextEditorTextBox.Text },
-                    { "prop", "text" },
-                    { "disablelimitreport", "true" },
-                };
-                string json = await _apiWorker.PostAndGetJsonFromApiAsync(
-                    _pageWikiContext.ApiEndpoint,
-                    postData
+                string fullHtml = WikitextParsingService.ParseToFullHtmlDocument(
+                    WikitextEditorTextBox.Text,
+                    _pageWikiContext,
+                    Application.Current.RequestedTheme == ApplicationTheme.Dark
                 );
-                var root = JObject.Parse(json);
-                string html = root["parse"]["text"]["*"].ToString();
-                string fullHtml =
-                    $"<html><head><style>{ArticleProcessingService.GetCssForTheme()}</style></head><body>{html}</body></html>";
                 ShowPreview(fullHtml);
             }
             catch (Exception ex)
@@ -212,11 +224,6 @@ namespace WikiViewer.Shared.Uwp.Pages
             }
             if (Frame.CanGoBack)
                 Frame.GoBack();
-        }
-
-        protected void Page_Unloaded(object sender, RoutedEventArgs e)
-        {
-            _apiWorker?.Dispose();
         }
     }
 }
