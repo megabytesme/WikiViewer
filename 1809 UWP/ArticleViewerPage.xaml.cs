@@ -174,62 +174,38 @@ namespace _1809_UWP.Pages
             CoreWebView2NavigationStartingEventArgs args
         )
         {
-            if (args.Uri.EndsWith("/article.html", StringComparison.OrdinalIgnoreCase))
+            if (
+                args.Uri.StartsWith(
+                    $"https://{GetVirtualHostName()}",
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
             {
                 return;
             }
 
             args.Cancel = true;
-
-            if (string.IsNullOrEmpty(args.Uri))
+            if (string.IsNullOrEmpty(args.Uri) || _pageWikiContext == null)
+            {
                 return;
+            }
 
             var uri = new Uri(args.Uri);
 
-            if (_pageWikiContext != null)
+            if (HandleSpecialLink(uri))
             {
-                string fullPathAndQuery = uri.PathAndQuery;
+                return;
+            }
 
-                if (
-                    fullPathAndQuery.Contains(
-                        "Special:UserLogin",
-                        StringComparison.OrdinalIgnoreCase
-                    )
-                )
+            if (uri.Host.Equals(_pageWikiContext.Host, StringComparison.OrdinalIgnoreCase))
+            {
+                string articlePathPrefix = $"/{_pageWikiContext.ArticlePath}";
+                if (uri.AbsolutePath.StartsWith(articlePathPrefix))
                 {
-                    Frame.Navigate(GetLoginPageType(), _pageWikiContext.Id);
-                    return;
-                }
-                if (
-                    fullPathAndQuery.Contains(
-                        "Special:CreateAccount",
-                        StringComparison.OrdinalIgnoreCase
-                    )
-                )
-                {
-                    Frame.Navigate(GetCreateAccountPageType(), _pageWikiContext.Id);
-                    return;
-                }
-
-                if (uri.Host.Equals(GetVirtualHostName(), StringComparison.OrdinalIgnoreCase))
-                {
-                    string clickedPath = uri.AbsolutePath;
-                    string newTitle = null;
-                    string articlePathPrefix = $"/{_pageWikiContext.ArticlePath}";
-
-                    if (
-                        !string.IsNullOrEmpty(_pageWikiContext.ArticlePath)
-                        && clickedPath.StartsWith(articlePathPrefix)
-                    )
-                        newTitle = clickedPath.Substring(articlePathPrefix.Length);
-                    else
-                        newTitle = clickedPath.TrimStart('/');
-
+                    string newTitle = uri.AbsolutePath.Substring(articlePathPrefix.Length);
                     if (!string.IsNullOrEmpty(newTitle))
                     {
-                        _pageTitleToFetch = Uri.UnescapeDataString(newTitle);
-                        _articleHistory.Push(_pageTitleToFetch);
-                        StartArticleFetch();
+                        NavigateToInternalPage(Uri.UnescapeDataString(newTitle));
                         return;
                     }
                 }

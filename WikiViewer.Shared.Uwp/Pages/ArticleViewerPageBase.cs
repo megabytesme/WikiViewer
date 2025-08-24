@@ -123,12 +123,13 @@ namespace WikiViewer.Shared.Uwp.Pages
                 }
                 else
                 {
-                    _pageTitleToFetch = navParam.PageTitle.Replace(' ', '_');
-                    if (_articleHistory.Count == 0 || _articleHistory.Peek() != _pageTitleToFetch)
+                    string normalizedTitle = navParam.PageTitle.Replace(' ', '_');
+                    if (_articleHistory.Count == 0 || _articleHistory.Peek() != normalizedTitle)
                     {
                         _articleHistory.Clear();
-                        _articleHistory.Push(_pageTitleToFetch);
+                        _articleHistory.Push(normalizedTitle);
                     }
+                    _pageTitleToFetch = _articleHistory.Peek();
                 }
             }
 
@@ -146,6 +147,34 @@ namespace WikiViewer.Shared.Uwp.Pages
             {
                 StartArticleFetch();
             }
+        }
+
+        protected void NavigateToInternalPage(string newTitle)
+        {
+            string normalizedTitle = newTitle.Replace(' ', '_');
+            _pageTitleToFetch = normalizedTitle;
+            _articleHistory.Push(_pageTitleToFetch);
+            StartArticleFetch();
+        }
+
+        protected bool HandleSpecialLink(Uri uri)
+        {
+            if (_pageWikiContext == null || uri == null)
+                return false;
+
+            string pathAndQuery = uri.PathAndQuery.ToLowerInvariant();
+            if (pathAndQuery.Contains("special:login"))
+            {
+                Frame.Navigate(GetLoginPageType(), _pageWikiContext.Id);
+                return true;
+            }
+            if (pathAndQuery.Contains("special:createaccount"))
+            {
+                Frame.Navigate(GetCreateAccountPageType(), _pageWikiContext.Id);
+                return true;
+            }
+
+            return false;
         }
 
         protected void Page_Loaded(object sender, RoutedEventArgs e)
@@ -190,6 +219,21 @@ namespace WikiViewer.Shared.Uwp.Pages
                 || VerificationPanelGrid.Visibility == Visibility.Visible
             )
                 return;
+
+            if (_pageTitleToFetch.StartsWith("Special:", StringComparison.OrdinalIgnoreCase))
+            {
+                var dummyUri = new Uri(
+                    $"{_pageWikiContext.BaseUrl.TrimEnd('/')}/{_pageWikiContext.ArticlePath.TrimStart('/')}{_pageTitleToFetch}"
+                );
+                if (HandleSpecialLink(dummyUri))
+                {
+                    if (_articleHistory.Any())
+                    {
+                        _articleHistory.Pop();
+                    }
+                    return;
+                }
+            }
 
             ReviewRequestService.IncrementPageLoadCount();
             ReviewRequestService.TryRequestReview();

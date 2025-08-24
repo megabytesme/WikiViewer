@@ -139,77 +139,37 @@ namespace _1703_UWP.Pages
             WebViewNavigationStartingEventArgs args
         )
         {
-            if (
-                args.Uri != null
-                && args.Uri.AbsolutePath.EndsWith(
-                    "/article.html",
-                    StringComparison.OrdinalIgnoreCase
-                )
-            )
+            if (args.Uri != null && args.Uri.Scheme == "ms-local-stream")
             {
                 return;
             }
 
             args.Cancel = true;
-            if (args.Uri == null)
-                return;
-
-            string path = args.Uri.ToString();
-
-            if (_pageWikiContext != null)
+            if (args.Uri == null || _pageWikiContext == null)
             {
-                string loginPath = $"{_pageWikiContext.IndexEndpoint}?title=Special:UserLogin";
-                string createAccountPath =
-                    $"{_pageWikiContext.IndexEndpoint}?title=Special:CreateAccount";
-
-                if (
-                    path.StartsWith(loginPath, StringComparison.OrdinalIgnoreCase)
-                    || path.EndsWith("Special:UserLogin", StringComparison.OrdinalIgnoreCase)
-                )
-                {
-                    Frame.Navigate(GetLoginPageType(), _pageWikiContext.Id);
-                    return;
-                }
-                if (
-                    path.StartsWith(createAccountPath, StringComparison.OrdinalIgnoreCase)
-                    || path.EndsWith("Special:CreateAccount", StringComparison.OrdinalIgnoreCase)
-                )
-                {
-                    Frame.Navigate(GetCreateAccountPageType(), _pageWikiContext.Id);
-                    return;
-                }
-            }
-
-            if (path.Contains("http://") || path.Contains("https://"))
-            {
-                int httpIndex = path.IndexOf("http");
-                if (httpIndex != -1)
-                {
-                    string realUrl = path.Substring(httpIndex);
-                    await Windows.System.Launcher.LaunchUriAsync(new Uri(realUrl));
-                }
                 return;
             }
-            if (args.Uri.Scheme == "ms-appdata" || args.Uri.Scheme == "ms-local-stream")
-            {
-                string clickedPath = args.Uri.AbsolutePath;
-                string newTitle = null;
 
+            if (HandleSpecialLink(args.Uri))
+            {
+                return;
+            }
+
+            if (args.Uri.Host.Equals(_pageWikiContext.Host, StringComparison.OrdinalIgnoreCase))
+            {
                 string articlePathPrefix = $"/{_pageWikiContext.ArticlePath}";
-                int articlePathIndex = clickedPath.IndexOf(articlePathPrefix);
-
-                if (articlePathIndex != -1)
+                if (args.Uri.AbsolutePath.StartsWith(articlePathPrefix))
                 {
-                    newTitle = clickedPath.Substring(articlePathIndex + articlePathPrefix.Length);
-                }
-
-                if (!string.IsNullOrEmpty(newTitle))
-                {
-                    _pageTitleToFetch = Uri.UnescapeDataString(newTitle);
-                    _articleHistory.Push(_pageTitleToFetch);
-                    StartArticleFetch();
+                    string newTitle = args.Uri.AbsolutePath.Substring(articlePathPrefix.Length);
+                    if (!string.IsNullOrEmpty(newTitle))
+                    {
+                        NavigateToInternalPage(Uri.UnescapeDataString(newTitle));
+                        return;
+                    }
                 }
             }
+
+            await Windows.System.Launcher.LaunchUriAsync(args.Uri);
         }
 
         protected override void ShowLoadingOverlay()
