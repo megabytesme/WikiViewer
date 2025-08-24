@@ -38,6 +38,8 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected abstract void InitializePlatformControls();
         protected abstract void UninitializePlatformControls();
         protected abstract Type GetEditPageType();
+        protected abstract Task ExecuteScriptInWebViewAsync(string script);
+        protected abstract string GetImageUpdateScript(string originalUrl, string localPath);
         protected abstract Type GetLoginPageType();
         protected abstract Type GetCreateAccountPageType();
 
@@ -46,6 +48,24 @@ namespace WikiViewer.Shared.Uwp.Pages
             AuthenticationService.AuthenticationStateChanged += OnAuthenticationStateChanged;
             this.Loaded += Page_Loaded;
             this.Unloaded += Page_Unloaded;
+        }
+
+        private async void OnMediaDownloaded(string originalUrl, string localPath)
+        {
+            if (string.IsNullOrEmpty(originalUrl) || string.IsNullOrEmpty(localPath))
+                return;
+
+            await Dispatcher.RunAsync(
+                Windows.UI.Core.CoreDispatcherPriority.Normal,
+                async () =>
+                {
+                    string updateScript = GetImageUpdateScript(originalUrl, localPath);
+                    if (updateScript != null)
+                    {
+                        await ExecuteScriptInWebViewAsync(updateScript);
+                    }
+                }
+            );
         }
 
         private void OnAuthenticationStateChanged(
@@ -131,6 +151,7 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected void Page_Loaded(object sender, RoutedEventArgs e)
         {
             DataTransferManager.GetForCurrentView().DataRequested += OnDataRequested;
+            BackgroundDownloadManager.MediaDownloaded += OnMediaDownloaded;
             if (_isInitialized)
                 return;
 
@@ -151,6 +172,7 @@ namespace WikiViewer.Shared.Uwp.Pages
         private void Page_Unloaded(object sender, RoutedEventArgs e)
         {
             DataTransferManager.GetForCurrentView().DataRequested -= OnDataRequested;
+            BackgroundDownloadManager.MediaDownloaded -= OnMediaDownloaded;
             AuthenticationService.AuthenticationStateChanged -= OnAuthenticationStateChanged;
             UninitializePlatformControls();
         }
@@ -187,8 +209,8 @@ namespace WikiViewer.Shared.Uwp.Pages
             try
             {
                 var worker = SessionManager.GetAnonymousWorkerForWiki(_pageWikiContext);
-                var (processedHtml, resolvedTitle) =
-                    await ArticleProcessingService.FetchAndCacheArticleAsync(
+                var (html, resolvedTitle) =
+                    await ArticleProcessingService.FetchAndProcessArticleAsync(
                         _pageTitleToFetch,
                         fetchStopwatch,
                         worker,
@@ -200,7 +222,16 @@ namespace WikiViewer.Shared.Uwp.Pages
                     _articleHistory.Pop();
                     _articleHistory.Push(_pageTitleToFetch);
                     ArticleTitleTextBlock.Text = resolvedTitle;
+                    mainPage?.SetPageTitle(resolvedTitle);
                 }
+
+                var processedHtml = await ArticleProcessingService.ProcessHtmlAsync(
+                    html,
+                    _pageTitleToFetch,
+                    worker,
+                    _pageWikiContext
+                );
+
                 await DisplayProcessedHtmlAsync(processedHtml);
                 var lastUpdated = await ArticleProcessingService.FetchLastUpdatedTimestampAsync(
                     _pageTitleToFetch,
@@ -224,8 +255,9 @@ namespace WikiViewer.Shared.Uwp.Pages
                 var dialog = new ContentDialog
                 {
                     Title = "Verification Required",
-                    Content = "This site is protected by a security check that is incompatible with this version of WebView.\n\nPlease go to Settings -> Manage Wikis, edit this wiki, and switch its 'Connection Backend' to 'Proxy' to access this content.",
-                    CloseButtonText = "OK"
+                    Content =
+                        "This site is protected by a security check that is incompatible with this version of WebView.\n\nPlease go to Settings -> Manage Wikis, edit this wiki, and switch its 'Connection Backend' to 'Proxy' to access this content.",
+                    CloseButtonText = "OK",
                 };
                 await dialog.ShowAsync();
 #endif

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Microsoft.Web.WebView2.Core;
+using Newtonsoft.Json;
 using WikiViewer.Shared.Uwp.Pages;
 using WikiViewer.Shared.Uwp.Services;
 using Windows.Foundation;
@@ -119,6 +120,31 @@ namespace _1809_UWP.Pages
             };
             VerificationWebView.CoreWebView2.NavigationCompleted += successHandler;
             VerificationWebView.CoreWebView2.Navigate(url);
+        }
+
+        protected override async Task ExecuteScriptInWebViewAsync(string script)
+        {
+            try
+            {
+                if (ArticleDisplayWebView?.CoreWebView2 != null)
+                {
+                    await ArticleDisplayWebView.ExecuteScriptAsync(script);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"[1809-JS] Script injection failed: {ex.Message}"
+                );
+            }
+        }
+
+        protected override string GetImageUpdateScript(string originalUrl, string localPath)
+        {
+            string virtualHostUrl = $"https://{GetVirtualHostName()}{localPath.Replace('\\', '/')}";
+            string escapedOriginalUrl = JsonConvert.ToString(originalUrl);
+            string escapedVirtualUrl = JsonConvert.ToString(virtualHostUrl);
+            return $"var imgs = document.querySelectorAll('img[src=' + {escapedOriginalUrl} + ']'); for (var i = 0; i < imgs.length; i++) {{ imgs[i].src = {escapedVirtualUrl}; }}";
         }
 
         protected override void InitializePlatformControls()

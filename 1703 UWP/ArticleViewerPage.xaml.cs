@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
 using WikiViewer.Shared.Uwp.Pages;
 using WikiViewer.Shared.Uwp.Services;
 using Windows.Foundation;
@@ -25,7 +26,9 @@ namespace _1703_UWP.Pages
         protected override AppBarButton FavoriteAppBarButton => FavoriteButton;
 
         protected override Type GetEditPageType() => typeof(EditPage);
+
         protected override Type GetLoginPageType() => typeof(LoginPage);
+
         protected override Type GetCreateAccountPageType() => typeof(CreateAccountPage);
 
         private async Task UpdateWebViewThemeAsync()
@@ -104,6 +107,31 @@ namespace _1703_UWP.Pages
             await FileIO.WriteTextAsync(articleFile, html);
             Uri localUri = new Uri($"ms-appdata:///local/cache/article.html");
             ArticleDisplayWebView.Navigate(localUri);
+        }
+
+        protected override async Task ExecuteScriptInWebViewAsync(string script)
+        {
+            try
+            {
+                if (ArticleDisplayWebView != null)
+                {
+                    await ArticleDisplayWebView.InvokeScriptAsync("eval", new[] { script });
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"[1703-JS] Script injection failed: {ex.Message}"
+                );
+            }
+        }
+
+        protected override string GetImageUpdateScript(string originalUrl, string localPath)
+        {
+            string fileName = System.IO.Path.GetFileName(localPath);
+            string escapedOriginalUrl = JsonConvert.ToString(originalUrl);
+            string escapedFileName = JsonConvert.ToString(fileName);
+            return $"var imgs = document.querySelectorAll('img[src=' + {escapedOriginalUrl} + ']'); for (var i = 0; i < imgs.length; i++) {{ imgs[i].src = {escapedFileName}; }}";
         }
 
         private async void ArticleDisplayWebView_NavigationStarting(

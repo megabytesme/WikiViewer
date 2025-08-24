@@ -23,6 +23,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Services\ApiWorkerProvider.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\ArticleProcessingService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\AuthenticationService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)services\BackgroundDownloadManager.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\CloudflareDetector.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\FaviconService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\FavouritesService.cs" />

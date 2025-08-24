@@ -124,11 +124,11 @@ namespace WikiViewer.Shared.Uwp.Managers
             return item is StorageFile file ? await FileIO.ReadTextAsync(file) : null;
         }
 
-        public static async Task SaveArticleToCacheAsync(
+        public static async Task SaveArticleHtmlAsync(
             string pageTitle,
+            Guid wikiId,
             string htmlContent,
-            DateTime lastUpdated,
-            Guid wikiId
+            DateTime lastUpdated
         )
         {
             await InitializeAsync();

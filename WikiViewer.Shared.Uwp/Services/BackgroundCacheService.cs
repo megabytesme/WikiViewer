@@ -40,7 +40,7 @@ namespace WikiViewer.Shared.Uwp.Services
                             await tempWorker.InitializeAsync(wiki.BaseUrl);
 
                             var stopwatch = Stopwatch.StartNew();
-                            await ArticleProcessingService.FetchAndCacheArticleAsync(
+                            await ArticleProcessingService.FetchAndProcessArticleAsync(
                                 title,
                                 stopwatch,
                                 tempWorker,

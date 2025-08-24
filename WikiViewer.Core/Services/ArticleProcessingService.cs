@@ -11,6 +11,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
+using WikiViewer.Core.Services;
 using WikiViewer.Shared.Uwp.Managers;
 using Windows.Storage;
 
@@ -18,7 +19,7 @@ namespace WikiViewer.Core.Services
 {
     public static class ArticleProcessingService
     {
-        public static async Task<(string Html, string ResolvedTitle)> FetchAndCacheArticleAsync(
+        public static async Task<(string Html, string ResolvedTitle)> FetchAndProcessArticleAsync(
             string pageTitle,
             Stopwatch stopwatch,
             IApiWorker worker,
@@ -33,95 +34,129 @@ namespace WikiViewer.Core.Services
                 throw new ArgumentNullException(nameof(wiki));
 
             string resolvedTitle = pageTitle;
+
+            // Handle Special:Random case
             if (
                 string.IsNullOrEmpty(pageTitle)
                 || pageTitle.Equals("Special:Random", StringComparison.OrdinalIgnoreCase)
             )
             {
-                string randomTitleJson = await worker.GetJsonFromApiAsync(
-                    $"{wiki.ApiEndpoint}?action=query&list=random&rnnamespace=0&rnlimit=1&format=json"
-                );
-                if (string.IsNullOrEmpty(randomTitleJson))
-                    throw new Exception(
-                        "Failed to retrieve a response for a random page from the API."
-                    );
-
-                try
-                {
-                    var randomResponse = JsonConvert.DeserializeObject<RandomQueryResponse>(
-                        randomTitleJson
-                    );
-                    resolvedTitle = randomResponse?.query?.random?.FirstOrDefault()?.title;
-                }
-                catch (JsonReaderException ex)
-                {
-                    Debug.WriteLine(
-                        $"[ArticleProcessingService] FAILED to parse random page JSON. The API returned non-JSON content. Raw response was:\n-----\n{randomTitleJson}\n-----"
-                    );
-                    throw new Exception(
-                        "The API did not return a valid response for a random article. A security check may be required.",
-                        ex
-                    );
-                }
-
+                resolvedTitle = await GetRandomPageTitleAsync(worker, wiki);
                 if (string.IsNullOrEmpty(resolvedTitle))
                     throw new Exception("Failed to get a random title from API response.");
             }
 
             bool isConnected = NetworkInterface.GetIsNetworkAvailable();
+
             if (AppSettings.IsCachingEnabled && !forceRefresh)
             {
                 var cachedMetadata = await ArticleCacheManager.GetCacheMetadataAsync(
                     resolvedTitle,
                     wiki.Id
                 );
-                DateTime? remoteTimestamp = isConnected
-                    ? await FetchLastUpdatedTimestampAsync(resolvedTitle, worker, wiki)
-                    : null;
-                if (
-                    cachedMetadata != null
-                    && (
-                        !isConnected
-                        || remoteTimestamp == null
-                        || remoteTimestamp.Value.ToUniversalTime()
-                            <= cachedMetadata.LastUpdated.ToUniversalTime()
-                    )
-                )
+                if (cachedMetadata != null)
                 {
-                    string cachedHtml = await ArticleCacheManager.GetCachedArticleHtmlAsync(
-                        resolvedTitle,
-                        wiki.Id
-                    );
-                    if (!string.IsNullOrEmpty(cachedHtml))
-                        return (cachedHtml, resolvedTitle);
+                    DateTime? remoteTimestamp = isConnected
+                        ? await FetchLastUpdatedTimestampAsync(resolvedTitle, worker, wiki)
+                        : null;
+
+                    if (
+                        !isConnected
+                        || (
+                            remoteTimestamp.HasValue
+                            && cachedMetadata.LastUpdated.ToUniversalTime()
+                                >= remoteTimestamp.Value.ToUniversalTime()
+                        )
+                    )
+                    {
+                        Debug.WriteLine(
+                            $"[ArticleProcessing] Loading '{resolvedTitle}' from fresh cache."
+                        );
+                        string cachedHtml = await ArticleCacheManager.GetCachedArticleHtmlAsync(
+                            resolvedTitle,
+                            wiki.Id
+                        );
+                        if (!string.IsNullOrEmpty(cachedHtml))
+                        {
+                            string enrichedHtml = await EnrichHtmlWithLocalMediaAsync(
+                                cachedHtml,
+                                wiki
+                            );
+                            _ = Task.Run(() => QueueMissingMediaForDownload(cachedHtml, wiki));
+                            return (enrichedHtml, resolvedTitle);
+                        }
+                    }
                 }
             }
+
             if (!isConnected)
-                throw new Exception(
-                    "No network connection and a fresh copy of the article is needed."
+            {
+                throw new Exception("No network connection and this article has not been cached.");
+            }
+
+            try
+            {
+                Debug.WriteLine(
+                    $"[ArticleProcessing] Fetching fresh copy of '{resolvedTitle}' from API."
+                );
+                string freshHtml = await FetchParsedHtmlFromApiAsync(resolvedTitle, worker, wiki);
+                await ArticleCacheManager.SaveArticleHtmlAsync(
+                    resolvedTitle,
+                    wiki.Id,
+                    freshHtml,
+                    DateTime.UtcNow
                 );
 
-            string pageUrl = wiki.GetWikiPageUrl(resolvedTitle);
-            var freshHtml = await worker.GetRawHtmlFromUrlAsync(pageUrl);
-            var processedHtml = await ProcessHtmlAsync(
-                freshHtml,
-                resolvedTitle,
-                worker,
-                wiki,
-                semaphore
-            );
-            var lastUpdated = await FetchLastUpdatedTimestampAsync(resolvedTitle, worker, wiki);
+                string enrichedHtml = await EnrichHtmlWithLocalMediaAsync(freshHtml, wiki);
+                _ = Task.Run(() => QueueMissingMediaForDownload(freshHtml, wiki));
 
-            if (AppSettings.IsCachingEnabled && lastUpdated.HasValue)
+                return (enrichedHtml, resolvedTitle);
+            }
+            catch (Exception ex)
             {
-                await ArticleCacheManager.SaveArticleToCacheAsync(
+                Debug.WriteLine(
+                    $"[ArticleProcessing] API fetch failed for '{resolvedTitle}', trying final cache fallback. Error: {ex.Message}"
+                );
+                string finalFallbackHtml = await ArticleCacheManager.GetCachedArticleHtmlAsync(
                     resolvedTitle,
-                    processedHtml,
-                    lastUpdated.Value,
                     wiki.Id
                 );
+                if (!string.IsNullOrEmpty(finalFallbackHtml))
+                {
+                    string enrichedHtml = await EnrichHtmlWithLocalMediaAsync(
+                        finalFallbackHtml,
+                        wiki
+                    );
+                    return (enrichedHtml, resolvedTitle);
+                }
+                throw;
             }
-            return (processedHtml, resolvedTitle);
+        }
+
+        private static async Task<string> FetchParsedHtmlFromApiAsync(
+            string title,
+            IApiWorker worker,
+            WikiInstance wiki
+        )
+        {
+            var url =
+                $"{wiki.ApiEndpoint}?action=parse&page={Uri.EscapeDataString(title)}&prop=text&format=json&disableeditsection=true";
+            var json = await worker.GetJsonFromApiAsync(url);
+
+            if (string.IsNullOrEmpty(json))
+                throw new Exception("API returned an empty response for parsed HTML.");
+
+            var response = JObject.Parse(json);
+            if (response["error"] != null)
+                throw new Exception(
+                    response["error"]["info"]?.ToString() ?? "Unknown API error during page parse."
+                );
+
+            var htmlContent = response["parse"]?["text"]?["*"]?.ToString();
+            if (string.IsNullOrEmpty(htmlContent))
+                throw new Exception("API response did not contain page HTML.");
+
+            return htmlContent;
         }
 
         public static async Task<string> ProcessHtmlAsync(
@@ -134,213 +169,95 @@ namespace WikiViewer.Core.Services
         {
             var doc = new HtmlDocument();
             doc.LoadHtml(rawHtml);
-            var contentNode =
-                doc.DocumentNode.SelectSingleNode("//div[@id='mw-content-text']")
-                ?? doc.DocumentNode;
-            await ProcessMediaInDocument(doc, worker, wiki, semaphore);
+
+            var contentNode = doc.DocumentNode;
+
             string styleBlock = GetCssForTheme();
-            return $@"<!DOCTYPE html><html><head><meta charset='UTF-8'><title>{System.Net.WebUtility.HtmlEncode(pageTitle)}</title><meta name='viewport' content='width=device-width, initial-scale=1.0'>{styleBlock}</head><body><div class='mw-parser-output'>{contentNode.InnerHtml}</div></body></html>";
+            string headContent =
+                $@"<head><meta charset='UTF-8'><title>{System.Net.WebUtility.HtmlEncode(pageTitle)}</title><meta name='viewport' content='width=device-width, initial-scale=1.0'><base href='{wiki.BaseUrl}' />{styleBlock}</head>";
+
+            return $@"<!DOCTYPE html><html>{headContent}<body><div class='mw-parser-output'>{contentNode.InnerHtml}</div></body></html>";
         }
 
-        private static async Task ProcessMediaInDocument(
-            HtmlDocument doc,
-            IApiWorker worker,
-            WikiInstance wiki,
-            SemaphoreSlim semaphore = null
-        )
-        {
-            var allImageNodes = doc.DocumentNode.SelectNodes("//img[@srcset]");
-            if (allImageNodes != null)
-            {
-                foreach (var imgNode in allImageNodes)
-                    imgNode.Attributes.Remove("srcset");
-            }
-
-            string fileLinkPrefix = $"/{wiki.ArticlePath}File:";
-            var imageLinks = doc.DocumentNode.SelectNodes(
-                $"//a[starts-with(@href, '{fileLinkPrefix}')]"
-            );
-            if (imageLinks != null && imageLinks.Any())
-            {
-                var imageFileNames = imageLinks
-                    .Select(link =>
-                        link.GetAttributeValue("href", "").Substring(fileLinkPrefix.Length - 1)
-                    )
-                    .Distinct()
-                    .ToList();
-                var titles = string.Join("|", imageFileNames.Select(Uri.EscapeDataString));
-                var imageUrlApi =
-                    $"{wiki.ApiEndpoint}?action=query&prop=imageinfo&iiprop=url&format=json&titles={titles}";
-
-                try
-                {
-                    string imageJsonResponse = await worker.GetJsonFromApiAsync(imageUrlApi);
-                    if (!string.IsNullOrEmpty(imageJsonResponse))
-                    {
-                        var imageInfoResponse = JsonConvert.DeserializeObject<ImageQueryResponse>(
-                            imageJsonResponse
-                        );
-                        if (imageInfoResponse?.query?.pages != null)
-                        {
-                            var imageUrlMap = imageInfoResponse
-                                .query.pages.Values.Where(p =>
-                                    p.imageinfo?.FirstOrDefault()?.url != null
-                                )
-                                .ToDictionary(p => p.title, p => p.imageinfo.First().url);
-                            if (imageUrlMap.Any())
-                            {
-                                foreach (var link in imageLinks)
-                                {
-                                    string lookupKey = Uri.UnescapeDataString(
-                                            link.GetAttributeValue("href", "")
-                                                .Substring(fileLinkPrefix.Length - 1)
-                                        )
-                                        .Replace('_', ' ');
-                                    if (imageUrlMap.TryGetValue(lookupKey, out string fullImageUrl))
-                                    {
-                                        var img = link.SelectSingleNode(".//img");
-                                        img?.SetAttributeValue("src", fullImageUrl);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                catch (JsonReaderException ex)
-                {
-                    Debug.WriteLine(
-                        $"[PROCESSOR-MEDIA] Failed to parse image info JSON. The article will be processed without high-res images. Error: {ex.Message}"
-                    );
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[PROCESSOR-MEDIA] Failed image URL lookup: {ex.Message}");
-                }
-            }
-            var semaphoreToUse = semaphore ?? new SemaphoreSlim(AppSettings.MaxConcurrentDownloads);
-            var mediaNodes = doc.DocumentNode.SelectNodes(
-                "//img | //audio/source | //video/source"
-            );
-            if (mediaNodes != null && mediaNodes.Any())
-            {
-                var downloadTasks = mediaNodes
-                    .Select(async node =>
-                    {
-                        await semaphoreToUse.WaitAsync();
-                        try
-                        {
-                            string originalUrl = node.GetAttributeValue("src", null);
-                            if (
-                                string.IsNullOrEmpty(originalUrl)
-                                || originalUrl.StartsWith("data:")
-                                || originalUrl.Contains("Special:CentralAutoLogin")
-                            )
-                            {
-                                return null;
-                            }
-
-                            var absoluteUrl = new Uri(
-                                new Uri(wiki.BaseUrl),
-                                originalUrl
-                            ).AbsoluteUri;
-
-                            string localPath = ImageUpgradeManager.GetUpgradePath(absoluteUrl);
-                            if (string.IsNullOrEmpty(localPath))
-                            {
-                                localPath = await DownloadAndCacheMediaAsync(
-                                    absoluteUrl,
-                                    worker,
-                                    wiki
-                                );
-                            }
-
-                            return new
-                            {
-                                OriginalUrl = originalUrl,
-                                Node = node,
-                                LocalPath = localPath,
-                            };
-                        }
-                        finally
-                        {
-                            semaphoreToUse.Release();
-                        }
-                    })
-                    .ToList();
-
-                var downloadResults = await Task.WhenAll(downloadTasks);
-
-                foreach (var result in downloadResults.Where(r => r?.LocalPath != null))
-                {
-#if UWP_1703
-                    string fileName = System.IO.Path.GetFileName(result.LocalPath);
-                    result.Node.SetAttributeValue("src", fileName);
-#else
-                    result.Node.SetAttributeValue("src", result.LocalPath);
-#endif
-                    result.Node.Attributes.Remove("srcset");
-                }
-            }
-        }
-
-        private static async Task<string> DownloadAndCacheMediaAsync(
-            string absoluteMediaUrl,
-            IApiWorker worker,
+        private static async Task<string> EnrichHtmlWithLocalMediaAsync(
+            string html,
             WikiInstance wiki
         )
         {
-            if (!Uri.TryCreate(absoluteMediaUrl, UriKind.Absolute, out Uri mediaUrl))
-                return null;
+            if (string.IsNullOrEmpty(html))
+                return html;
 
-            var extension = Path.GetExtension(mediaUrl.AbsolutePath).ToLowerInvariant();
-            if (string.IsNullOrEmpty(extension))
-                extension = ".dat";
+            var doc = new HtmlDocument();
+            doc.LoadHtml(html);
+            var baseUri = new Uri(wiki.BaseUrl);
 
-            var hash = System
-                .Security.Cryptography.SHA1.Create()
-                .ComputeHash(System.Text.Encoding.UTF8.GetBytes(mediaUrl.AbsoluteUri));
-            var baseFileName = hash.Aggregate("", (s, b) => s + b.ToString("x2"));
-            var finalFileName = baseFileName + extension;
-            var cacheFolder = await ApplicationData.Current.LocalFolder.CreateFolderAsync(
-                "cache",
-                CreationCollisionOption.OpenIfExists
+            var mediaNodes = doc.DocumentNode.SelectNodes(
+                "//img[@src] | //audio/source[@src] | //video/source[@src]"
             );
-            var relativePath = $"/cache/{finalFileName}";
+            if (mediaNodes == null)
+                return html;
 
-            if (await cacheFolder.TryGetItemAsync(finalFileName) is StorageFile)
-                return relativePath;
-
-            byte[] mediaBytes = null;
-            try
+            foreach (var node in mediaNodes)
             {
-                mediaBytes = await worker.GetRawBytesFromUrlAsync(mediaUrl.AbsoluteUri);
+                string originalUrl = node.GetAttributeValue("src", null);
+                if (string.IsNullOrEmpty(originalUrl))
+                    continue;
+
+                var absoluteUrl = new Uri(baseUri, originalUrl).AbsoluteUri;
+                string localPath = ImageUpgradeManager.GetUpgradePath(absoluteUrl);
+
+                if (!string.IsNullOrEmpty(localPath))
+                {
+#if UWP_1703
+                    string fileName = Path.GetFileName(localPath);
+                    node.SetAttributeValue("src", fileName);
+#else
+                    node.SetAttributeValue("src", localPath);
+#endif
+                }
+                else
+                {
+                    node.SetAttributeValue("src", absoluteUrl);
+                }
             }
-            catch (Exception ex)
+
+            return doc.DocumentNode.OuterHtml;
+        }
+
+        private static async Task QueueMissingMediaForDownload(string html, WikiInstance wiki)
+        {
+            if (string.IsNullOrEmpty(html))
+                return;
+
+            var doc = new HtmlDocument();
+            doc.LoadHtml(html);
+            var baseUri = new Uri(wiki.BaseUrl);
+
+            var mediaNodes = doc.DocumentNode.SelectNodes(
+                "//img[@src] | //audio/source[@src] | //video/source[@src]"
+            );
+            if (mediaNodes == null)
+                return;
+
+            var urlsToDownload = new List<string>();
+
+            foreach (var node in mediaNodes)
             {
-                Debug.WriteLine(
-                    $"[MediaDownloader] Non-critical download FAILED for {mediaUrl}: {ex.Message}"
-                );
-                return null;
+                string originalUrl = node.GetAttributeValue("src", null);
+                if (string.IsNullOrEmpty(originalUrl) || originalUrl.StartsWith("data:"))
+                    continue;
+
+                var absoluteUrl = new Uri(baseUri, originalUrl).AbsoluteUri;
+
+                if (string.IsNullOrEmpty(ImageUpgradeManager.GetUpgradePath(absoluteUrl)))
+                {
+                    urlsToDownload.Add(absoluteUrl);
+                }
             }
 
-            if (mediaBytes == null || mediaBytes.Length == 0)
-                return null;
-
-            try
+            if (urlsToDownload.Any())
             {
-                StorageFile newFile = await cacheFolder.CreateFileAsync(
-                    finalFileName,
-                    CreationCollisionOption.ReplaceExisting
-                );
-                await FileIO.WriteBytesAsync(newFile, mediaBytes);
-                return relativePath;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine(
-                    $"[MediaDownloader] FAILED to save file {finalFileName}: {ex.Message}"
-                );
-                return null;
+                await BackgroundDownloadManager.AddToQueueAsync(urlsToDownload.Distinct(), wiki);
             }
         }
 
@@ -383,6 +300,38 @@ namespace WikiViewer.Core.Services
                     $"[PROCESSOR-TIMESTAMP] Failed to get timestamp for '{pageTitle}': {ex.Message}"
                 );
                 return null;
+            }
+        }
+
+        private static async Task<string> GetRandomPageTitleAsync(
+            IApiWorker worker,
+            WikiInstance wiki
+        )
+        {
+            string randomTitleJson = await worker.GetJsonFromApiAsync(
+                $"{wiki.ApiEndpoint}?action=query&list=random&rnnamespace=0&rnlimit=1&format=json"
+            );
+            if (string.IsNullOrEmpty(randomTitleJson))
+                throw new Exception(
+                    "Failed to retrieve a response for a random page from the API."
+                );
+
+            try
+            {
+                var randomResponse = JsonConvert.DeserializeObject<RandomQueryResponse>(
+                    randomTitleJson
+                );
+                return randomResponse?.query?.random?.FirstOrDefault()?.title;
+            }
+            catch (JsonReaderException ex)
+            {
+                Debug.WriteLine(
+                    $"[ArticleProcessingService] FAILED to parse random page JSON. The API returned non-JSON content. Raw response was:\n-----\n{randomTitleJson}\n-----"
+                );
+                throw new Exception(
+                    "The API did not return a valid response for a random article. A security check may be required.",
+                    ex
+                );
             }
         }
 
