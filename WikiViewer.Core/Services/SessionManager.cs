@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
@@ -47,6 +48,7 @@ namespace WikiViewer.Core.Services
         {
             await PlatformReady;
             var allWikis = WikiManager.GetWikis();
+            var allLoginTasks = new List<Task>();
 
             foreach (var wiki in allWikis)
             {
@@ -54,10 +56,66 @@ namespace WikiViewer.Core.Services
                 foreach (var account in accountsForWiki)
                 {
                     var credentials = CredentialService.LoadCredentials(account.Id);
-                    if (credentials != null)
+                    if (credentials == null)
+                        continue;
+
+                    allLoginTasks.Add(
+                        Task.Run(async () =>
+                        {
+                            Debug.WriteLine(
+                                $"[SessionManager] Attempting auto-login for '{account.Username}' on '{wiki.Name}'..."
+                            );
+                            var authService = new AuthenticationService(
+                                account,
+                                wiki,
+                                ApiWorkerFactory
+                            );
+                            try
+                            {
+                                await authService.LoginAsync(credentials.Password);
+                                Debug.WriteLine(
+                                    $"[SessionManager] Auto-login SUCCESS for '{account.Username}' on '{wiki.Name}'."
+                                );
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine(
+                                    $"[SessionManager] Auto-login FAILED for '{account.Username}' on '{wiki.Name}': {ex.Message}"
+                                );
+                                AutoLoginFailed?.Invoke(
+                                    null,
+                                    new AutoLoginFailedEventArgs(wiki, ex)
+                                );
+                            }
+                        })
+                    );
+                }
+            }
+
+            if (allLoginTasks.Any())
+            {
+                await Task.WhenAll(allLoginTasks);
+            }
+        }
+
+        public static async Task PerformSingleLoginAsync(WikiInstance wiki)
+        {
+            await PlatformReady;
+
+            var accountsForWiki = AccountManager.GetAccountsForWiki(wiki.Id);
+            var loginTasks = new List<Task>();
+
+            foreach (var account in accountsForWiki)
+            {
+                var credentials = CredentialService.LoadCredentials(account.Id);
+                if (credentials == null)
+                    continue;
+
+                loginTasks.Add(
+                    Task.Run(async () =>
                     {
                         Debug.WriteLine(
-                            $"[SessionManager] Attempting auto-login for '{account.Username}' on '{wiki.Name}'..."
+                            $"[SessionManager] Retrying login for '{account.Username}' on '{wiki.Name}'..."
                         );
                         var authService = new AuthenticationService(
                             account,
@@ -68,50 +126,23 @@ namespace WikiViewer.Core.Services
                         {
                             await authService.LoginAsync(credentials.Password);
                             Debug.WriteLine(
-                                $"[SessionManager] Auto-login SUCCESS for '{account.Username}' on '{wiki.Name}'."
+                                $"[SessionManager] Retry-login SUCCESS for '{account.Username}' on '{wiki.Name}'."
                             );
                         }
                         catch (Exception ex)
                         {
                             Debug.WriteLine(
-                                $"[SessionManager] Auto-login FAILED for '{account.Username}' on '{wiki.Name}': {ex.Message}"
+                                $"[SessionManager] Retry-login FAILED for '{account.Username}' on '{wiki.Name}': {ex.Message}"
                             );
                             AutoLoginFailed?.Invoke(null, new AutoLoginFailedEventArgs(wiki, ex));
                         }
-                    }
-                }
+                    })
+                );
             }
-        }
 
-        public static async Task PerformSingleLoginAsync(WikiInstance wiki)
-        {
-            await PlatformReady;
-
-            var accountsForWiki = AccountManager.GetAccountsForWiki(wiki.Id);
-            foreach (var account in accountsForWiki)
+            if (loginTasks.Any())
             {
-                var credentials = CredentialService.LoadCredentials(account.Id);
-                if (credentials != null)
-                {
-                    Debug.WriteLine(
-                        $"[SessionManager] Retrying login for '{account.Username}' on '{wiki.Name}'..."
-                    );
-                    var authService = new AuthenticationService(account, wiki, ApiWorkerFactory);
-                    try
-                    {
-                        await authService.LoginAsync(credentials.Password);
-                        Debug.WriteLine(
-                            $"[SessionManager] Retry-login SUCCESS for '{account.Username}' on '{wiki.Name}'."
-                        );
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine(
-                            $"[SessionManager] Retry-login FAILED for '{account.Username}' on '{wiki.Name}': {ex.Message}"
-                        );
-                        AutoLoginFailed?.Invoke(null, new AutoLoginFailedEventArgs(wiki, ex));
-                    }
-                }
+                await Task.WhenAll(loginTasks);
             }
         }
 
