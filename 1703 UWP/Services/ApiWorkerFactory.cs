@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using WikiViewer.Core.Enums;
 using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
@@ -21,6 +22,11 @@ namespace _1703_UWP.Services
                 worker = webViewWorker;
             }
             return worker;
+        }
+
+        public Task<IApiWorker> CreateApiWorkerAsync(WikiInstance wiki)
+        {
+            return Task.FromResult(CreateApiWorker(wiki));
         }
     }
 }

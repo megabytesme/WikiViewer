@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using WikiViewer.Core.Enums;
 using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
@@ -9,18 +10,17 @@ namespace _1809_UWP.Services
     {
         public IApiWorker CreateApiWorker(WikiInstance wiki)
         {
-            IApiWorker worker;
             if (wiki.PreferredConnectionMethod == ConnectionMethod.HttpClientProxy)
             {
-                worker = new HttpClientApiWorker();
+                return new HttpClientApiWorker();
             }
-            else
-            {
-                var webView2Worker = new WebView2ApiWorker();
-                webView2Worker.Wiki = wiki;
-                worker = webView2Worker;
-            }
-            return worker;
+
+            return new PooledWebView2ProxyWorker(wiki);
+        }
+
+        public Task<IApiWorker> CreateApiWorkerAsync(WikiInstance wiki)
+        {
+            return Task.FromResult(CreateApiWorker(wiki));
         }
     }
 }

@@ -149,14 +149,17 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         private async void OnArticleCached(object sender, ArticleCachedEventArgs e)
         {
-            var itemToUpdate = _unifiedFavourites.FirstOrDefault(item =>
-                item.ArticlePageTitle == e.PageTitle
-            );
-            if (itemToUpdate != null)
+            await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, async () =>
             {
-                var wiki = WikiManager.GetWikiById(itemToUpdate.WikiId);
-                await FindAndSetLeadImage(itemToUpdate, wiki);
-            }
+                var itemToUpdate = _unifiedFavourites.FirstOrDefault(item =>
+                    item.ArticlePageTitle == e.PageTitle
+                );
+                if (itemToUpdate != null)
+                {
+                    var wiki = WikiManager.GetWikiById(itemToUpdate.WikiId);
+                    await FindAndSetLeadImage(itemToUpdate, wiki);
+                }
+            });
         }
 
         private void OnFavouritesChanged(object sender, EventArgs e)

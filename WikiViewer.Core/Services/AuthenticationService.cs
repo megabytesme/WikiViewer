@@ -6,8 +6,8 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using WikiViewer.Core.Interfaces;
-using WikiViewer.Core.Models;
 using WikiViewer.Core.Managers;
+using WikiViewer.Core.Models;
 
 namespace WikiViewer.Core.Services
 {
@@ -119,7 +119,7 @@ namespace WikiViewer.Core.Services
                     );
                 }
 
-                var authenticatedWorker = _workerFactory.CreateApiWorker(_wiki);
+                var authenticatedWorker = SessionManager.GetAnonymousWorkerForWiki(_wiki);
                 await authenticatedWorker.InitializeAsync(_wiki.BaseUrl);
                 await authenticatedWorker.CopyApiCookiesFromAsync(loginWorker);
                 _account.AuthenticatedApiWorker = authenticatedWorker;

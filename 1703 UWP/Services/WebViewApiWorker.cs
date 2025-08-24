@@ -130,12 +130,12 @@ namespace _1703_UWP.Services
         )
         {
             await EnsureInitializedAsync();
+
             return await DispatcherTaskExtensions.RunTaskAsync(
                 CoreApplication.MainView.CoreWindow.Dispatcher,
                 async () =>
                 {
                     var tempWebView = new WebView();
-
                     WikiViewer.Shared.Uwp.App.UIHost.Children.Add(tempWebView);
 
                     try
@@ -157,7 +157,6 @@ namespace _1703_UWP.Services
                         tempWebView.NavigationCompleted += navHandler;
 
                         tempWebView.NavigateWithHttpRequestMessage(httpRequest);
-
                         await navTcs.Task;
 
                         await Task.Delay(250);

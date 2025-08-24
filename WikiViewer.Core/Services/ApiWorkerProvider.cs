@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
 
@@ -9,8 +8,9 @@ namespace WikiViewer.Core.Services
     public class ApiWorkerProvider
     {
         private readonly IApiWorkerFactory _factory;
-        private readonly Dictionary<Guid, IApiWorker> _anonymousWorkers =
+        private readonly Dictionary<Guid, IApiWorker> _persistentWorkers =
             new Dictionary<Guid, IApiWorker>();
+        private readonly object _lock = new object();
 
         public ApiWorkerProvider(IApiWorkerFactory factory)
         {
@@ -22,23 +22,29 @@ namespace WikiViewer.Core.Services
             if (wiki == null)
                 throw new ArgumentNullException(nameof(wiki));
 
-            if (_anonymousWorkers.TryGetValue(wiki.Id, out var worker))
+            lock (_lock)
             {
-                return worker;
-            }
+                if (_persistentWorkers.TryGetValue(wiki.Id, out var worker))
+                {
+                    return worker;
+                }
 
-            var newWorker = _factory.CreateApiWorker(wiki);
-            _anonymousWorkers[wiki.Id] = newWorker;
-            return newWorker;
+                var newWorker = _factory.CreateApiWorker(wiki);
+                _persistentWorkers[wiki.Id] = newWorker;
+                return newWorker;
+            }
         }
 
         public void DisposeAll()
         {
-            foreach (var worker in _anonymousWorkers.Values)
+            lock (_lock)
             {
-                worker.Dispose();
+                foreach (var worker in _persistentWorkers.Values)
+                {
+                    worker.Dispose();
+                }
+                _persistentWorkers.Clear();
             }
-            _anonymousWorkers.Clear();
         }
     }
 }
