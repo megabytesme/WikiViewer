@@ -6,6 +6,31 @@ namespace WikiViewer.Shared.Uwp.Services
 {
     public static class DispatcherTaskExtensions
     {
+        public static Task RunTaskAsync(
+            this CoreDispatcher dispatcher,
+            Func<Task> func,
+            CoreDispatcherPriority priority = CoreDispatcherPriority.Normal
+        )
+        {
+            var tcs = new TaskCompletionSource<object>();
+            _ = dispatcher.RunAsync(
+                priority,
+                async () =>
+                {
+                    try
+                    {
+                        await func();
+                        tcs.SetResult(null);
+                    }
+                    catch (Exception e)
+                    {
+                        tcs.SetException(e);
+                    }
+                }
+            );
+            return tcs.Task;
+        }
+
         public static Task<T> RunTaskAsync<T>(
             this CoreDispatcher dispatcher,
             Func<Task<T>> func,

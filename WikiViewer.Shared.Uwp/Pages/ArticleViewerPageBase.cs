@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
+using HtmlAgilityPack;
 using Newtonsoft.Json;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
@@ -50,22 +51,50 @@ namespace WikiViewer.Shared.Uwp.Pages
             this.Unloaded += Page_Unloaded;
         }
 
-        private async void OnMediaDownloaded(string originalUrl, string localPath)
+        private async void EnhanceDisplayedHtmlWithCachedMediaAsync(string html)
         {
-            if (string.IsNullOrEmpty(originalUrl) || string.IsNullOrEmpty(localPath))
+            if (string.IsNullOrEmpty(html) || _pageWikiContext == null)
                 return;
 
-            await Dispatcher.RunAsync(
-                Windows.UI.Core.CoreDispatcherPriority.Normal,
-                async () =>
+            var doc = new HtmlDocument();
+            doc.LoadHtml(html);
+            var baseUri = new Uri(_pageWikiContext.BaseUrl);
+
+            var mediaNodes = doc.DocumentNode.SelectNodes("//img[@src]");
+            if (mediaNodes == null)
+                return;
+
+            foreach (var node in mediaNodes)
+            {
+                string originalUrl = node.GetAttributeValue("src", null);
+                if (
+                    string.IsNullOrEmpty(originalUrl)
+                    || originalUrl.StartsWith("data:")
+                    || originalUrl.StartsWith("ms-appdata")
+                )
+                    continue;
+
+                var absoluteUrl = new Uri(baseUri, originalUrl).AbsoluteUri;
+
+                _ = Task.Run(async () =>
                 {
-                    string updateScript = GetImageUpdateScript(originalUrl, localPath);
-                    if (updateScript != null)
+                    string localUri = await MediaCacheService.GetLocalUriAsync(
+                        absoluteUrl,
+                        _pageWikiContext
+                    );
+                    if (!string.IsNullOrEmpty(localUri))
                     {
-                        await ExecuteScriptInWebViewAsync(updateScript);
+                        string updateScript = GetImageUpdateScript(absoluteUrl, localUri);
+                        await Dispatcher.RunAsync(
+                            Windows.UI.Core.CoreDispatcherPriority.Normal,
+                            async () =>
+                            {
+                                await ExecuteScriptInWebViewAsync(updateScript);
+                            }
+                        );
                     }
-                }
-            );
+                });
+            }
         }
 
         private void OnAuthenticationStateChanged(
@@ -180,7 +209,6 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected void Page_Loaded(object sender, RoutedEventArgs e)
         {
             DataTransferManager.GetForCurrentView().DataRequested += OnDataRequested;
-            BackgroundDownloadManager.MediaDownloaded += OnMediaDownloaded;
             if (_isInitialized)
                 return;
 
@@ -201,7 +229,6 @@ namespace WikiViewer.Shared.Uwp.Pages
         private void Page_Unloaded(object sender, RoutedEventArgs e)
         {
             DataTransferManager.GetForCurrentView().DataRequested -= OnDataRequested;
-            BackgroundDownloadManager.MediaDownloaded -= OnMediaDownloaded;
             AuthenticationService.AuthenticationStateChanged -= OnAuthenticationStateChanged;
             UninitializePlatformControls();
         }
@@ -277,6 +304,8 @@ namespace WikiViewer.Shared.Uwp.Pages
                 );
 
                 await DisplayProcessedHtmlAsync(processedHtml);
+                EnhanceDisplayedHtmlWithCachedMediaAsync(html);
+
                 var lastUpdated = await ArticleProcessingService.FetchLastUpdatedTimestampAsync(
                     _pageTitleToFetch,
                     worker,

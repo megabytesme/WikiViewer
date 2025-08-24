@@ -26,12 +26,11 @@
     <Compile Include="$(MSBuildThisFileDirectory)Services\ApiWorkerProvider.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\ArticleProcessingService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\AuthenticationService.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)services\BackgroundDownloadManager.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\CloudflareDetector.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\FaviconService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\FavouritesService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\HttpClientApiWorker.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Services\ImageUpgradeManager.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)services\MediaCacheService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\SessionManager.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\WikiManager.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\WikiPathDetectorService.cs" />

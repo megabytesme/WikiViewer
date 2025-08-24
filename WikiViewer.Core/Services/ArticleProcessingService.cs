@@ -75,12 +75,7 @@ namespace WikiViewer.Core.Services
                         );
                         if (!string.IsNullOrEmpty(cachedHtml))
                         {
-                            string enrichedHtml = await EnrichHtmlWithLocalMediaAsync(
-                                cachedHtml,
-                                wiki
-                            );
-                            _ = Task.Run(() => QueueMissingMediaForDownload(cachedHtml, wiki));
-                            return (enrichedHtml, resolvedTitle);
+                            return (cachedHtml, resolvedTitle);
                         }
                     }
                 }
@@ -104,10 +99,7 @@ namespace WikiViewer.Core.Services
                     DateTime.UtcNow
                 );
 
-                string enrichedHtml = await EnrichHtmlWithLocalMediaAsync(freshHtml, wiki);
-                _ = Task.Run(() => QueueMissingMediaForDownload(freshHtml, wiki));
-
-                return (enrichedHtml, resolvedTitle);
+                return (freshHtml, resolvedTitle);
             }
             catch (Exception ex)
             {
@@ -120,11 +112,7 @@ namespace WikiViewer.Core.Services
                 );
                 if (!string.IsNullOrEmpty(finalFallbackHtml))
                 {
-                    string enrichedHtml = await EnrichHtmlWithLocalMediaAsync(
-                        finalFallbackHtml,
-                        wiki
-                    );
-                    return (enrichedHtml, resolvedTitle);
+                    return (finalFallbackHtml, resolvedTitle);
                 }
                 throw;
             }
@@ -174,88 +162,6 @@ namespace WikiViewer.Core.Services
                 $@"<head><meta charset='UTF-8'><title>{System.Net.WebUtility.HtmlEncode(pageTitle)}</title><meta name='viewport' content='width=device-width, initial-scale=1.0'><base href='{wiki.BaseUrl}' />{styleBlock}</head>";
 
             return $@"<!DOCTYPE html><html>{headContent}<body><div class='mw-parser-output'>{contentNode.InnerHtml}</div></body></html>";
-        }
-
-        private static async Task<string> EnrichHtmlWithLocalMediaAsync(
-            string html,
-            WikiInstance wiki
-        )
-        {
-            if (string.IsNullOrEmpty(html))
-                return html;
-
-            var doc = new HtmlDocument();
-            doc.LoadHtml(html);
-            var baseUri = new Uri(wiki.BaseUrl);
-
-            var mediaNodes = doc.DocumentNode.SelectNodes(
-                "//img[@src] | //audio/source[@src] | //video/source[@src]"
-            );
-            if (mediaNodes == null)
-                return html;
-
-            foreach (var node in mediaNodes)
-            {
-                string originalUrl = node.GetAttributeValue("src", null);
-                if (string.IsNullOrEmpty(originalUrl))
-                    continue;
-
-                var absoluteUrl = new Uri(baseUri, originalUrl).AbsoluteUri;
-                string localPath = ImageUpgradeManager.GetUpgradePath(absoluteUrl);
-
-                if (!string.IsNullOrEmpty(localPath))
-                {
-#if UWP_1703
-                    string fileName = Path.GetFileName(localPath);
-                    node.SetAttributeValue("src", fileName);
-#else
-                    node.SetAttributeValue("src", localPath);
-#endif
-                }
-                else
-                {
-                    node.SetAttributeValue("src", absoluteUrl);
-                }
-            }
-
-            return doc.DocumentNode.OuterHtml;
-        }
-
-        private static async Task QueueMissingMediaForDownload(string html, WikiInstance wiki)
-        {
-            if (string.IsNullOrEmpty(html))
-                return;
-
-            var doc = new HtmlDocument();
-            doc.LoadHtml(html);
-            var baseUri = new Uri(wiki.BaseUrl);
-
-            var mediaNodes = doc.DocumentNode.SelectNodes(
-                "//img[@src] | //audio/source[@src] | //video/source[@src]"
-            );
-            if (mediaNodes == null)
-                return;
-
-            var urlsToDownload = new List<string>();
-
-            foreach (var node in mediaNodes)
-            {
-                string originalUrl = node.GetAttributeValue("src", null);
-                if (string.IsNullOrEmpty(originalUrl) || originalUrl.StartsWith("data:"))
-                    continue;
-
-                var absoluteUrl = new Uri(baseUri, originalUrl).AbsoluteUri;
-
-                if (string.IsNullOrEmpty(ImageUpgradeManager.GetUpgradePath(absoluteUrl)))
-                {
-                    urlsToDownload.Add(absoluteUrl);
-                }
-            }
-
-            if (urlsToDownload.Any())
-            {
-                await BackgroundDownloadManager.AddToQueueAsync(urlsToDownload.Distinct(), wiki);
-            }
         }
 
         public static async Task<DateTime?> FetchLastUpdatedTimestampAsync(

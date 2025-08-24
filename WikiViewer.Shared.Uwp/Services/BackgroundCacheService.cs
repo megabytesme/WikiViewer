@@ -12,8 +12,6 @@ namespace WikiViewer.Shared.Uwp.Services
 {
     public static class BackgroundCacheService
     {
-        public static event EventHandler<ArticleCachedEventArgs> ArticleCached;
-
         public static async Task CacheArticlesAsync(
             Dictionary<string, WikiInstance> articlesToCache
         )
@@ -45,10 +43,8 @@ namespace WikiViewer.Shared.Uwp.Services
                                 stopwatch,
                                 tempWorker,
                                 wiki,
-                                true,
-                                semaphore
+                                true
                             );
-                            ArticleCached?.Invoke(null, new ArticleCachedEventArgs(title));
                         }
                     }
                     catch (Exception ex)

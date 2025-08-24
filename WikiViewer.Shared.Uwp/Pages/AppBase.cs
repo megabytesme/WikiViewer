@@ -66,13 +66,16 @@ namespace WikiViewer.Shared.Uwp
             var credentialService = new CredentialService();
 
             AppSettings.SettingsProvider = settingsProvider;
-            ImageUpgradeManager.StorageProvider = storageProvider;
             ArticleCacheManager.StorageProvider = storageProvider;
             AccountManager.StorageProvider = storageProvider;
             AccountManager.CredentialService = credentialService;
             WikiManager.StorageProvider = storageProvider;
-            BackgroundDownloadManager.ApiWorkerFactory = ApiWorkerFactory;
-            BackgroundDownloadManager.StorageProvider = storageProvider;
+
+            MediaCacheService.ApiWorkerFactory = ApiWorkerFactory;
+            MediaCacheService.StorageProvider = storageProvider;
+            MediaCacheService.DispatcherInvoker = (func) =>
+                Window.Current.Dispatcher.RunTaskAsync(func);
+
             SessionManager.ApiWorkerFactory = ApiWorkerFactory;
             SessionManager.CredentialService = credentialService;
             SessionManager.PlatformReady = UIReady;
@@ -80,9 +83,7 @@ namespace WikiViewer.Shared.Uwp
             await WikiManager.InitializeAsync();
             await AccountManager.InitializeAsync();
             await FavouritesService.InitializeAsync();
-            await ImageUpgradeManager.InitializeAsync();
-            await BackgroundDownloadManager.InitializeAsync();
-            _ = BackgroundDownloadManager.ProcessQueueAsync();
+            await MediaCacheService.InitializeAsync();
 
             Frame rootFrame = Window.Current.Content as Frame;
             if (rootFrame == null)

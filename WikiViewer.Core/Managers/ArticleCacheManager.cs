@@ -22,6 +22,8 @@ namespace WikiViewer.Core.Managers
         private const string ArticleCacheFolderName = "ArticleCache";
         private const string ImageCacheFolderName = "cache";
 
+        public static event EventHandler<ArticleCachedEventArgs> ArticleCached;
+
         public static async Task<ulong> GetCacheSizeAsync()
         {
             if (StorageProvider == null)
@@ -111,6 +113,8 @@ namespace WikiViewer.Core.Managers
 
             var htmlPath = Path.Combine(ArticleCacheFolderName, baseFileName + ".html");
             await StorageProvider.WriteTextAsync(htmlPath, htmlContent);
+
+            ArticleCached?.Invoke(null, new ArticleCachedEventArgs(pageTitle));
         }
 
         public static async Task ClearCacheForItemAsync(string pageTitle, Guid wikiId)
