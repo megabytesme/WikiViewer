@@ -6,9 +6,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using HtmlAgilityPack;
 using WikiViewer.Core;
+using WikiViewer.Core.Managers;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
-using WikiViewer.Core.Managers;
 using WikiViewer.Shared.Uwp.Services;
 using Windows.Storage;
 using Windows.UI.Xaml;
@@ -149,17 +149,20 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         private async void OnArticleCached(object sender, ArticleCachedEventArgs e)
         {
-            await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, async () =>
-            {
-                var itemToUpdate = _unifiedFavourites.FirstOrDefault(item =>
-                    item.ArticlePageTitle == e.PageTitle
-                );
-                if (itemToUpdate != null)
+            await Dispatcher.RunAsync(
+                Windows.UI.Core.CoreDispatcherPriority.Normal,
+                async () =>
                 {
-                    var wiki = WikiManager.GetWikiById(itemToUpdate.WikiId);
-                    await FindAndSetLeadImage(itemToUpdate, wiki);
+                    var itemToUpdate = _unifiedFavourites.FirstOrDefault(item =>
+                        item.ArticlePageTitle == e.PageTitle
+                    );
+                    if (itemToUpdate != null)
+                    {
+                        var wiki = WikiManager.GetWikiById(itemToUpdate.WikiId);
+                        await FindAndSetLeadImage(itemToUpdate, wiki);
+                    }
                 }
-            });
+            );
         }
 
         private void OnFavouritesChanged(object sender, EventArgs e)
@@ -216,9 +219,6 @@ namespace WikiViewer.Shared.Uwp.Pages
             foreach (var item in tempList.OrderBy(i => i.DisplayTitle))
             {
                 _unifiedFavourites.Add(item);
-                var wiki = WikiManager.GetWikiById(item.WikiId);
-
-                _ = FindAndSetLeadImage(item, wiki);
             }
 
             NoFavouritesTextBlock.Visibility = _unifiedFavourites.Any()
@@ -523,6 +523,34 @@ namespace WikiViewer.Shared.Uwp.Pages
                 : Visibility.Visible;
             ViewToggleButton.Icon = new SymbolIcon(_isGridView ? Symbol.List : Symbol.ViewAll);
             ViewToggleButton.Label = _isGridView ? "List View" : "Grid View";
+        }
+
+        protected void FavouritesControl_ContainerContentChanging(
+            ListViewBase sender,
+            ContainerContentChangingEventArgs args
+        )
+        {
+            if (args.Phase != 0)
+            {
+                return;
+            }
+
+            var item = args.Item as FavouriteItem;
+            if (item == null)
+            {
+                return;
+            }
+
+            if (item.ImageUrl == null || item.ImageUrl.Contains("Square150x150Logo.png"))
+            {
+                item.ImageUrl = "ms-appx:///Assets/Square150x150Logo.png";
+
+                var wiki = WikiManager.GetWikiById(item.WikiId);
+                if (wiki != null)
+                {
+                    _ = FindAndSetLeadImage(item, wiki);
+                }
+            }
         }
     }
 }

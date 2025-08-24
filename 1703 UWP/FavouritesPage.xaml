@@ -16,8 +16,8 @@
     </Page.Resources>
     <Grid>
         <ScrollViewer x:Name="GridViewScrollViewerControl" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Visible">
-                <GridView x:Name="FavouritesGridViewControl" Padding="24,0,24,48" IsItemClickEnabled="False" SelectionMode="Multiple" SelectionChanged="FavouritesGridView_SelectionChanged" HorizontalAlignment="Center">
-                    <GridView.ItemContainerStyle>
+            <GridView x:Name="FavouritesGridViewControl" Padding="24,0,24,48" IsItemClickEnabled="False" SelectionMode="Multiple" SelectionChanged="FavouritesGridView_SelectionChanged" HorizontalAlignment="Center" ContainerContentChanging="FavouritesControl_ContainerContentChanging">
+                <GridView.ItemContainerStyle>
                         <Style TargetType="GridViewItem">
                             <Setter Property="Margin" Value="8"/>
                         </Style>
@@ -55,7 +55,7 @@
             </GridView>
         </ScrollViewer>
         <ScrollViewer x:Name="ListViewScrollViewerControl" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Visible" Visibility="Collapsed">
-            <ListView x:Name="FavouritesListViewControl" Padding="12,52,12,48" SelectionMode="Multiple" SelectionChanged="FavouritesListView_SelectionChanged">
+            <ListView x:Name="FavouritesListViewControl" Padding="12,52,12,48" SelectionMode="Multiple" SelectionChanged="FavouritesListView_SelectionChanged" ContainerContentChanging="FavouritesControl_ContainerContentChanging">
                 <ListView.ItemContainerStyle>
                     <Style TargetType="ListViewItem">
                         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
