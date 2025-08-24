@@ -251,6 +251,9 @@ namespace WikiViewer.Core.Models
         [JsonProperty("message")]
         public string Message { get; set; }
 
+        [JsonProperty("messagecode")]
+        public string MessageCode { get; set; }
+
         [JsonProperty("username")]
         public string Username { get; set; }
     }

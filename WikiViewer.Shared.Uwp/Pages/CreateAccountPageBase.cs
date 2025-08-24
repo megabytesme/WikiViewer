@@ -34,6 +34,7 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected abstract Windows.UI.Xaml.Controls.ProgressRing LoadingProgressRing { get; }
         protected abstract void ShowError(string message);
         protected abstract UIElement CreateFormattedContentPresenter(string header, string content);
+        protected abstract Task ShowComplexErrorDialogAsync(string title, string wikitextContent);
 
         protected override async void OnNavigatedTo(NavigationEventArgs e)
         {
@@ -337,9 +338,20 @@ namespace WikiViewer.Shared.Uwp.Pages
                 }
                 else
                 {
-                    ShowError(
-                        result.Message ?? $"Account creation failed with status: {result.Status}"
-                    );
+                    if (result.MessageCode == "globalblocking-blockedtext-range")
+                    {
+                        await ShowComplexErrorDialogAsync(
+                            "Account Creation Blocked",
+                            result.Message
+                        );
+                    }
+                    else
+                    {
+                        ShowError(
+                            result.Message
+                                ?? $"Account creation failed with status: {result.Status}"
+                        );
+                    }
 
                     if (result.Message.ToLower().Contains("captcha"))
                     {

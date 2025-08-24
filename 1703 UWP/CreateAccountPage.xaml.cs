@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 
@@ -124,6 +125,35 @@ namespace _1703_UWP.Pages
                 );
             }
             return $"<html><head><style>body {{ font-family: 'Segoe UI', sans-serif; color: {(Application.Current.RequestedTheme == ApplicationTheme.Dark ? "white" : "black")}; background-color: transparent; margin: 0; padding: 8px; font-size: 14px; text-align: center; display: flex; align-items: center; justify-content: center; height: 100vh; }} img {{ max-width: 100%; height: auto; }} a {{ color: {(Application.Current.RequestedTheme == ApplicationTheme.Dark ? "#85B9F3" : "#0066CC")}; }}</style></head><body><div>{bodyContent}</div></body></html>";
+        }
+
+        protected override async Task ShowComplexErrorDialogAsync(string title, string wikitextContent)
+        {
+            var webView = new WebView
+            {
+                Height = 200,
+                DefaultBackgroundColor = Windows.UI.Colors.Transparent,
+            };
+            string htmlContent = ParseWikitextToHtml(wikitextContent);
+
+            webView.NavigationStarting += async (s, ev) =>
+            {
+                if (ev.Uri != null)
+                {
+                    ev.Cancel = true;
+                    await Windows.System.Launcher.LaunchUriAsync(ev.Uri);
+                }
+            };
+            webView.NavigateToString(htmlContent);
+
+            var dialog = new ContentDialog
+            {
+                Title = title,
+                Content = webView,
+                CloseButtonText = "Close"
+            };
+
+            await dialog.ShowAsync();
         }
     }
 }

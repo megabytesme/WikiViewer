@@ -1,5 +1,6 @@
-﻿using System;
-using Microsoft.UI.Xaml.Controls;
+﻿using Microsoft.UI.Xaml.Controls;
+using System;
+using System.Threading.Tasks;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 
@@ -124,6 +125,39 @@ namespace _1809_UWP.Pages
                 );
             }
             return $"<html><head><style>body {{ font-family: 'Segoe UI', sans-serif; color: {(Application.Current.RequestedTheme == ApplicationTheme.Dark ? "white" : "black")}; background-color: transparent; margin: 0; padding: 8px; font-size: 14px; text-align: center; display: flex; align-items: center; justify-content: center; height: 100vh; }} img {{ max-width: 100%; height: auto; }} a {{ color: {(Application.Current.RequestedTheme == ApplicationTheme.Dark ? "#85B9F3" : "#0066CC")}; }}</style></head><body><div>{bodyContent}</div></body></html>";
+        }
+
+        protected override async Task ShowComplexErrorDialogAsync(string title, string wikitextContent)
+        {
+            var webView = new Microsoft.UI.Xaml.Controls.WebView2
+            {
+                Height = 200
+            };
+            string htmlContent = ParseWikitextToHtml(wikitextContent);
+
+            webView.Loaded += async (s, ev) =>
+            {
+                var wv = s as Microsoft.UI.Xaml.Controls.WebView2;
+                await wv.EnsureCoreWebView2Async();
+                wv.CoreWebView2.NavigationStarting += async (c, args) =>
+                {
+                    if (!string.IsNullOrEmpty(args.Uri) && args.Uri.StartsWith("http"))
+                    {
+                        args.Cancel = true;
+                        await Windows.System.Launcher.LaunchUriAsync(new Uri(args.Uri));
+                    }
+                };
+                wv.NavigateToString(htmlContent);
+            };
+
+            var dialog = new ContentDialog
+            {
+                Title = title,
+                Content = webView,
+                CloseButtonText = "Close"
+            };
+
+            await dialog.ShowAsync();
         }
     }
 }
