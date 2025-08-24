@@ -24,12 +24,9 @@ namespace WikiViewer.Core.Services
         private static SemaphoreSlim _downloadSemaphore;
         private static bool _isInitialized = false;
 
-        // --- NEW ADDITIONS FOR FIX ---
         private static Timer _saveTimer;
         private static readonly SemaphoreSlim _saveLock = new SemaphoreSlim(1, 1);
         private static bool _isMapDirty = false;
-
-        // -----------------------------
 
         public static async Task InitializeAsync()
         {
