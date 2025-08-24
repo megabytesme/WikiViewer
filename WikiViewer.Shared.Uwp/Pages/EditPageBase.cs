@@ -260,5 +260,25 @@ namespace WikiViewer.Shared.Uwp.Pages
             if (Frame.CanGoBack)
                 Frame.GoBack();
         }
+
+        protected void InsertWikitext(string prefix, string suffix = "", string defaultText = "")
+        {
+            var textBox = WikitextEditorTextBox;
+            int selectionStart = textBox.SelectionStart;
+            int selectionLength = textBox.SelectionLength;
+            string selectedText = textBox.SelectedText;
+
+            if (selectionLength > 0)
+            {
+                textBox.SelectedText = $"{prefix}{selectedText}{suffix}";
+                textBox.Select(selectionStart, prefix.Length + selectedText.Length + suffix.Length);
+            }
+            else
+            {
+                string textToInsert = $"{prefix}{defaultText}{suffix}";
+                textBox.SelectedText = textToInsert;
+                textBox.Select(selectionStart + prefix.Length, defaultText.Length);
+            }
+        }
     }
 }

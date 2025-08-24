@@ -15,7 +15,30 @@
                 <ColumnDefinition Width="12"/>
                 <ColumnDefinition Width="*" MinWidth="150"/>
             </Grid.ColumnDefinitions>
-            <TextBox x:Name="WikitextEditor" Grid.Column="0" AcceptsReturn="True" TextWrapping="Wrap" Padding="12" FontFamily="Consolas, Courier New" PlaceholderText="Loading Wikitext..." BorderThickness="0,0,1,0"/>
+            <TextBox x:Name="WikitextEditor" Grid.Column="0" AcceptsReturn="True" TextWrapping="Wrap" Padding="12" FontFamily="Consolas, Courier New" PlaceholderText="Loading Wikitext..." BorderThickness="0,0,1,0">
+                <TextBox.ContextFlyout>
+                    <MenuFlyout>
+                        <MenuFlyoutSubItem Text="Formatting">
+                            <MenuFlyoutItem Text="Bold" Click="InsertBold_Click" />
+                            <MenuFlyoutItem Text="Italic" Click="InsertItalic_Click" />
+                        </MenuFlyoutSubItem>
+                        <MenuFlyoutSubItem Text="Insert Link">
+                            <MenuFlyoutItem Text="Internal Link" Click="InsertInternalLink_Click" />
+                            <MenuFlyoutItem Text="External Link" Click="InsertExternalLink_Click" />
+                        </MenuFlyoutSubItem>
+                        <MenuFlyoutSubItem Text="Insert Template">
+                            <MenuFlyoutItem Text="Generic Template" Click="InsertGenericTemplate_Click" />
+                            <MenuFlyoutSeparator />
+                            <MenuFlyoutItem Text="Cite web" Click="InsertCiteWeb_Click" />
+                            <MenuFlyoutItem Text="Unreferenced" Click="InsertUnreferenced_Click" />
+                        </MenuFlyoutSubItem>
+                        <MenuFlyoutSeparator />
+                        <MenuFlyoutItem Text="Insert Reference" Click="InsertReference_Click" />
+                        <MenuFlyoutItem Text="Insert Heading (Level 2)" Click="InsertHeading2_Click" />
+                        <MenuFlyoutItem Text="Insert Bulleted List Item" Click="InsertBulletedListItem_Click" />
+                    </MenuFlyout>
+                </TextBox.ContextFlyout>
+            </TextBox>
             <Rectangle Grid.Column="1" Fill="{ThemeResource SystemControlForegroundBaseLowBrush}" PointerPressed="Splitter_PointerPressed" PointerMoved="Splitter_PointerMoved" PointerReleased="Splitter_PointerReleased" PointerEntered="Splitter_PointerEntered" PointerExited="Splitter_PointerExited"/>
             <Grid Grid.Column="2">
                 <WebView x:Name="PreviewWebView" Visibility="Collapsed"/>
