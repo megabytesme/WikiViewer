@@ -18,24 +18,63 @@
             <TextBox x:Name="WikitextEditor" Grid.Column="0" AcceptsReturn="True" TextWrapping="Wrap" Padding="12" FontFamily="Consolas, Courier New" PlaceholderText="Loading Wikitext..." BorderThickness="0,0,1,0">
                 <TextBox.ContextFlyout>
                     <MenuFlyout>
+                        <!-- Text Formatting -->
                         <MenuFlyoutSubItem Text="Formatting">
                             <MenuFlyoutItem Text="Bold" Click="InsertBold_Click" />
                             <MenuFlyoutItem Text="Italic" Click="InsertItalic_Click" />
+                            <MenuFlyoutItem Text="Bold &amp; Italic" Click="InsertBoldItalic_Click" />
+                            <MenuFlyoutSeparator />
+                            <MenuFlyoutItem Text="Underline" Click="InsertUnderline_Click" />
+                            <MenuFlyoutItem Text="Strikethrough" Click="InsertStrikethrough_Click" />
+                            <MenuFlyoutSeparator />
+                            <MenuFlyoutItem Text="Superscript" Click="InsertSuperscript_Click" />
+                            <MenuFlyoutItem Text="Subscript" Click="InsertSubscript_Click" />
+                            <MenuFlyoutSeparator />
+                            <MenuFlyoutItem Text="Small Text" Click="InsertSmall_Click" />
+                            <MenuFlyoutItem Text="Big Text" Click="InsertBig_Click" />
                         </MenuFlyoutSubItem>
-                        <MenuFlyoutSubItem Text="Insert Link">
+
+                        <!-- Links & References -->
+                        <MenuFlyoutSubItem Text="Links &amp; References">
                             <MenuFlyoutItem Text="Internal Link" Click="InsertInternalLink_Click" />
                             <MenuFlyoutItem Text="External Link" Click="InsertExternalLink_Click" />
-                        </MenuFlyoutSubItem>
-                        <MenuFlyoutSubItem Text="Insert Template">
-                            <MenuFlyoutItem Text="Generic Template" Click="InsertGenericTemplate_Click" />
+                            <MenuFlyoutItem Text="Redirect" Click="InsertRedirect_Click" />
                             <MenuFlyoutSeparator />
-                            <MenuFlyoutItem Text="Cite web" Click="InsertCiteWeb_Click" />
-                            <MenuFlyoutItem Text="Unreferenced" Click="InsertUnreferenced_Click" />
+                            <MenuFlyoutItem Text="Reference" Click="InsertReference_Click" />
+                            <MenuFlyoutItem Text="Cite Link" Click="InsertCite_Click" />
                         </MenuFlyoutSubItem>
-                        <MenuFlyoutSeparator />
-                        <MenuFlyoutItem Text="Insert Reference" Click="InsertReference_Click" />
-                        <MenuFlyoutItem Text="Insert Heading (Level 2)" Click="InsertHeading2_Click" />
-                        <MenuFlyoutItem Text="Insert Bulleted List Item" Click="InsertBulletedListItem_Click" />
+
+                        <!-- Structure -->
+                        <MenuFlyoutSubItem Text="Structure">
+                            <MenuFlyoutSubItem Text="Heading">
+                                <MenuFlyoutItem Text="Level 2" Click="InsertHeading2_Click" />
+                                <MenuFlyoutItem Text="Level 3" Click="InsertHeading3_Click" />
+                                <MenuFlyoutItem Text="Level 4" Click="InsertHeading4_Click" />
+                            </MenuFlyoutSubItem>
+                            <MenuFlyoutSeparator />
+                            <MenuFlyoutSubItem Text="Lists">
+                                <MenuFlyoutItem Text="Bulleted Item" Click="InsertBulletedListItem_Click" />
+                                <MenuFlyoutItem Text="Numbered Item" Click="InsertNumberedListItem_Click" />
+                                <MenuFlyoutItem Text="Indented Item" Click="InsertIndentedListItem_Click" />
+                            </MenuFlyoutSubItem>
+                            <MenuFlyoutSeparator />
+                            <MenuFlyoutItem Text="Horizontal Rule" Click="InsertHorizontalRule_Click" />
+                            <MenuFlyoutItem Text="Blockquote" Click="InsertBlockquote_Click" />
+                        </MenuFlyoutSubItem>
+
+                        <!-- Advanced -->
+                        <MenuFlyoutSubItem Text="Advanced">
+                            <MenuFlyoutItem Text="Display as Code" Click="InsertCode_Click" />
+                            <MenuFlyoutItem Text="Preformatted Text" Click="InsertPreformatted_Click" />
+                            <MenuFlyoutItem Text="Ignore Wikitext (nowiki)" Click="InsertNoWiki_Click" />
+                        </MenuFlyoutSubItem>
+
+                        <!-- Signature -->
+                        <MenuFlyoutSubItem Text="Signature">
+                            <MenuFlyoutItem Text="Username Only (~~~)" Click="InsertSignature3_Click" />
+                            <MenuFlyoutItem Text="Username &amp; Timestamp (~~~~)" Click="InsertSignature4_Click" />
+                            <MenuFlyoutItem Text="Timestamp Only (~~~~~)" Click="InsertSignature5_Click" />
+                        </MenuFlyoutSubItem>
                     </MenuFlyout>
                 </TextBox.ContextFlyout>
             </TextBox>

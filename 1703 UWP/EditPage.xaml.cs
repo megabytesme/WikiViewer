@@ -31,34 +31,93 @@ namespace _1703_UWP.Pages
             PreviewPlaceholder.Visibility = Windows.UI.Xaml.Visibility.Visible;
         }
 
+        // --- Text Formatting ---
         private void InsertBold_Click(object sender, RoutedEventArgs e) =>
             InsertWikitext("'''", "'''", "bold text");
 
         private void InsertItalic_Click(object sender, RoutedEventArgs e) =>
             InsertWikitext("''", "''", "italic text");
 
+        private void InsertBoldItalic_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("'''''", "'''''", "bold and italic text");
+
+        private void InsertUnderline_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("<u>", "</u>", "underlined text");
+
+        private void InsertStrikethrough_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("<s>", "</s>", "strikethrough text");
+
+        private void InsertSuperscript_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("<sup>", "</sup>", "superscript");
+
+        private void InsertSubscript_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("<sub>", "</sub>", "subscript");
+
+        private void InsertSmall_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("<small>", "</small>", "small text");
+
+        private void InsertBig_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("<span style=\"font-size:larger;\">", "</span>", "big text");
+
+        private void InsertBlockquote_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("<blockquote>", "</blockquote>", "quoted text");
+
+        // --- Links & References ---
         private void InsertInternalLink_Click(object sender, RoutedEventArgs e) =>
             InsertWikitext("[[", "]]", "Page title");
 
         private void InsertExternalLink_Click(object sender, RoutedEventArgs e) =>
             InsertWikitext("[", "]", "http://www.example.com link text");
 
-        private void InsertGenericTemplate_Click(object sender, RoutedEventArgs e) =>
-            InsertWikitext("{{", "}}", "template");
-
-        private void InsertCiteWeb_Click(object sender, RoutedEventArgs e) =>
-            InsertWikitext("{{Cite web|url=|title=|access-date=}}");
-
-        private void InsertUnreferenced_Click(object sender, RoutedEventArgs e) =>
-            InsertWikitext("{{Unreferenced|date=}}");
+        private void InsertRedirect_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("#REDIRECT [[", "]]", "Target Page");
 
         private void InsertReference_Click(object sender, RoutedEventArgs e) =>
             InsertWikitext("<ref>", "</ref>", "reference text");
 
+        private void InsertCite_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("<cite>", "</cite>", "https://www.example.com");
+
+        // --- Signatures ---
+        private void InsertSignature3_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("~~~");
+
+        private void InsertSignature4_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("~~~~");
+
+        private void InsertSignature5_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("~~~~~");
+
+        // --- Advanced ---
+        private void InsertNoWiki_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("<nowiki>", "</nowiki>", "[[Not a link]]");
+
+        private void InsertCode_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("<code>", "</code>", "Source Code");
+
+        private void InsertPreformatted_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("<pre>", "</pre>", "preformatted text");
+
+        // --- Structure (Line-based) ---
         private void InsertHeading2_Click(object sender, RoutedEventArgs e) =>
             InsertWikitext("\n== ", " ==\n", "Heading");
 
+        private void InsertHeading3_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("\n=== ", " ===\n", "Heading");
+
+        private void InsertHeading4_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("\n==== ", " ====\n", "Heading");
+
+        private void InsertHorizontalRule_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("\n----\n");
+
+        private void InsertIndentedListItem_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("\n: ", "", "Indented text");
+
         private void InsertBulletedListItem_Click(object sender, RoutedEventArgs e) =>
             InsertWikitext("\n* ", "", "List item");
+
+        private void InsertNumberedListItem_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("\n# ", "", "List item");
     }
 }
