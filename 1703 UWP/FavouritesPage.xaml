@@ -55,7 +55,7 @@
             </GridView>
         </ScrollViewer>
         <ScrollViewer x:Name="ListViewScrollViewerControl" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Visible" Visibility="Collapsed">
-            <ListView x:Name="FavouritesListViewControl" Padding="12,52,12,48" SelectionMode="Multiple" SelectionChanged="FavouritesListView_SelectionChanged" ContainerContentChanging="FavouritesControl_ContainerContentChanging">
+            <ListView x:Name="FavouritesListViewControl" Padding="12,12,12,58" SelectionMode="Multiple" SelectionChanged="FavouritesListView_SelectionChanged" ContainerContentChanging="FavouritesControl_ContainerContentChanging">
                 <ListView.ItemContainerStyle>
                     <Style TargetType="ListViewItem">
                         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>

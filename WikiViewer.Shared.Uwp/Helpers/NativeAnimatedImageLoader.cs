@@ -231,7 +231,7 @@ namespace WikiViewer.Shared.Uwp.Helpers
             s.ReadySize = s.ContainerW > 0 && s.ContainerH > 0;
         }
 
-        private static void TryPrimeImagePixels(State s)
+        private static async void TryPrimeImagePixels(State s)
         {
             if (s.Image?.Source is BitmapSource bs)
             {
@@ -240,7 +240,7 @@ namespace WikiViewer.Shared.Uwp.Helpers
             }
             else if (s.Image?.Source is SvgImageSource svg && svg.UriSource != null)
             {
-                var aspect = GetSvgAspectRatio(svg.UriSource);
+                var aspect = await GetSvgAspectRatioAsync(svg.UriSource);
                 if (aspect.HasValue)
                 {
                     s.ImagePxH = 500;
@@ -252,20 +252,17 @@ namespace WikiViewer.Shared.Uwp.Helpers
                     s.ImagePxH = s.ContainerH > 0 ? s.ContainerH : 200;
                 }
             }
+            s.ReadyImage = s.ImagePxW > 0 && s.ImagePxH > 0;
+            Log($"ImagePixels Primed (async): px={s.ImagePxW}x{s.ImagePxH}", s);
+            MaybeInit(s);
         }
 
-        private static double? GetSvgAspectRatio(Uri svgUri)
+        private static async Task<double?> GetSvgAspectRatioAsync(Uri svgUri)
         {
             try
             {
-                var fileTask = StorageFile.GetFileFromApplicationUriAsync(svgUri).AsTask();
-                fileTask.Wait();
-                var file = fileTask.Result;
-
-                var textTask = FileIO.ReadTextAsync(file).AsTask();
-                textTask.Wait();
-                var text = textTask.Result;
-
+                var file = await StorageFile.GetFileFromApplicationUriAsync(svgUri);
+                var text = await FileIO.ReadTextAsync(file);
                 var doc = new Windows.Data.Xml.Dom.XmlDocument();
                 doc.LoadXml(text);
 

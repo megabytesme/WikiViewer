@@ -2,42 +2,23 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using HtmlAgilityPack;
-using WikiViewer.Core;
 using WikiViewer.Core.Managers;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
 using WikiViewer.Shared.Uwp.Services;
-using Windows.Storage;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Navigation;
-#if UWP_1809
-using Microsoft.UI.Xaml.Controls;
-#endif
 
 namespace WikiViewer.Shared.Uwp.Pages
 {
-    public class FavouriteGroup
-    {
-        public WikiInstance Wiki { get; set; }
-        public ObservableCollection<FavouriteItem> Favourites { get; set; }
-    }
-
     public abstract class FavouritesPageBase : Page
     {
-        private static bool _isCachingInProgress = false;
         private readonly ObservableCollection<FavouriteItem> _unifiedFavourites =
             new ObservableCollection<FavouriteItem>();
         private bool _isGridView = true;
-
-        private static readonly SemaphoreSlim _imageDownloaderSemaphore = new SemaphoreSlim(
-            AppSettings.MaxConcurrentDownloads
-        );
-        private static readonly HashSet<string> _urlsBeingDownloaded = new HashSet<string>();
-        private static readonly HashSet<Guid> _wikisNeedingVerification = new HashSet<Guid>();
 
         protected abstract ListView FavouritesListView { get; }
         protected abstract GridView FavouritesGridView { get; }
@@ -67,84 +48,18 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
-
             FavouritesService.FavouritesChanged += OnFavouritesChanged;
-            BackgroundCacheService.ArticleCached += OnArticleCached;
-
+            ArticleCacheManager.ArticleCached += OnArticleCached;
             LoadAllFavourites();
-            _ = CheckAndStartCachingFavouritesAsync();
+            _ = PreCacheFavouriteArticlesAsync();
         }
 
         protected override void OnNavigatedFrom(NavigationEventArgs e)
         {
             base.OnNavigatedFrom(e);
-
             FavouritesService.FavouritesChanged -= OnFavouritesChanged;
-            BackgroundCacheService.ArticleCached -= OnArticleCached;
-
-#if UWP_1809
-            var webView2s = this.FindChildren<WebView2>().ToList();
-            foreach (var webView in webView2s)
-            {
-                webView.Close();
-                if (webView.Parent is Panel panel)
-                    panel.Children.Remove(webView);
-                else if (webView.Parent is ContentControl cc)
-                    cc.Content = null;
-            }
-#else
-            var webViews = this.FindChildren<WebView>().ToList();
-            foreach (var webView in webViews)
-            {
-                webView.NavigateToString("about:blank");
-                if (webView.Parent is Panel panel)
-                    panel.Children.Remove(webView);
-                else if (webView.Parent is ContentControl cc)
-                    cc.Content = null;
-            }
-#endif
-
+            ArticleCacheManager.ArticleCached -= OnArticleCached;
             _unifiedFavourites.Clear();
-        }
-
-        private async Task CheckAndStartCachingFavouritesAsync()
-        {
-            if (_isCachingInProgress)
-                return;
-
-            _isCachingInProgress = true;
-            _wikisNeedingVerification.Clear();
-
-            var imageFetchTasks = _unifiedFavourites
-                .Select(item => FindAndSetLeadImage(item, WikiManager.GetWikiById(item.WikiId)))
-                .ToList();
-
-            _ = Task.Run(async () =>
-            {
-                var articlesToCache = new Dictionary<string, WikiInstance>();
-                foreach (var item in _unifiedFavourites)
-                {
-                    if (
-                        !string.IsNullOrEmpty(item.ArticlePageTitle)
-                        && !await ArticleCacheManager.IsArticleCachedAsync(
-                            item.ArticlePageTitle,
-                            item.WikiId
-                        )
-                    )
-                    {
-                        articlesToCache[item.ArticlePageTitle] = WikiManager.GetWikiById(
-                            item.WikiId
-                        );
-                    }
-                }
-                if (articlesToCache.Any())
-                {
-                    await BackgroundCacheService.CacheArticlesAsync(articlesToCache);
-                }
-            });
-
-            await Task.WhenAll(imageFetchTasks);
-            _isCachingInProgress = false;
         }
 
         private async void OnArticleCached(object sender, ArticleCachedEventArgs e)
@@ -169,8 +84,35 @@ namespace WikiViewer.Shared.Uwp.Pages
         {
             _ = Dispatcher.RunAsync(
                 Windows.UI.Core.CoreDispatcherPriority.Normal,
-                LoadAllFavourites
+                () =>
+                {
+                    LoadAllFavourites();
+                    _ = PreCacheFavouriteArticlesAsync();
+                }
             );
+        }
+
+        private async Task PreCacheFavouriteArticlesAsync()
+        {
+            var articlesToCache = new Dictionary<string, WikiInstance>();
+            foreach (var item in _unifiedFavourites)
+            {
+                if (
+                    !string.IsNullOrEmpty(item.ArticlePageTitle)
+                    && !await ArticleCacheManager.IsArticleCachedAsync(
+                        item.ArticlePageTitle,
+                        item.WikiId
+                    )
+                )
+                {
+                    articlesToCache[item.ArticlePageTitle] = WikiManager.GetWikiById(item.WikiId);
+                }
+            }
+
+            if (articlesToCache.Any())
+            {
+                await BackgroundCacheService.CacheArticlesAsync(articlesToCache);
+            }
         }
 
         private string GetBaseTitle(string fullTitle)
@@ -224,23 +166,11 @@ namespace WikiViewer.Shared.Uwp.Pages
             NoFavouritesTextBlock.Visibility = _unifiedFavourites.Any()
                 ? Visibility.Collapsed
                 : Visibility.Visible;
-
-            if (!_unifiedFavourites.Any())
-            {
-                NoFavouritesTextBlock.Text =
-                    "You haven't added any Favourites yet across any of your wikis.";
-            }
         }
 
         private async Task FindAndSetLeadImage(FavouriteItem item, WikiInstance wiki)
         {
-            item.ImageUrl = "ms-appx:///Assets/Square150x150Logo.png";
-
-            if (
-                wiki == null
-                || string.IsNullOrEmpty(item.ArticlePageTitle)
-                || _wikisNeedingVerification.Contains(wiki.Id)
-            )
+            if (wiki == null || string.IsNullOrEmpty(item.ArticlePageTitle))
                 return;
 
             string cachedHtml = await ArticleCacheManager.GetCachedArticleHtmlAsync(
@@ -248,31 +178,39 @@ namespace WikiViewer.Shared.Uwp.Pages
                 wiki.Id
             );
             if (string.IsNullOrEmpty(cachedHtml))
+            {
                 return;
+            }
 
             var doc = new HtmlDocument();
             doc.LoadHtml(cachedHtml);
 
             var firstImageNode = doc.DocumentNode.SelectSingleNode("//img[@src]");
-            var imageLinkNode = doc.DocumentNode.SelectSingleNode(
-                $"//a[contains(@href, '/{wiki.ArticlePath}File:')]"
-            );
-
-            if (firstImageNode == null || imageLinkNode == null)
+            if (firstImageNode == null)
                 return;
 
             string originalThumbnailSrc = firstImageNode.GetAttributeValue("src", "");
             if (string.IsNullOrEmpty(originalThumbnailSrc))
                 return;
+
             string absoluteThumbnailUrl = new Uri(
                 new Uri(wiki.BaseUrl),
                 originalThumbnailSrc
             ).AbsoluteUri;
 
-            string knownUpgradePath = ImageUpgradeManager.GetUpgradePath(absoluteThumbnailUrl);
-            if (!string.IsNullOrEmpty(knownUpgradePath))
+            var imageLinkNode = doc.DocumentNode.SelectSingleNode(
+                $"//a[contains(@href, '/{wiki.ArticlePath}File:')]"
+            );
+            if (imageLinkNode == null)
             {
-                item.ImageUrl = $"ms-appdata:///local{knownUpgradePath}";
+                string localUriNoLink = await MediaCacheService.GetLocalUriAsync(
+                    absoluteThumbnailUrl,
+                    wiki
+                );
+                if (!string.IsNullOrEmpty(localUriNoLink))
+                {
+                    item.ImageUrl = localUriNoLink;
+                }
                 return;
             }
 
@@ -281,71 +219,60 @@ namespace WikiViewer.Shared.Uwp.Pages
             if (string.IsNullOrEmpty(fileTitle))
                 return;
 
-            string finalImageUrl = await Task.Run(async () =>
+            using (var worker = App.ApiWorkerFactory.CreateApiWorker(wiki))
             {
-                await _imageDownloaderSemaphore.WaitAsync();
-                try
+                await worker.InitializeAsync(wiki.BaseUrl);
+                string url =
+                    $"{wiki.ApiEndpoint}?action=query&prop=imageinfo&iiprop=url&format=json&titles={Uri.EscapeDataString(fileTitle)}";
+                string json = await worker.GetJsonFromApiAsync(url);
+                if (string.IsNullOrEmpty(json))
+                    return;
+
+                var imageResponse =
+                    Newtonsoft.Json.JsonConvert.DeserializeObject<ImageQueryResponse>(json);
+                string highResUrl = imageResponse
+                    ?.query?.pages?.Values.FirstOrDefault()
+                    ?.imageinfo?.FirstOrDefault()
+                    ?.url;
+
+                if (!string.IsNullOrEmpty(highResUrl))
                 {
-                    using (var worker = App.ApiWorkerFactory.CreateApiWorker(wiki))
+                    string localUri = await MediaCacheService.GetLocalUriAsync(
+                        highResUrl,
+                        wiki,
+                        absoluteThumbnailUrl
+                    );
+                    if (!string.IsNullOrEmpty(localUri))
                     {
-                        await worker.InitializeAsync(wiki.BaseUrl);
-                        string url =
-                            $"{wiki.ApiEndpoint}?action=query&prop=imageinfo&iiprop=url&format=json&titles={Uri.EscapeDataString(fileTitle)}";
-                        string json = await worker.GetJsonFromApiAsync(url);
-                        if (string.IsNullOrEmpty(json))
-                            return null;
-
-                        var imageResponse =
-                            Newtonsoft.Json.JsonConvert.DeserializeObject<ImageQueryResponse>(json);
-                        string highResUrl = imageResponse
-                            ?.query?.pages?.Values.FirstOrDefault()
-                            ?.imageinfo?.FirstOrDefault()
-                            ?.url;
-
-                        if (!string.IsNullOrEmpty(highResUrl))
-                        {
-                            byte[] imageBytes = await worker.GetRawBytesFromUrlAsync(highResUrl);
-                            if (imageBytes?.Length > 0)
-                            {
-                                var cacheFolder =
-                                    await ApplicationData.Current.LocalFolder.CreateFolderAsync(
-                                        "cache",
-                                        CreationCollisionOption.OpenIfExists
-                                    );
-                                var hash = System
-                                    .Security.Cryptography.SHA1.Create()
-                                    .ComputeHash(System.Text.Encoding.UTF8.GetBytes(highResUrl));
-                                var fileName =
-                                    string.Concat(hash.Select(b => b.ToString("x2")))
-                                    + System.IO.Path.GetExtension(highResUrl);
-                                var file = await cacheFolder.CreateFileAsync(
-                                    fileName,
-                                    CreationCollisionOption.ReplaceExisting
-                                );
-                                await FileIO.WriteBytesAsync(file, imageBytes);
-
-                                string relativePath = $"/cache/{fileName}";
-
-                                ImageUpgradeManager.SetUpgradePath(
-                                    absoluteThumbnailUrl,
-                                    relativePath
-                                );
-
-                                return $"ms-appdata:///local{relativePath}";
-                            }
-                        }
+                        item.ImageUrl = localUri;
                     }
                 }
-                finally
-                {
-                    _imageDownloaderSemaphore.Release();
-                }
-                return null;
-            });
+            }
+        }
 
-            if (!string.IsNullOrEmpty(finalImageUrl))
+        protected void FavouritesControl_ContainerContentChanging(
+            ListViewBase sender,
+            ContainerContentChangingEventArgs args
+        )
+        {
+            if (args.Phase != 0)
+                return;
+
+            var item = args.Item as FavouriteItem;
+            if (item == null)
+                return;
+
+            if (
+                string.IsNullOrEmpty(item.ImageUrl)
+                || item.ImageUrl.Contains("Square150x150Logo.png")
+            )
             {
-                item.ImageUrl = finalImageUrl;
+                item.ImageUrl = "ms-appx:///Assets/Square150x150Logo.png";
+                var wiki = WikiManager.GetWikiById(item.WikiId);
+                if (wiki != null)
+                {
+                    _ = FindAndSetLeadImage(item, wiki);
+                }
             }
         }
 
@@ -449,11 +376,6 @@ namespace WikiViewer.Shared.Uwp.Pages
             }
         }
 
-        private FavouriteItem FindItemFromDataContext(object dataContext)
-        {
-            return dataContext as FavouriteItem;
-        }
-
         protected void FavouritesGridView_SelectionChanged(
             object sender,
             SelectionChangedEventArgs e
@@ -492,12 +414,10 @@ namespace WikiViewer.Shared.Uwp.Pages
                     (account != null)
                         ? new AuthenticationService(account, wiki, App.ApiWorkerFactory)
                         : null;
-
                 var titlesToRemove = group
                     .Select(item => item.ArticlePageTitle)
                     .Where(t => !string.IsNullOrEmpty(t))
                     .ToList();
-
                 if (titlesToRemove.Any())
                 {
                     await FavouritesService.RemoveMultipleFavoritesAsync(
@@ -523,34 +443,6 @@ namespace WikiViewer.Shared.Uwp.Pages
                 : Visibility.Visible;
             ViewToggleButton.Icon = new SymbolIcon(_isGridView ? Symbol.List : Symbol.ViewAll);
             ViewToggleButton.Label = _isGridView ? "List View" : "Grid View";
-        }
-
-        protected void FavouritesControl_ContainerContentChanging(
-            ListViewBase sender,
-            ContainerContentChangingEventArgs args
-        )
-        {
-            if (args.Phase != 0)
-            {
-                return;
-            }
-
-            var item = args.Item as FavouriteItem;
-            if (item == null)
-            {
-                return;
-            }
-
-            if (item.ImageUrl == null || item.ImageUrl.Contains("Square150x150Logo.png"))
-            {
-                item.ImageUrl = "ms-appx:///Assets/Square150x150Logo.png";
-
-                var wiki = WikiManager.GetWikiById(item.WikiId);
-                if (wiki != null)
-                {
-                    _ = FindAndSetLeadImage(item, wiki);
-                }
-            }
         }
     }
 }
