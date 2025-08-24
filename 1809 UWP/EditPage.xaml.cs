@@ -41,13 +41,19 @@ namespace _1809_UWP.Pages
             InsertWikitext("''", "''", "italic text");
 
         private void InsertBoldItalic_Click(object sender, RoutedEventArgs e) =>
-            InsertWikitext("'''''", "'''''", "bold and italic text");
+            InsertWikitext("'''''", "'''''", "bold & italic text");
 
         private void InsertUnderline_Click(object sender, RoutedEventArgs e) =>
             InsertWikitext("<u>", "</u>", "underlined text");
 
         private void InsertStrikethrough_Click(object sender, RoutedEventArgs e) =>
             InsertWikitext("<s>", "</s>", "strikethrough text");
+
+        private void InsertInserted_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("<ins>", "</ins>", "inserted text");
+
+        private void InsertDeleted_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("<del>", "</del>", "deleted text");
 
         private void InsertSuperscript_Click(object sender, RoutedEventArgs e) =>
             InsertWikitext("<sup>", "</sup>", "superscript");
@@ -61,8 +67,30 @@ namespace _1809_UWP.Pages
         private void InsertBig_Click(object sender, RoutedEventArgs e) =>
             InsertWikitext("<span style=\"font-size:larger;\">", "</span>", "big text");
 
-        private void InsertBlockquote_Click(object sender, RoutedEventArgs e) =>
-            InsertWikitext("<blockquote>", "</blockquote>", "quoted text");
+        // --- Image Formatting ---
+        private void InsertImageBasic_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("[[File:", "]]", "Example.jpg");
+
+        private void InsertImageThumbnail_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("[[File:", "|thumb|Caption text]]", "Example.jpg");
+
+        private void InsertImageAlignLeft_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("[[File:", "|thumb|left|Caption text]]", "Example.jpg");
+
+        private void InsertAlignCenter_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("[[File:", "|thumb|center|Caption text]]", "Example.jpg");
+
+        private void InsertAlignRight_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("[[File:", "|thumb|right|Caption text]]", "Example.jpg");
+
+        private void InsertImageLinked_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("[[File:", "|link=Target Page]]", "Example.jpg");
+
+        private void InsertImageAlt_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("[[File:", "|alt=Alternative text for screen readers]]", "Example.jpg");
+
+        private void InsertMediaLink_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("[[Media:", "]]", "Example.ogg");
 
         // --- Links & References ---
         private void InsertInternalLink_Click(object sender, RoutedEventArgs e) =>
@@ -100,6 +128,12 @@ namespace _1809_UWP.Pages
         private void InsertPreformatted_Click(object sender, RoutedEventArgs e) =>
             InsertWikitext("<pre>", "</pre>", "preformatted text");
 
+        private void InsertPreformattedStyled_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("<pre style=\"\">", "</pre>", "styled preformatted text");
+
+        private void InsertComment_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("<!-- ", " -->", "comment");
+
         // --- Structure (Line-based) ---
         private void InsertHeading2_Click(object sender, RoutedEventArgs e) =>
             InsertWikitext("\n== ", " ==\n", "Heading");
@@ -110,8 +144,14 @@ namespace _1809_UWP.Pages
         private void InsertHeading4_Click(object sender, RoutedEventArgs e) =>
             InsertWikitext("\n==== ", " ====\n", "Heading");
 
+        private void InsertLineBreak_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("<br />");
+
         private void InsertHorizontalRule_Click(object sender, RoutedEventArgs e) =>
             InsertWikitext("\n----\n");
+
+        private void InsertBlockquote_Click(object sender, RoutedEventArgs e) =>
+            InsertWikitext("\n<blockquote>", "</blockquote>\n", "quoted text");
 
         private void InsertIndentedListItem_Click(object sender, RoutedEventArgs e) =>
             InsertWikitext("\n: ", "", "Indented text");

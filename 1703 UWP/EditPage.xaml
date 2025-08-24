@@ -26,12 +26,29 @@
                             <MenuFlyoutSeparator />
                             <MenuFlyoutItem Text="Underline" Click="InsertUnderline_Click" />
                             <MenuFlyoutItem Text="Strikethrough" Click="InsertStrikethrough_Click" />
+                            <MenuFlyoutItem Text="Inserted Text" Click="InsertInserted_Click" />
+                            <MenuFlyoutItem Text="Deleted Text" Click="InsertDeleted_Click" />
                             <MenuFlyoutSeparator />
                             <MenuFlyoutItem Text="Superscript" Click="InsertSuperscript_Click" />
                             <MenuFlyoutItem Text="Subscript" Click="InsertSubscript_Click" />
                             <MenuFlyoutSeparator />
                             <MenuFlyoutItem Text="Small Text" Click="InsertSmall_Click" />
                             <MenuFlyoutItem Text="Big Text" Click="InsertBig_Click" />
+                        </MenuFlyoutSubItem>
+
+                        <!-- Insert Image -->
+                        <MenuFlyoutSubItem Text="Insert Image">
+                            <MenuFlyoutItem Text="Basic Image" Click="InsertImageBasic_Click" />
+                            <MenuFlyoutItem Text="Thumbnail with Caption" Click="InsertImageThumbnail_Click" />
+                            <MenuFlyoutSubItem Text="Aligned Thumbnail">
+                                <MenuFlyoutItem Text="Left Aligned" Click="InsertImageAlignLeft_Click" />
+                                <MenuFlyoutItem Text="Center Aligned" Click="InsertAlignCenter_Click" />
+                                <MenuFlyoutItem Text="Right Aligned" Click="InsertAlignRight_Click" />
+                            </MenuFlyoutSubItem>
+                            <MenuFlyoutSeparator/>
+                            <MenuFlyoutItem Text="Image Linking to Page" Click="InsertImageLinked_Click" />
+                            <MenuFlyoutItem Text="Image with Alt Text" Click="InsertImageAlt_Click" />
+                            <MenuFlyoutItem Text="Direct Link to Media File" Click="InsertMediaLink_Click" />
                         </MenuFlyoutSubItem>
 
                         <!-- Links & References -->
@@ -51,13 +68,13 @@
                                 <MenuFlyoutItem Text="Level 3" Click="InsertHeading3_Click" />
                                 <MenuFlyoutItem Text="Level 4" Click="InsertHeading4_Click" />
                             </MenuFlyoutSubItem>
-                            <MenuFlyoutSeparator />
                             <MenuFlyoutSubItem Text="Lists">
                                 <MenuFlyoutItem Text="Bulleted Item" Click="InsertBulletedListItem_Click" />
                                 <MenuFlyoutItem Text="Numbered Item" Click="InsertNumberedListItem_Click" />
                                 <MenuFlyoutItem Text="Indented Item" Click="InsertIndentedListItem_Click" />
                             </MenuFlyoutSubItem>
                             <MenuFlyoutSeparator />
+                            <MenuFlyoutItem Text="Line Break" Click="InsertLineBreak_Click" />
                             <MenuFlyoutItem Text="Horizontal Rule" Click="InsertHorizontalRule_Click" />
                             <MenuFlyoutItem Text="Blockquote" Click="InsertBlockquote_Click" />
                         </MenuFlyoutSubItem>
@@ -66,7 +83,10 @@
                         <MenuFlyoutSubItem Text="Advanced">
                             <MenuFlyoutItem Text="Display as Code" Click="InsertCode_Click" />
                             <MenuFlyoutItem Text="Preformatted Text" Click="InsertPreformatted_Click" />
+                            <MenuFlyoutItem Text="Preformatted (Styled)" Click="InsertPreformattedStyled_Click" />
                             <MenuFlyoutItem Text="Ignore Wikitext (nowiki)" Click="InsertNoWiki_Click" />
+                            <MenuFlyoutSeparator/>
+                            <MenuFlyoutItem Text="Comment (Hidden)" Click="InsertComment_Click" />
                         </MenuFlyoutSubItem>
 
                         <!-- Signature -->
