@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
+using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
 using Windows.UI.Core;
@@ -142,17 +143,46 @@ namespace WikiViewer.Shared.Uwp.Pages
             }
         }
 
-        protected void PreviewButton_Click(object sender, RoutedEventArgs e)
+        protected async void PreviewButton_Click(object sender, RoutedEventArgs e)
         {
             PreviewAppBarButton.IsEnabled = false;
             HidePreview("Generating preview...");
+
             try
             {
-                string fullHtml = WikitextParsingService.ParseToFullHtmlDocument(
+                var account = AccountManager
+                    .GetAccountsForWiki(_pageWikiContext.Id)
+                    .FirstOrDefault(a => a.IsLoggedIn);
+                IApiWorker worker;
+
+                if (account != null && account.IsLoggedIn)
+                {
+                    var authService = new AuthenticationService(
+                        account,
+                        _pageWikiContext,
+                        App.ApiWorkerFactory
+                    );
+                    worker = account.AuthenticatedApiWorker;
+                }
+                else
+                {
+                    worker = SessionManager.GetAnonymousWorkerForWiki(_pageWikiContext);
+                }
+
+                if (worker == null)
+                {
+                    throw new InvalidOperationException(
+                        "Could not obtain an API worker for the preview."
+                    );
+                }
+
+                string fullHtml = await WikitextParsingService.ParseWikitextToPreviewHtmlAsync(
                     WikitextEditorTextBox.Text,
+                    _pageTitle,
                     _pageWikiContext,
-                    Application.Current.RequestedTheme == ApplicationTheme.Dark
+                    worker
                 );
+
                 ShowPreview(fullHtml);
             }
             catch (Exception ex)
