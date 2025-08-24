@@ -31,5 +31,6 @@
     <Compile Include="$(MSBuildThisFileDirectory)Services\SessionManager.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\WikiManager.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\WikiPathDetectorService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)services\WikitextParsingService.cs" />
   </ItemGroup>
 </Project>
