@@ -1,8 +1,9 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using Newtonsoft.Json;
 
 namespace WikiViewer.Core.Models
 {
@@ -276,6 +277,9 @@ namespace WikiViewer.Core.Models
     {
         [JsonProperty("id")]
         public string Id { get; set; }
+
+        [JsonProperty("metadata")]
+        public JObject Metadata { get; set; }
 
         [JsonProperty("required")]
         public string Required { get; set; }
