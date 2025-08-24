@@ -4,6 +4,7 @@ using WikiViewer.Core;
 using WikiViewer.Core.Enums;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
+using WikiViewer.Shared.Uwp.Services;
 using Windows.UI;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
@@ -51,6 +52,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                 };
                 PopulateDetails();
                 PageTitleTextBlockControl.Text = "Add New Wiki";
+                this.FindParent<MainPageBase>()?.SetPageTitle("Add New Wiki");
             }
 
             if (_currentWiki == null)
@@ -64,6 +66,8 @@ namespace WikiViewer.Shared.Uwp.Pages
             PageTitleTextBlockControl.Text = _isNewWiki
                 ? "Add New Wiki"
                 : $"Editing '{_currentWiki.Name}'";
+            this.FindParent<MainPageBase>()
+                ?.SetPageTitle(_isNewWiki ? "Add New Wiki" : $"Editing '{_currentWiki.Name}'");
             WikiNameTextBoxControl.Text = _currentWiki.Name;
             WikiUrlTextBoxControl.Text = _currentWiki.BaseUrl;
             ScriptPathTextBoxControl.Text = _currentWiki.ScriptPath;
@@ -229,19 +233,20 @@ namespace WikiViewer.Shared.Uwp.Pages
                         VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                         Content = new TextBlock
                         {
-                            Text = "You are enabling an optional, experimental proxy service. Please read the following carefully:\n\n" +
-                                   "1. Data Transmission: To bypass web restrictions (like Cloudflare), your network requests from this app will be routed through an intermediary server hosted by the developer in the United Kingdom.\n\n" +
-                                   "2. No Logging Policy: This server does not intentionally log or store the content of the pages you visit. Its purpose is only to transmit the request and return the result.\n\n" +
-                                   "3. Security and Data Handling: The connection to the proxy server is secured using HTTPS (SSL/TLS). However, to function, the server must process your requests. This means unencrypted data is momentarily accessible on the server before being forwarded to the destination wiki. For this reason, it is strongly advised that you do not use this service for sensitive accounts or private information.\n\n" +
-                                   "4. Acceptable Use: You agree to use this service only for lawful purposes. You will not use it to access or distribute illegal content. The developer reserves the right to block access to the service in cases of misuse.\n\n" +
-                                   "5. No Warranty: This service is provided 'as is', without any guarantees of availability, speed, or reliability. It may not work for all websites.\n\n" +
-                                   "By clicking 'Agree and Enable', you acknowledge that you have read and understood these points and agree to use this service at your own risk.",
-                            TextWrapping = TextWrapping.Wrap
-                        }
+                            Text =
+                                "You are enabling an optional, experimental proxy service. Please read the following carefully:\n\n"
+                                + "1. Data Transmission: To bypass web restrictions (like Cloudflare), your network requests from this app will be routed through an intermediary server hosted by the developer in the United Kingdom.\n\n"
+                                + "2. No Logging Policy: This server does not intentionally log or store the content of the pages you visit. Its purpose is only to transmit the request and return the result.\n\n"
+                                + "3. Security and Data Handling: The connection to the proxy server is secured using HTTPS (SSL/TLS). However, to function, the server must process your requests. This means unencrypted data is momentarily accessible on the server before being forwarded to the destination wiki. For this reason, it is strongly advised that you do not use this service for sensitive accounts or private information.\n\n"
+                                + "4. Acceptable Use: You agree to use this service only for lawful purposes. You will not use it to access or distribute illegal content. The developer reserves the right to block access to the service in cases of misuse.\n\n"
+                                + "5. No Warranty: This service is provided 'as is', without any guarantees of availability, speed, or reliability. It may not work for all websites.\n\n"
+                                + "By clicking 'Agree and Enable', you acknowledge that you have read and understood these points and agree to use this service at your own risk.",
+                            TextWrapping = TextWrapping.Wrap,
+                        },
                     },
                     PrimaryButtonText = "Agree and Enable",
                     CloseButtonText = "Cancel",
-                    DefaultButton = ContentDialogButton.Close
+                    DefaultButton = ContentDialogButton.Close,
                 };
 
                 var result = await dialog.ShowAsync();

@@ -13,7 +13,7 @@ namespace _1703_UWP
             this.InitializeComponent();
         }
 
-        protected override TextBlock PageTitleTextBlockControl => this.PageTitle;
+        protected override TextBlock PageTitleTextBlockControl => new TextBlock();
         protected override TextBox WikiNameTextBoxControl => this.WikiNameTextBox;
         protected override TextBox WikiUrlTextBoxControl => this.WikiUrlTextBox;
         protected override TextBox ScriptPathTextBoxControl => this.ScriptPathTextBox;

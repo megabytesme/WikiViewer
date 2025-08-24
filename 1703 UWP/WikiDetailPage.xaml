@@ -9,15 +9,10 @@
     Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <Grid Style="{StaticResource PageTitleBarGridStyle}">
-            <TextBlock x:Name="PageTitle" Style="{StaticResource PageTitleBarTextStyle}"/>
-        </Grid>
-
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel Padding="24" MaxWidth="600" HorizontalAlignment="Center">
                 <TextBox x:Name="WikiNameTextBox" Header="Wiki Name" Margin="0,0,0,12"/>
                 <TextBox x:Name="WikiUrlTextBox" Header="MediaWiki Base URL" PlaceholderText="https://en.wikipedia.org/" Margin="0,0,0,12"/>
@@ -40,19 +35,19 @@
             </StackPanel>
         </ScrollViewer>
 
-        <CommandBar Grid.Row="1" VerticalAlignment="Bottom">
+        <CommandBar VerticalAlignment="Bottom">
             <AppBarButton Icon="Save" Label="Save" Click="SaveButton_Click"/>
             <AppBarButton Icon="Delete" Label="Delete" Click="DeleteButton_Click"/>
         </CommandBar>
 
-        <Grid x:Name="LoadingOverlay" Grid.RowSpan="2" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Visibility="Collapsed">
+        <Grid x:Name="LoadingOverlay" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Visibility="Collapsed">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                 <ProgressRing IsActive="True" Width="60" Height="60"/>
                 <TextBlock x:Name="LoadingText" Text="Please wait..."/>
             </StackPanel>
         </Grid>
 
-        <Grid x:Name="VerificationPanel" Grid.RowSpan="2" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Visibility="Collapsed">
+        <Grid x:Name="VerificationPanel" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Visibility="Collapsed">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>

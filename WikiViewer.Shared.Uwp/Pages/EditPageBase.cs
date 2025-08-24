@@ -5,6 +5,7 @@ using Newtonsoft.Json.Linq;
 using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
+using WikiViewer.Shared.Uwp.Services;
 using Windows.UI.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
@@ -73,6 +74,10 @@ namespace WikiViewer.Shared.Uwp.Pages
 
             PageTitleTextBlock.Text =
                 $"Editing: {_pageTitle.Replace('_', ' ')} on {_pageWikiContext.Name}";
+            this.FindParent<MainPageBase>()
+                ?.SetPageTitle(
+                    $"Editing: {_pageTitle.Replace('_', ' ')} on {_pageWikiContext.Name}"
+                );
             _ = LoadContentAsync();
         }
 

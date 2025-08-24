@@ -8,18 +8,12 @@
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <Grid Style="{StaticResource PageTitleBarGridStyle}" Background="{ThemeResource SystemControlBackgroundAltHighBrush}">
-            <TextBlock Text="Settings" Style="{StaticResource PageTitleBarTextStyle}"/>
-        </Grid>
-
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="12">
-            <StackPanel MaxWidth="600" HorizontalAlignment="Center">
-
-                <Border BorderThickness="1" BorderBrush="{ThemeResource SystemControlForegroundBaseLowBrush}" Padding="16" Margin="0,0,0,16">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel MaxWidth="600" HorizontalAlignment="Center" Margin="8,0,8,0">
+                <Border BorderThickness="1" BorderBrush="{ThemeResource SystemControlForegroundBaseLowBrush}" Padding="16" Margin="0,16,0,16">
                     <StackPanel>
                         <TextBlock Text="Manage Wikis" Style="{ThemeResource SubtitleTextBlockStyle}" Margin="0,0,0,8"/>
                         <TextBlock Text="Add, remove, or edit the MediaWiki sites this app connects to." TextWrapping="Wrap" Opacity="0.7" Margin="0,0,0,12"/>
@@ -70,7 +64,7 @@
                     </StackPanel>
                 </Border>
 
-                <Border BorderThickness="1" BorderBrush="{ThemeResource SystemControlForegroundBaseLowBrush}" Padding="16">
+                <Border BorderThickness="1" BorderBrush="{ThemeResource SystemControlForegroundBaseLowBrush}" Padding="16" Margin="0,0,0,16">
                     <StackPanel>
                         <TextBlock Text="About" Style="{ThemeResource SubtitleTextBlockStyle}" Margin="0,0,0,12"/>
                         <StackPanel Orientation="Horizontal">

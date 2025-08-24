@@ -23,11 +23,15 @@ namespace _1703_UWP.Pages
         protected override Grid AppTitleBarGrid => this.AppTitleBar;
         protected override ColumnDefinition LeftPaddingColumn => this.TitleBarLeftPaddingColumn;
         protected override ColumnDefinition RightPaddingColumn => this.TitleBarRightPaddingColumn;
+
         protected override Panel GetWorkerHost() => this.WorkerWebViewHost;
 
         protected override Type GetArticleViewerPageType() => typeof(ArticleViewerPage);
+
         protected override Type GetFavouritesPageType() => typeof(FavouritesPage);
+
         protected override Type GetLoginPageType() => typeof(_1703_UWP.LoginPage);
+
         protected override Type GetSettingsPageType() => typeof(SettingsPage);
 
         private void MainPage_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -61,15 +65,22 @@ namespace _1703_UWP.Pages
             this.PageHeaderControl.Title = title;
         }
 
-        protected override void ShowConnectionInfoBar(string title, string message, bool showActionButton)
+        protected override void ShowConnectionInfoBar(
+            string title,
+            string message,
+            bool showActionButton
+        )
         {
             this.InfoBarTitle.Text = title;
             this.InfoBarMessage.Text = message;
-            this.InfoBarButton.Visibility = showActionButton ? Visibility.Visible : Visibility.Collapsed;
+            this.InfoBarButton.Visibility = showActionButton
+                ? Visibility.Visible
+                : Visibility.Collapsed;
             this.ConnectionInfoBar.Visibility = Visibility.Visible;
         }
 
-        protected override void HideConnectionInfoBar() => this.ConnectionInfoBar.Visibility = Visibility.Collapsed;
+        protected override void HideConnectionInfoBar() =>
+            this.ConnectionInfoBar.Visibility = Visibility.Collapsed;
 
         protected override void ClearWikiNavItems()
         {
@@ -88,8 +99,13 @@ namespace _1703_UWP.Pages
 
         protected override bool TryGoBack()
         {
-            if (ContentFrame?.Content is ArticleViewerPage avp && avp.CanGoBackInPage) return avp.GoBackInPage();
-            if (ContentFrame?.CanGoBack == true) { ContentFrame.GoBack(); return true; }
+            if (ContentFrame?.Content is ArticleViewerPage avp && avp.CanGoBackInPage)
+                return avp.GoBackInPage();
+            if (ContentFrame?.CanGoBack == true)
+            {
+                ContentFrame.GoBack();
+                return true;
+            }
             return false;
         }
 
@@ -98,18 +114,54 @@ namespace _1703_UWP.Pages
             this.NavSplitView.IsPaneOpen = !this.NavSplitView.IsPaneOpen;
         }
 
-        private void ContentFrame_Navigated(object sender, Windows.UI.Xaml.Navigation.NavigationEventArgs e)
+        private void ContentFrame_Navigated(
+            object sender,
+            Windows.UI.Xaml.Navigation.NavigationEventArgs e
+        )
         {
-            if (ContentFrame == null) return;
-            bool canGoBackInPage = (ContentFrame.Content as ArticleViewerPage)?.CanGoBackInPage == true;
+            if (ContentFrame == null)
+                return;
+            bool canGoBackInPage =
+                (ContentFrame.Content as ArticleViewerPage)?.CanGoBackInPage == true;
             bool canGoBack = ContentFrame.CanGoBack || canGoBackInPage;
-            Windows.UI.Core.SystemNavigationManager.GetForCurrentView().AppViewBackButtonVisibility = canGoBack ? Windows.UI.Core.AppViewBackButtonVisibility.Visible : Windows.UI.Core.AppViewBackButtonVisibility.Collapsed;
+            Windows
+                .UI.Core.SystemNavigationManager.GetForCurrentView()
+                .AppViewBackButtonVisibility = canGoBack
+                ? Windows.UI.Core.AppViewBackButtonVisibility.Visible
+                : Windows.UI.Core.AppViewBackButtonVisibility.Collapsed;
+
+            this.NavFooterListView.SelectionChanged -= NavListView_SelectionChanged;
+
+            if (e.SourcePageType == GetFavouritesPageType())
+            {
+                this.PageHeaderControl.Title = "Favourites";
+            }
+            else if (e.SourcePageType == GetSettingsPageType())
+            {
+                this.PageHeaderControl.Title = "Settings";
+            }
 
             this.NavFooterListView.SelectionChanged -= NavListView_SelectionChanged;
 
             if (e.SourcePageType == GetSettingsPageType())
             {
-                this.NavFooterListView.SelectedIndex = 0;
+                var settingsItem = NavFooterListView
+                    .Items.OfType<ListViewItem>()
+                    .FirstOrDefault(i => "settings".Equals(i.Tag));
+                if (settingsItem != null)
+                    NavFooterListView.SelectedItem = settingsItem;
+                else
+                    this.NavFooterListView.SelectedItem = null;
+            }
+            else if (e.SourcePageType == GetFavouritesPageType())
+            {
+                var favItem = NavFooterListView
+                    .Items.OfType<ListViewItem>()
+                    .FirstOrDefault(i => "favourites".Equals(i.Tag));
+                if (favItem != null)
+                    NavFooterListView.SelectedItem = favItem;
+                else
+                    this.NavFooterListView.SelectedItem = null;
             }
             else
             {
@@ -156,7 +208,10 @@ namespace _1703_UWP.Pages
         private void HandleWikiNavigation(WikiInstance wiki, string action)
         {
             var pageTitle = action == "random" ? "Special:Random" : "Main Page";
-            NavigateToPage(GetArticleViewerPageType(), new ArticleNavigationParameter { WikiId = wiki.Id, PageTitle = pageTitle });
+            NavigateToPage(
+                GetArticleViewerPageType(),
+                new ArticleNavigationParameter { WikiId = wiki.Id, PageTitle = pageTitle }
+            );
         }
 
         private void MainWikiButton_Click(object sender, RoutedEventArgs e)

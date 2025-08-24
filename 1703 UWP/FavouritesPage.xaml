@@ -16,11 +16,11 @@
     </Page.Resources>
     <Grid>
         <ScrollViewer x:Name="GridViewScrollViewerControl" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Visible">
-            <GridView x:Name="FavouritesGridViewControl" Padding="24,52,24,48" IsItemClickEnabled="False" SelectionMode="Multiple" SelectionChanged="FavouritesGridView_SelectionChanged" HorizontalAlignment="Center">
-                <GridView.ItemContainerStyle>
-                    <Style TargetType="GridViewItem">
-                        <Setter Property="Margin" Value="8"/>
-                    </Style>
+                <GridView x:Name="FavouritesGridViewControl" Padding="24,0,24,48" IsItemClickEnabled="False" SelectionMode="Multiple" SelectionChanged="FavouritesGridView_SelectionChanged" HorizontalAlignment="Center">
+                    <GridView.ItemContainerStyle>
+                        <Style TargetType="GridViewItem">
+                            <Setter Property="Margin" Value="8"/>
+                        </Style>
                 </GridView.ItemContainerStyle>
                 <GridView.ItemTemplate>
                     <DataTemplate x:DataType="models:FavouriteItem">
@@ -87,9 +87,6 @@
             </ListView>
         </ScrollViewer>
         <TextBlock x:Name="NoFavouritesTextBlockControl" Text="You haven't added any Favourites yet." Style="{ThemeResource SubtitleTextBlockStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
-        <Grid VerticalAlignment="Top" Style="{StaticResource PageTitleBarGridStyle}" Margin="0,0,15,0" Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}">
-            <TextBlock Text="Favourites" Style="{StaticResource PageTitleBarTextStyle}" TextWrapping="Wrap" Foreground="{ThemeResource SystemControlForegroundBaseHighBrush}"/>
-        </Grid>
         <CommandBar x:Name="BottomCommandBarControl" VerticalAlignment="Bottom" Margin="0,0,15,0">
             <AppBarButton x:Name="DeleteButtonControl" Icon="Delete" Label="Delete" Click="DeleteButton_Click" Visibility="Collapsed"/>
             <AppBarButton x:Name="ViewToggleButtonControl" Icon="List" Label="List View" Click="ViewToggleButton_Click"/>

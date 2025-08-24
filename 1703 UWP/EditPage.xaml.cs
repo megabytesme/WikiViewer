@@ -9,7 +9,7 @@ namespace _1703_UWP.Pages
 
         protected override TextBox WikitextEditorTextBox => WikitextEditor;
         protected override TextBox SummaryTextBoxTextBox => SummaryTextBox;
-        protected override TextBlock PageTitleTextBlock => PageTitle;
+        protected override TextBlock PageTitleTextBlock => new TextBlock();
         protected override TextBlock LoadingTextBlock => LoadingText;
         protected override Grid LoadingOverlayGrid => LoadingOverlay;
         protected override Grid SplitterGrid => SplitGrid;

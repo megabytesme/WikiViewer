@@ -6,14 +6,10 @@
     Background="Transparent" NavigationCacheMode="Disabled">
     <Grid x:Name="MainGrid">
         <Grid.RowDefinitions>
-            <RowDefinition Height="52"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        <Grid Grid.Row="0" Style="{StaticResource PageTitleBarGridStyle}" Background="{ThemeResource SystemControlForegroundBaseLowBrush}">
-            <TextBlock x:Name="PageTitle" Style="{StaticResource PageTitleBarTextStyle}" Text="Loading Editor..."/>
-        </Grid>
-        <Grid x:Name="SplitGrid" Grid.Row="1">
+        <Grid x:Name="SplitGrid" Grid.Row="0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" MinWidth="150"/>
                 <ColumnDefinition Width="12"/>
@@ -26,7 +22,7 @@
                 <TextBlock x:Name="PreviewPlaceholder" Text="Click 'Preview' to see a rendering of your changes." Style="{ThemeResource BodyTextBlockStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
             </Grid>
         </Grid>
-        <CommandBar Grid.Row="2">
+        <CommandBar Grid.Row="1">
             <AppBarButton x:Name="SaveButton" Icon="Save" Label="Save Page" Click="SaveButton_Click"/>
             <AppBarButton x:Name="PreviewButton" Icon="View" Label="Preview" Click="PreviewButton_Click"/>
             <AppBarSeparator/>
