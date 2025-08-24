@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Threading.Tasks;
 using _1703_UWP.ViewModels;
 using WikiViewer.Core.Models;
 using WikiViewer.Shared.Uwp.Pages;
@@ -68,7 +69,8 @@ namespace _1703_UWP.Pages
         protected override void ShowConnectionInfoBar(
             string title,
             string message,
-            bool showActionButton
+            bool showActionButton,
+            bool isClosable
         )
         {
             this.InfoBarTitle.Text = title;
@@ -77,6 +79,17 @@ namespace _1703_UWP.Pages
                 ? Visibility.Visible
                 : Visibility.Collapsed;
             this.ConnectionInfoBar.Visibility = Visibility.Visible;
+        }
+
+        protected override async Task ShowDialogAsync(string title, string message)
+        {
+            var dialog = new ContentDialog
+            {
+                Title = title,
+                Content = message,
+                CloseButtonText = "OK",
+            };
+            await dialog.ShowAsync();
         }
 
         protected override void HideConnectionInfoBar() =>
@@ -130,8 +143,6 @@ namespace _1703_UWP.Pages
                 ? Windows.UI.Core.AppViewBackButtonVisibility.Visible
                 : Windows.UI.Core.AppViewBackButtonVisibility.Collapsed;
 
-            this.NavFooterListView.SelectionChanged -= NavListView_SelectionChanged;
-
             if (e.SourcePageType == GetFavouritesPageType())
             {
                 this.PageHeaderControl.Title = "Favourites";
@@ -139,6 +150,14 @@ namespace _1703_UWP.Pages
             else if (e.SourcePageType == GetSettingsPageType())
             {
                 this.PageHeaderControl.Title = "Settings";
+            }
+            else if (
+                e.SourcePageType == GetArticleViewerPageType()
+                || e.SourcePageType == typeof(EditPage)
+                || e.SourcePageType == typeof(WikiDetailPage)
+            )
+            {
+                this.PageHeaderControl.Title = "";
             }
 
             this.NavFooterListView.SelectionChanged -= NavListView_SelectionChanged;

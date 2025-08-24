@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Threading.Tasks;
 using Newtonsoft.Json;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
@@ -54,13 +55,20 @@ namespace _1809_UWP.Pages
         protected override void ShowConnectionInfoBar(
             string title,
             string message,
-            bool showActionButton
+            bool showActionButton,
+            bool isClosable
         )
         {
             ConnectionInfoBar.Title = title;
             ConnectionInfoBar.Message = message;
             InfoBarButton.Visibility = showActionButton ? Visibility.Visible : Visibility.Collapsed;
+            ConnectionInfoBar.IsClosable = isClosable;
             ConnectionInfoBar.IsOpen = true;
+        }
+
+        protected override Task ShowDialogAsync(string title, string message)
+        {
+            return Task.CompletedTask;
         }
 
         protected override void HideConnectionInfoBar() => ConnectionInfoBar.IsOpen = false;

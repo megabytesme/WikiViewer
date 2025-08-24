@@ -42,9 +42,11 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected abstract void ShowConnectionInfoBar(
             string title,
             string message,
-            bool showActionButton
+            bool showActionButton,
+            bool isClosable
         );
         protected abstract void HideConnectionInfoBar();
+        protected abstract Task ShowDialogAsync(string title, string message);
         protected abstract bool TryGoBack();
         protected abstract Panel GetWorkerHost();
         protected abstract Type GetArticleViewerPageType();
@@ -124,36 +126,42 @@ namespace WikiViewer.Shared.Uwp.Pages
             SessionManager.AutoLoginFailed -= OnAutoLoginFailed;
         }
 
-        private void OnAutoLoginFailed(object sender, AutoLoginFailedEventArgs e)
+        private async void OnAutoLoginFailed(object sender, AutoLoginFailedEventArgs e)
         {
-            if (e.Exception is NeedsUserVerificationException)
-            {
-                _postVerificationAction = () =>
+            await Dispatcher.RunAsync(
+                CoreDispatcherPriority.Normal,
+                async () =>
                 {
-                    Debug.WriteLine(
-                        $"[MainPageBase] Retrying auto-login for '{e.Wiki.Name}' post-verification."
-                    );
-                    return SessionManager.PerformSingleLoginAsync(e.Wiki);
-                };
+                    if (e.Exception is NeedsUserVerificationException)
+                    {
+                        _postVerificationAction = () =>
+                        {
+                            Debug.WriteLine(
+                                $"[MainPageBase] Retrying auto-login for '{e.Wiki.Name}' post-verification."
+                            );
+                            return SessionManager.PerformSingleLoginAsync(e.Wiki);
+                        };
 
 #if UWP_1809
-                ShowVerificationRequiredBar(e.Wiki);
+                        ShowVerificationRequiredBar(e.Wiki);
 #else
-                ShowConnectionInfoBar(
-                    "Verification Recommended",
-                    $"Access to '{e.Wiki.Name}' is restricted by a security check on this WebView version. For the best experience, consider editing this wiki in Settings and switching its 'Connection Backend' to 'Proxy'.",
-                    false
-                );
+                        await ShowDialogAsync(
+                            "Verification Required",
+                            $"Access to '{e.Wiki.Name}' is restricted by a security check. For the best experience, please edit this wiki in Settings and switch its 'Connection Backend' to 'Proxy'."
+                        );
 #endif
-            }
-            else
-            {
-                ShowConnectionInfoBar(
-                    "Login Failed",
-                    $"Could not automatically sign in to '{e.Wiki.Name}'. Please check your connection or credentials.",
-                    false
-                );
-            }
+                    }
+                    else
+                    {
+                        ShowConnectionInfoBar(
+                            "Login Failed",
+                            $"Could not automatically sign in to '{e.Wiki.Name}'. Please check your connection or credentials.",
+                            false,
+                            true
+                        );
+                    }
+                }
+            );
         }
 
         private void OnWikisChanged(object sender, EventArgs e)
@@ -228,7 +236,8 @@ namespace WikiViewer.Shared.Uwp.Pages
                 ShowConnectionInfoBar(
                     "Verification Required",
                     "A security check is required to continue.",
-                    true
+                    true,
+                    false
                 );
             }
             catch (Exception)
@@ -249,7 +258,8 @@ namespace WikiViewer.Shared.Uwp.Pages
                     ShowConnectionInfoBar(
                         "Offline Mode",
                         $"Could not connect to {firstWiki.Host}. Only cached articles are available.",
-                        false
+                        false,
+                        true
                     );
                 }
             }
@@ -474,7 +484,8 @@ namespace WikiViewer.Shared.Uwp.Pages
             ShowConnectionInfoBar(
                 "Verification Required",
                 $"Access to '{wiki.Name}' is blocked by a security check. Please click 'Action' to continue.",
-                true
+                true,
+                false
             );
         }
     }

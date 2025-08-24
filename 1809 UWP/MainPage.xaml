@@ -52,7 +52,7 @@
 
             <Grid>
                 <Frame x:Name="PageContentFrame" Navigated="ContentFrame_Navigated"/>
-                <muxc:InfoBar x:Name="ConnectionInfoBar" Grid.Row="0" Title="Connection Issue" Severity="Warning" IsOpen="False" IsClosable="False" Margin="12,12,12,0" VerticalAlignment="Top">
+                <muxc:InfoBar x:Name="ConnectionInfoBar" Grid.Row="0" Title="Connection Issue" Severity="Warning" IsOpen="False" IsClosable="True" Margin="12,12,12,0" VerticalAlignment="Top">
                     <muxc:InfoBar.ActionButton>
                         <Button x:Name="InfoBarButton" Content="Action" Click="InfoBarButton_Click" Visibility="Collapsed"/>
                     </muxc:InfoBar.ActionButton>
