@@ -281,7 +281,7 @@ namespace WikiViewer.Core.Services
             return (string.IsNullOrEmpty(watchToken) || watchToken == "+\\") ? null : watchToken;
         }
 
-        public async Task<bool> SavePageAsync(string title, string content, string summary)
+        public async Task<bool> SavePageAsync(string title, string content, string summary, bool isMinorEdit)
         {
             if (!_account.IsLoggedIn)
                 throw new InvalidOperationException("User must be logged in to save a page.");

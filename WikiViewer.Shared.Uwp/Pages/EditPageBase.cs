@@ -24,7 +24,7 @@ namespace WikiViewer.Shared.Uwp.Pages
         private GridLength leftColInitialWidth;
 
         protected abstract TextBox WikitextEditorTextBox { get; }
-        protected abstract TextBox SummaryTextBoxTextBox { get; }
+        {
         protected abstract TextBlock PageTitleTextBlock { get; }
         protected abstract TextBlock LoadingTextBlock { get; }
         protected abstract Grid LoadingOverlayGrid { get; }
@@ -202,43 +202,47 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         protected async void SaveButton_Click(object sender, RoutedEventArgs e)
         {
+            var dialog = new WikiViewer.Shared.Uwp.Controls.SaveDialog();
+            var result = await dialog.ShowAsync();
+
+            if (result != ContentDialogResult.Primary)
+            {
+                return;
+            }
+
             LoadingOverlayGrid.Visibility = Visibility.Visible;
             LoadingTextBlock.Text = "Saving...";
             try
             {
-                var account = AccountManager
-                    .GetAccountsForWiki(_pageWikiContext.Id)
-                    .FirstOrDefault(a => a.IsLoggedIn);
-                if (account == null)
-                    throw new InvalidOperationException("User must be logged in to save a page.");
+                var account = AccountManager.GetAccountsForWiki(_pageWikiContext.Id).FirstOrDefault(a => a.IsLoggedIn);
+                if (account == null) throw new InvalidOperationException("User must be logged in to save a page.");
 
-                var authService = new AuthenticationService(
-                    account,
-                    _pageWikiContext,
-                    App.ApiWorkerFactory
-                );
+                var authService = new AuthenticationService(account, _pageWikiContext, App.ApiWorkerFactory);
+                WikitextEditorTextBox.Document.GetText(TextGetOptions.None, out var wikitext);
+
                 bool success = await authService.SavePageAsync(
                     _pageTitle,
-                    WikitextEditorTextBox.Text,
-                    SummaryTextBoxTextBox.Text
+                    wikitext,
+                    dialog.Summary,
+                    dialog.IsMinorEdit
                 );
+
                 if (success)
                 {
-                    _originalWikitext = WikitextEditorTextBox.Text;
+                    _originalWikitext = wikitext;
                     Frame.GoBack();
                 }
             }
             catch (Exception ex)
             {
                 LoadingOverlayGrid.Visibility = Visibility.Collapsed;
-                var dialog = new ContentDialog
+                var errorDialog = new ContentDialog
                 {
                     Title = "Save Failed",
-                    Content =
-                        $"The page could not be saved. The server reported the following error:\n\n{ex.Message}",
+                    Content = $"The page could not be saved. The server reported the following error:\n\n{ex.Message}",
                     CloseButtonText = "OK",
                 };
-                await dialog.ShowAsync();
+                await errorDialog.ShowAsync();
             }
         }
 

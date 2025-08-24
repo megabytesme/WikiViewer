@@ -111,9 +111,6 @@
             <AppBarButton x:Name="PreviewButton" Icon="View" Label="Preview" Click="PreviewButton_Click"/>
             <AppBarSeparator/>
             <AppBarButton x:Name="CancelButton" Icon="Cancel" Label="Cancel" Click="CancelButton_Click"/>
-            <CommandBar.Content>
-                <TextBox x:Name="SummaryTextBox" PlaceholderText="Edit summary (e.g., fixed typo)" Width="300" Margin="12,0"/>
-            </CommandBar.Content>
         </CommandBar>
         <Grid x:Name="LoadingOverlay" Grid.RowSpan="3" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">

@@ -11,7 +11,6 @@ namespace _1703_UWP.Pages
         public EditPage() => this.InitializeComponent();
 
         protected override TextBox WikitextEditorTextBox => WikitextEditor;
-        protected override TextBox SummaryTextBoxTextBox => SummaryTextBox;
         protected override TextBlock PageTitleTextBlock => new TextBlock();
         protected override TextBlock LoadingTextBlock => LoadingText;
         protected override Grid LoadingOverlayGrid => LoadingOverlay;
