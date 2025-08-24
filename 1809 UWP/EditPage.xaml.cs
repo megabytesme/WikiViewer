@@ -1,4 +1,5 @@
 ﻿using System;
+using WikiViewer.Shared.Uwp.Controls;
 using WikiViewer.Shared.Uwp.Pages;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
@@ -161,5 +162,15 @@ namespace _1809_UWP.Pages
 
         private void InsertNumberedListItem_Click(object sender, RoutedEventArgs e) =>
             InsertWikitext("\n# ", "", "List item");
+
+        private async void InsertSpecialCharacter_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new SymbolPickerDialog();
+            var result = await dialog.ShowAsync();
+            if (result == ContentDialogResult.Primary && !string.IsNullOrEmpty(dialog.SelectedEntity))
+            {
+                InsertWikitext(dialog.SelectedEntity);
+            }
+        }
     }
 }

@@ -86,6 +86,8 @@
 
                         <!-- Advanced -->
                         <MenuFlyoutSubItem Text="Advanced">
+                            <MenuFlyoutItem Text="Insert Special Character..." Click="InsertSpecialCharacter_Click" />
+                            <MenuFlyoutSeparator/>
                             <MenuFlyoutItem Text="Display as Code" Click="InsertCode_Click" />
                             <MenuFlyoutItem Text="Preformatted Text" Click="InsertPreformatted_Click" />
                             <MenuFlyoutItem Text="Preformatted (Styled)" Click="InsertPreformattedStyled_Click" />

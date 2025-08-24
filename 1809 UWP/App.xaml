@@ -29,6 +29,18 @@
                         <Setter Property="HorizontalAlignment" Value="Left"/>
                         <Setter Property="Margin" Value="12,0"/>
                     </Style>
+
+                    <Style TargetType="ContentDialog">
+                        <Setter Property="Background" Value="{ThemeResource SystemControlAcrylicWindowBrush}" />
+                        <Setter Property="CornerRadius" Value="8" />
+                        <Setter Property="TitleTemplate">
+                            <Setter.Value>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}" FontWeight="SemiBold" FontSize="20" Margin="0,0,0,12" TextWrapping="Wrap"/>
+                                </DataTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
                 </ResourceDictionary>
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>

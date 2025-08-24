@@ -12,8 +12,12 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Controls with XAML -->
+    <Compile Include="$(MSBuildThisFileDirectory)Controls\SymbolPickerDialog.xaml.cs">
+      <DependentUpon>SymbolPickerDialog.xaml</DependentUpon>
+    </Compile>
     <Compile Include="$(MSBuildThisFileDirectory)helpers\NativeAnimatedImageLoader.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)services\UwpStorageProvider.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)viewmodels\SymbolViewModel.cs" />
     <Page Include="$(MSBuildThisFileDirectory)Controls\AccountStatusFlyout.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -21,6 +25,9 @@
     <Compile Include="$(MSBuildThisFileDirectory)Controls\AccountStatusFlyout.xaml.cs">
       <DependentUpon>AccountStatusFlyout.xaml</DependentUpon>
     </Compile>
+    <Page Include="$(MSBuildThisFileDirectory)Controls\SymbolPickerDialog.xaml">
+      <SubType>Designer</SubType>
+    </Page>
     <Page Include="$(MSBuildThisFileDirectory)Controls\WikiActionsFlyout.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -60,7 +67,6 @@
     <Folder Include="$(MSBuildThisFileDirectory)ViewModels\" />
     <Folder Include="$(MSBuildThisFileDirectory)Services\" />
     <Folder Include="$(MSBuildThisFileDirectory)Converters\" />
-    <Folder Include="$(MSBuildThisFileDirectory)Controls\" />
     <Folder Include="$(MSBuildThisFileDirectory)Pages\" />
   </ItemGroup>
 </Project>
