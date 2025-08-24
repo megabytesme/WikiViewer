@@ -4,7 +4,12 @@ namespace WikiViewer.Core.Interfaces
 {
     public interface IStorageProvider
     {
-        Task<string> ReadTextAsync(string fileName);
-        Task WriteTextAsync(string fileName, string content);
+        Task<string> ReadTextAsync(string relativePath);
+        Task WriteTextAsync(string relativePath, string content);
+        Task WriteBytesAsync(string relativePath, byte[] content);
+        Task<bool> FileExistsAsync(string relativePath);
+        Task DeleteFileAsync(string relativePath);
+        Task<ulong> GetFolderSizeAsync(string relativePath);
+        Task ClearFolderAsync(string relativePath);
     }
 }

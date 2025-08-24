@@ -2,8 +2,8 @@ using System;
 using System.Threading.Tasks;
 using WikiViewer.Core;
 using WikiViewer.Core.Interfaces;
+using WikiViewer.Core.Managers;
 using WikiViewer.Core.Services;
-using WikiViewer.Shared.Uwp.Managers;
 using WikiViewer.Shared.Uwp.Services;
 using Windows.ApplicationModel;
 using Windows.ApplicationModel.Activation;
@@ -33,8 +33,6 @@ namespace WikiViewer.Shared.Uwp
 
         public App()
         {
-            AppSettings.SettingsProvider = new UwpSettingsProvider();
-            ImageUpgradeManager.StorageProvider = new UwpStorageProvider();
             this.InitializeComponent();
             this.Suspending += OnSuspending;
         }
@@ -63,10 +61,25 @@ namespace WikiViewer.Shared.Uwp
             ApiWorkerFactory = new _1809_UWP.Services.ApiWorkerFactory();
 #endif
 
+            var storageProvider = new UwpStorageProvider();
+            var settingsProvider = new UwpSettingsProvider();
+            var credentialService = new CredentialService();
+
+            AppSettings.SettingsProvider = settingsProvider;
+            ImageUpgradeManager.StorageProvider = storageProvider;
+            ArticleCacheManager.StorageProvider = storageProvider;
+            AccountManager.StorageProvider = storageProvider;
+            AccountManager.CredentialService = credentialService;
+            WikiManager.StorageProvider = storageProvider;
+            BackgroundDownloadManager.ApiWorkerFactory = ApiWorkerFactory;
+            BackgroundDownloadManager.StorageProvider = storageProvider;
+            SessionManager.ApiWorkerFactory = ApiWorkerFactory;
+            SessionManager.CredentialService = credentialService;
+            SessionManager.PlatformReady = UIReady;
+
             await WikiManager.InitializeAsync();
             await AccountManager.InitializeAsync();
             await FavouritesService.InitializeAsync();
-            await ArticleCacheManager.InitializeAsync();
             await ImageUpgradeManager.InitializeAsync();
             await BackgroundDownloadManager.InitializeAsync();
             _ = BackgroundDownloadManager.ProcessQueueAsync();

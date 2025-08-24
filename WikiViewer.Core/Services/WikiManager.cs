@@ -4,13 +4,14 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
-using Windows.Storage;
 
 namespace WikiViewer.Core.Services
 {
     public static class WikiManager
     {
+        public static IStorageProvider StorageProvider { get; set; }
         private const string WikisFileName = "wikis.json";
         private static List<WikiInstance> _wikis;
 
@@ -20,15 +21,14 @@ namespace WikiViewer.Core.Services
         {
             if (_wikis != null)
                 return;
+            if (StorageProvider == null)
+                throw new InvalidOperationException("StorageProvider not set for WikiManager.");
 
             try
             {
-                var file =
-                    await ApplicationData.Current.LocalFolder.TryGetItemAsync(WikisFileName)
-                    as StorageFile;
-                if (file != null)
+                string json = await StorageProvider.ReadTextAsync(WikisFileName);
+                if (!string.IsNullOrEmpty(json))
                 {
-                    string json = await FileIO.ReadTextAsync(file);
                     _wikis =
                         JsonConvert.DeserializeObject<List<WikiInstance>>(json)
                         ?? new List<WikiInstance>();
@@ -55,12 +55,11 @@ namespace WikiViewer.Core.Services
 
         public static async Task SaveAsync()
         {
-            var file = await ApplicationData.Current.LocalFolder.CreateFileAsync(
-                WikisFileName,
-                CreationCollisionOption.ReplaceExisting
-            );
+            if (StorageProvider == null)
+                throw new InvalidOperationException("StorageProvider not set for WikiManager.");
+
             string json = JsonConvert.SerializeObject(_wikis, Formatting.Indented);
-            await FileIO.WriteTextAsync(file, json);
+            await StorageProvider.WriteTextAsync(WikisFileName, json);
             WikisChanged?.Invoke(null, EventArgs.Empty);
         }
 

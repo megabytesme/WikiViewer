@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using WikiViewer.Core;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
-using WikiViewer.Shared.Uwp.Managers;
+using WikiViewer.Core.Managers;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Documents;

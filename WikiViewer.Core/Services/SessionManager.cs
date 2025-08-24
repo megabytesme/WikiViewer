@@ -1,12 +1,9 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
-using WikiViewer.Shared.Uwp;
-using WikiViewer.Shared.Uwp.Services;
 
 namespace WikiViewer.Core.Services
 {
@@ -15,6 +12,10 @@ namespace WikiViewer.Core.Services
         private static ApiWorkerProvider _workerProvider;
         public static bool IsResetPending { get; set; } = false;
         public static event EventHandler<AutoLoginFailedEventArgs> AutoLoginFailed;
+
+        public static IApiWorkerFactory ApiWorkerFactory { get; set; }
+        public static Task PlatformReady { get; set; } = Task.CompletedTask;
+        public static ICredentialService CredentialService { get; set; }
 
         public static IApiWorker GetAnonymousWorkerForWiki(WikiInstance wiki)
         {
@@ -25,6 +26,9 @@ namespace WikiViewer.Core.Services
 
         public static async Task InitializeAsync()
         {
+            if (ApiWorkerFactory == null || CredentialService == null)
+                throw new InvalidOperationException("Dependencies for SessionManager not set.");
+
             if (IsResetPending)
             {
                 DisposeAndReset();
@@ -33,7 +37,7 @@ namespace WikiViewer.Core.Services
 
             if (_workerProvider == null)
             {
-                _workerProvider = new ApiWorkerProvider(App.ApiWorkerFactory);
+                _workerProvider = new ApiWorkerProvider(ApiWorkerFactory);
             }
 
             await Task.CompletedTask;
@@ -41,7 +45,7 @@ namespace WikiViewer.Core.Services
 
         public static async Task PerformAutoLoginAsync()
         {
-            await App.UIReady;
+            await PlatformReady;
             var allWikis = WikiManager.GetWikis();
 
             foreach (var wiki in allWikis)
@@ -58,7 +62,7 @@ namespace WikiViewer.Core.Services
                         var authService = new AuthenticationService(
                             account,
                             wiki,
-                            App.ApiWorkerFactory
+                            ApiWorkerFactory
                         );
                         try
                         {
@@ -81,7 +85,7 @@ namespace WikiViewer.Core.Services
 
         public static async Task PerformSingleLoginAsync(WikiInstance wiki)
         {
-            await App.UIReady;
+            await PlatformReady;
 
             var accountsForWiki = AccountManager.GetAccountsForWiki(wiki.Id);
             foreach (var account in accountsForWiki)
@@ -92,11 +96,7 @@ namespace WikiViewer.Core.Services
                     Debug.WriteLine(
                         $"[SessionManager] Retrying login for '{account.Username}' on '{wiki.Name}'..."
                     );
-                    var authService = new AuthenticationService(
-                        account,
-                        wiki,
-                        App.ApiWorkerFactory
-                    );
+                    var authService = new AuthenticationService(account, wiki, ApiWorkerFactory);
                     try
                     {
                         await authService.LoginAsync(credentials.Password);

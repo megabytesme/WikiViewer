@@ -4,14 +4,16 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
-using WikiViewer.Shared.Uwp.Services;
-using Windows.Storage;
 
 namespace WikiViewer.Core.Services
 {
     public static class AccountManager
     {
+        public static IStorageProvider StorageProvider { get; set; }
+        public static ICredentialService CredentialService { get; set; }
+
         private const string AccountsFileName = "accounts.json";
         private static List<Account> _accounts;
 
@@ -19,15 +21,14 @@ namespace WikiViewer.Core.Services
         {
             if (_accounts != null)
                 return;
+            if (StorageProvider == null || CredentialService == null)
+                throw new InvalidOperationException("Providers not set for AccountManager.");
 
             try
             {
-                var file =
-                    await ApplicationData.Current.LocalFolder.TryGetItemAsync(AccountsFileName)
-                    as StorageFile;
-                if (file != null)
+                string json = await StorageProvider.ReadTextAsync(AccountsFileName);
+                if (!string.IsNullOrEmpty(json))
                 {
-                    string json = await FileIO.ReadTextAsync(file);
                     _accounts =
                         JsonConvert.DeserializeObject<List<Account>>(json) ?? new List<Account>();
                 }
@@ -45,12 +46,8 @@ namespace WikiViewer.Core.Services
 
         public static async Task SaveAsync()
         {
-            var file = await ApplicationData.Current.LocalFolder.CreateFileAsync(
-                AccountsFileName,
-                CreationCollisionOption.ReplaceExisting
-            );
             string json = JsonConvert.SerializeObject(_accounts, Formatting.Indented);
-            await FileIO.WriteTextAsync(file, json);
+            await StorageProvider.WriteTextAsync(AccountsFileName, json);
         }
 
         public static List<Account> GetAccountsForWiki(Guid wikiId) =>

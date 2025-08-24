@@ -1,27 +1,23 @@
 using System;
 using System.Linq;
+using WikiViewer.Core.Interfaces;
+using WikiViewer.Core.Models;
 using Windows.Security.Credentials;
 
 namespace WikiViewer.Shared.Uwp.Services
 {
-    public class UserCredentials
-    {
-        public string Username { get; set; }
-        public string Password { get; set; }
-    }
-
-    public static class CredentialService
+    public class CredentialService : ICredentialService
     {
         private const string ResourceName = "WikiViewerAppCredentials";
 
-        public static void SaveCredentials(Guid accountId, string username, string password)
+        public void SaveCredentials(Guid accountId, string username, string password)
         {
             var vault = new PasswordVault();
             var credential = new PasswordCredential(accountId.ToString(), username, password);
             vault.Add(credential);
         }
 
-        public static UserCredentials LoadCredentials(Guid accountId)
+        public UserCredentials LoadCredentials(Guid accountId)
         {
             try
             {
@@ -49,7 +45,7 @@ namespace WikiViewer.Shared.Uwp.Services
             return null;
         }
 
-        public static void ClearCredentials(Guid accountId)
+        public void ClearCredentials(Guid accountId)
         {
             try
             {

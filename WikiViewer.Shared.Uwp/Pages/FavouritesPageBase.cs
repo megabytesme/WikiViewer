@@ -8,7 +8,7 @@ using HtmlAgilityPack;
 using WikiViewer.Core;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
-using WikiViewer.Shared.Uwp.Managers;
+using WikiViewer.Core.Managers;
 using WikiViewer.Shared.Uwp.Services;
 using Windows.Storage;
 using Windows.UI.Xaml;

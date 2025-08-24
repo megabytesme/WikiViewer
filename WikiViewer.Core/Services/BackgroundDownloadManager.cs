@@ -8,13 +8,14 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
-using WikiViewer.Shared.Uwp;
-using Windows.Storage;
 
 namespace WikiViewer.Core.Services
 {
     public static class BackgroundDownloadManager
     {
+        public static IApiWorkerFactory ApiWorkerFactory { get; set; }
+        public static IStorageProvider StorageProvider { get; set; }
+
         private class DownloadQueueItem
         {
             public string Url { get; set; }
@@ -27,12 +28,17 @@ namespace WikiViewer.Core.Services
         private static bool _isProcessing = false;
         private static readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
 
-        public static event Action<string, string> MediaDownloaded;
+        public static event Action<string, string> MediaDownloaded; // originalUrl, localPath
 
         public static async Task InitializeAsync()
         {
             if (_isInitialized)
                 return;
+            if (StorageProvider == null)
+                throw new InvalidOperationException(
+                    "StorageProvider not set for BackgroundDownloadManager."
+                );
+
             await _semaphore.WaitAsync();
             try
             {
@@ -41,12 +47,9 @@ namespace WikiViewer.Core.Services
 
                 try
                 {
-                    var file =
-                        await ApplicationData.Current.LocalFolder.TryGetItemAsync(QueueFileName)
-                        as StorageFile;
-                    if (file != null)
+                    string json = await StorageProvider.ReadTextAsync(QueueFileName);
+                    if (!string.IsNullOrEmpty(json))
                     {
-                        string json = await FileIO.ReadTextAsync(file);
                         _downloadQueue =
                             JsonConvert.DeserializeObject<List<DownloadQueueItem>>(json)
                             ?? new List<DownloadQueueItem>();
@@ -73,12 +76,8 @@ namespace WikiViewer.Core.Services
             await _semaphore.WaitAsync();
             try
             {
-                var file = await ApplicationData.Current.LocalFolder.CreateFileAsync(
-                    QueueFileName,
-                    CreationCollisionOption.ReplaceExisting
-                );
                 string json = JsonConvert.SerializeObject(_downloadQueue, Formatting.None);
-                await FileIO.WriteTextAsync(file, json);
+                await StorageProvider.WriteTextAsync(QueueFileName, json);
             }
             catch (Exception ex)
             {
@@ -122,7 +121,7 @@ namespace WikiViewer.Core.Services
 
         public static async Task ProcessQueueAsync()
         {
-            if (!_isInitialized || _isProcessing)
+            if (!_isInitialized || _isProcessing || ApiWorkerFactory == null)
                 return;
 
             await _semaphore.WaitAsync();
@@ -149,7 +148,7 @@ namespace WikiViewer.Core.Services
                     _downloadQueue.Clear();
                     _semaphore.Release();
 
-                    await SaveQueueAsync();
+                    await SaveQueueAsync(); // Save the now-empty queue
 
                     Debug.WriteLine(
                         $"[BG D/L] Starting queue processing. Items to process: {itemsToProcess.Count}"
@@ -163,7 +162,8 @@ namespace WikiViewer.Core.Services
                         if (wiki == null)
                             continue;
 
-                        using (var worker = App.ApiWorkerFactory.CreateApiWorker(wiki))
+                        // Create ONE worker per wiki and reuse it for all downloads in the group
+                        using (var worker = ApiWorkerFactory.CreateApiWorker(wiki))
                         {
                             await worker.InitializeAsync(wiki.BaseUrl);
                             var downloadSemaphore = new SemaphoreSlim(
@@ -233,19 +233,12 @@ namespace WikiViewer.Core.Services
             var baseFileName = hash.Aggregate("", (s, b) => s + b.ToString("x2"));
             var finalFileName = baseFileName + extension;
 
-            var cacheFolder = await ApplicationData.Current.LocalFolder.CreateFolderAsync(
-                "cache",
-                CreationCollisionOption.OpenIfExists
-            );
+            var relativePath = $"/cache/{finalFileName}";
+            var fullPath = Path.Combine("cache", finalFileName);
 
             try
             {
-                StorageFile newFile = await cacheFolder.CreateFileAsync(
-                    finalFileName,
-                    CreationCollisionOption.ReplaceExisting
-                );
-                await FileIO.WriteBytesAsync(newFile, mediaBytes);
-                var relativePath = $"/cache/{finalFileName}";
+                await StorageProvider.WriteBytesAsync(fullPath, mediaBytes);
                 ImageUpgradeManager.SetUpgradePath(absoluteMediaUrl, relativePath);
                 return relativePath;
             }

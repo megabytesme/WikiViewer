@@ -35,7 +35,6 @@
     <!-- Helpers -->
     <Compile Include="$(MSBuildThisFileDirectory)Helpers\AnimatedImageLoader.cs" />
     <!-- Managers -->
-    <Compile Include="$(MSBuildThisFileDirectory)Managers\ArticleCacheManager.cs" />
     <!-- Pages (code-only base classes, no XAML) -->
     <Compile Include="$(MSBuildThisFileDirectory)Pages\AppBase.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Pages\ArticleViewerPageBase.cs" />
@@ -62,7 +61,6 @@
     <Folder Include="$(MSBuildThisFileDirectory)Services\" />
     <Folder Include="$(MSBuildThisFileDirectory)Converters\" />
     <Folder Include="$(MSBuildThisFileDirectory)Controls\" />
-    <Folder Include="$(MSBuildThisFileDirectory)Managers\" />
     <Folder Include="$(MSBuildThisFileDirectory)Pages\" />
   </ItemGroup>
 </Project>

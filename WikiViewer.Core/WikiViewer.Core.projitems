@@ -12,11 +12,14 @@
     <Compile Include="$(MSBuildThisFileDirectory)Enums\ConnectionMethod.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Interfaces\IApiWorkerFactory.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Interfaces\IApiWorker.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)interfaces\ICredentialService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Interfaces\ISettingsProvider.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)interfaces\IStorageProvider.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Managers\ArticleCacheManager.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)models\Account.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\ApiModels.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)models\AutoLoginFailedEventArgs.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)models\UserCredentials.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)models\WikiInstance.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Repositories\AppSettings.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\AccountManager.cs" />

@@ -7,7 +7,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
-using WikiViewer.Shared.Uwp.Managers;
+using WikiViewer.Core.Managers;
 
 namespace WikiViewer.Core.Services
 {

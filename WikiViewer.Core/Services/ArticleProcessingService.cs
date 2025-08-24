@@ -10,10 +10,8 @@ using HtmlAgilityPack;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using WikiViewer.Core.Interfaces;
+using WikiViewer.Core.Managers;
 using WikiViewer.Core.Models;
-using WikiViewer.Core.Services;
-using WikiViewer.Shared.Uwp.Managers;
-using Windows.Storage;
 
 namespace WikiViewer.Core.Services
 {
@@ -35,7 +33,6 @@ namespace WikiViewer.Core.Services
 
             string resolvedTitle = pageTitle;
 
-            // Handle Special:Random case
             if (
                 string.IsNullOrEmpty(pageTitle)
                 || pageTitle.Equals("Special:Random", StringComparison.OrdinalIgnoreCase)
