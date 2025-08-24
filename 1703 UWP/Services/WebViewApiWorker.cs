@@ -111,11 +111,14 @@ namespace _1703_UWP.Services
                     string json = doc.DocumentNode.SelectSingleNode("//body/pre")?.InnerText;
                     if (string.IsNullOrWhiteSpace(json))
                         json = doc.DocumentNode.SelectSingleNode("//body")?.InnerText;
-                    if (
-                        !string.IsNullOrWhiteSpace(json)
-                        && (json.Trim().StartsWith("{") || json.Trim().StartsWith("["))
-                    )
-                        return json.Trim();
+                    if (!string.IsNullOrWhiteSpace(json))
+                    {
+                        string decodedJson = System.Net.WebUtility.HtmlDecode(json);
+                        if (
+                            decodedJson.Trim().StartsWith("{") || decodedJson.Trim().StartsWith("[")
+                        )
+                            return decodedJson.Trim();
+                    }
                     return null;
                 }
             );
@@ -185,12 +188,16 @@ namespace _1703_UWP.Services
                         if (string.IsNullOrWhiteSpace(json))
                             json = doc.DocumentNode.SelectSingleNode("//body")?.InnerText;
 
-                        if (
-                            !string.IsNullOrWhiteSpace(json)
-                            && (json.Trim().StartsWith("{") || json.Trim().StartsWith("["))
-                        )
+                        if (!string.IsNullOrWhiteSpace(json))
                         {
-                            return json.Trim();
+                            string decodedJson = System.Net.WebUtility.HtmlDecode(json);
+                            if (
+                                decodedJson.Trim().StartsWith("{")
+                                || decodedJson.Trim().StartsWith("[")
+                            )
+                            {
+                                return decodedJson.Trim();
+                            }
                         }
 
                         throw new Exception(

@@ -57,7 +57,9 @@ namespace _1809_UWP.Services
 
                         if (WebView.CoreWebView2 == null)
                         {
-                            throw new InvalidOperationException("CoreWebView2 could not be initialized. The environment may be unstable.");
+                            throw new InvalidOperationException(
+                                "CoreWebView2 could not be initialized. The environment may be unstable."
+                            );
                         }
 
                         if (!string.IsNullOrEmpty(baseUrl))
@@ -437,11 +439,15 @@ namespace _1809_UWP.Services
                     string json = doc.DocumentNode.SelectSingleNode("//body/pre")?.InnerText;
                     if (string.IsNullOrWhiteSpace(json))
                         json = doc.DocumentNode.SelectSingleNode("//body")?.InnerText;
-                    if (
-                        !string.IsNullOrWhiteSpace(json)
-                        && (json.Trim().StartsWith("{") || json.Trim().StartsWith("["))
-                    )
-                        return json.Trim();
+
+                    if (!string.IsNullOrWhiteSpace(json))
+                    {
+                        string decodedJson = System.Net.WebUtility.HtmlDecode(json);
+                        if (
+                            decodedJson.Trim().StartsWith("{") || decodedJson.Trim().StartsWith("[")
+                        )
+                            return decodedJson.Trim();
+                    }
                     return null;
                 }
             );
@@ -495,11 +501,16 @@ namespace _1809_UWP.Services
                         var doc = new HtmlAgilityPack.HtmlDocument();
                         doc.LoadHtml(fullHtml);
                         string json = doc.DocumentNode.SelectSingleNode("//body/pre")?.InnerText;
-                        if (
-                            !string.IsNullOrWhiteSpace(json)
-                            && (json.Trim().StartsWith("{") || json.Trim().StartsWith("["))
-                        )
-                            return json.Trim();
+
+                        if (!string.IsNullOrWhiteSpace(json))
+                        {
+                            string decodedJson = System.Net.WebUtility.HtmlDecode(json);
+                            if (
+                                decodedJson.Trim().StartsWith("{")
+                                || decodedJson.Trim().StartsWith("[")
+                            )
+                                return decodedJson.Trim();
+                        }
                     }
                     throw new TimeoutException($"Content validation timed out for POST URL: {url}");
                 }
