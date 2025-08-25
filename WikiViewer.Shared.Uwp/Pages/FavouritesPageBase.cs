@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using HtmlAgilityPack;
 using WikiViewer.Core.Managers;
@@ -19,6 +20,12 @@ namespace WikiViewer.Shared.Uwp.Pages
         private readonly ObservableCollection<FavouriteItem> _unifiedFavourites =
             new ObservableCollection<FavouriteItem>();
         private bool _isGridView = true;
+        protected string _activeWikiFilter = "";
+        protected string _activeSortTag = "TitleAsc";
+        private string _searchQuery = "";
+        private readonly ObservableCollection<FavouriteItem> _visibleFavourites =
+            new ObservableCollection<FavouriteItem>();
+        private CancellationTokenSource _searchDebounceToken;
 
         protected abstract ListView FavouritesListView { get; }
         protected abstract GridView FavouritesGridView { get; }
@@ -29,6 +36,9 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected abstract AppBarButton ViewToggleButton { get; }
         protected abstract AppBarButton DeleteButton { get; }
         protected abstract Grid LoadingOverlay { get; }
+        protected abstract ComboBox WikiFilterComboBox { get; }
+        protected abstract ComboBox SortComboBox { get; }
+        protected abstract AutoSuggestBox SearchBox { get; }
         protected abstract void ShowLoadingOverlay();
         protected abstract void HideLoadingOverlay();
         protected abstract Type GetArticleViewerPageType();
@@ -41,8 +51,8 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         private void FavouritesPage_Loaded(object sender, RoutedEventArgs e)
         {
-            FavouritesGridView.ItemsSource = _unifiedFavourites;
-            FavouritesListView.ItemsSource = _unifiedFavourites;
+            FavouritesGridView.ItemsSource = _visibleFavourites;
+            FavouritesListView.ItemsSource = _visibleFavourites;
         }
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -166,6 +176,120 @@ namespace WikiViewer.Shared.Uwp.Pages
             NoFavouritesTextBlock.Visibility = _unifiedFavourites.Any()
                 ? Visibility.Collapsed
                 : Visibility.Visible;
+
+            WikiFilterComboBox.Items.Clear();
+            WikiFilterComboBox.Items.Add(new ComboBoxItem { Content = "All Wikis", Tag = "" });
+
+            foreach (var wiki in WikiManager.GetWikis())
+            {
+                WikiFilterComboBox.Items.Add(
+                    new ComboBoxItem { Content = wiki.Name, Tag = wiki.Id }
+                );
+            }
+
+            WikiFilterComboBox.SelectedIndex = 0;
+            SortComboBox.SelectedIndex = 0;
+        }
+
+        protected void WikiFilterComboBox_SelectionChanged(
+            object sender,
+            SelectionChangedEventArgs e
+        )
+        {
+            _activeWikiFilter =
+                (WikiFilterComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "";
+            ApplyFavouritesViewAsync();
+        }
+
+        protected void SortComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            _activeSortTag =
+                (SortComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "TitleAsc";
+            ApplyFavouritesViewAsync();
+        }
+
+        protected void SearchBoxControl_TextChanged(
+            object sender,
+            AutoSuggestBoxTextChangedEventArgs e
+        )
+        {
+            if (e.Reason == AutoSuggestionBoxTextChangeReason.UserInput)
+            {
+                _searchDebounceToken?.Cancel();
+                _searchDebounceToken = new CancellationTokenSource();
+                var token = _searchDebounceToken.Token;
+
+                Task.Delay(250, token)
+                    .ContinueWith(t =>
+                    {
+                        if (t.IsCanceled)
+                            return;
+
+                        Dispatcher.RunAsync(
+                            Windows.UI.Core.CoreDispatcherPriority.Normal,
+                            () =>
+                            {
+                                _searchQuery = SearchBox.Text?.Trim() ?? "";
+                                ApplyFavouritesViewAsync();
+                            }
+                        );
+                    });
+            }
+        }
+
+        protected async void ApplyFavouritesViewAsync()
+        {
+            ShowLoadingOverlay();
+
+            var filteredSorted = await Task.Run(() =>
+            {
+                var filtered = _unifiedFavourites.Where(item =>
+                {
+                    bool matchesWiki =
+                        string.IsNullOrEmpty(_activeWikiFilter)
+                        || (
+                            Guid.TryParse(_activeWikiFilter, out Guid wikiId)
+                            && item.WikiId == wikiId
+                        );
+
+                    bool matchesSearch =
+                        string.IsNullOrWhiteSpace(_searchQuery)
+                        || item.DisplayTitle?.IndexOf(
+                            _searchQuery,
+                            StringComparison.OrdinalIgnoreCase
+                        ) >= 0;
+
+                    return matchesWiki && matchesSearch;
+                });
+
+                switch (_activeSortTag)
+                {
+                    case "TitleAsc":
+                        filtered = filtered.OrderBy(i => i.DisplayTitle);
+                        break;
+                    case "TitleDesc":
+                        filtered = filtered.OrderByDescending(i => i.DisplayTitle);
+                        break;
+                    case "WikiAsc":
+                        filtered = filtered.OrderBy(i => i.WikiName);
+                        break;
+                    case "WikiDesc":
+                        filtered = filtered.OrderByDescending(i => i.WikiName);
+                        break;
+                }
+
+                return filtered.ToList();
+            });
+
+            _visibleFavourites.Clear();
+            foreach (var item in filteredSorted)
+                _visibleFavourites.Add(item);
+
+            NoFavouritesTextBlock.Visibility = _visibleFavourites.Any()
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+
+            HideLoadingOverlay();
         }
 
         private async Task FindAndSetLeadImage(FavouriteItem item, WikiInstance wiki)
@@ -443,6 +567,20 @@ namespace WikiViewer.Shared.Uwp.Pages
                 : Visibility.Visible;
             ViewToggleButton.Icon = new SymbolIcon(_isGridView ? Symbol.List : Symbol.ViewAll);
             ViewToggleButton.Label = _isGridView ? "List View" : "Grid View";
+        }
+
+        protected void WikiFilterMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            var menuItem = (MenuFlyoutItem)sender;
+            _activeWikiFilter = menuItem.Tag?.ToString() ?? "";
+            ApplyFavouritesViewAsync();
+        }
+
+        protected void SortMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            var menuItem = (MenuFlyoutItem)sender;
+            _activeSortTag = menuItem.Tag?.ToString() ?? "TitleAsc";
+            ApplyFavouritesViewAsync();
         }
     }
 }

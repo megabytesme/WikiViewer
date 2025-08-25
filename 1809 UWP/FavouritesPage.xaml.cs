@@ -22,20 +22,26 @@ namespace _1809_UWP.Pages
         protected override AppBarButton ViewToggleButton => ViewToggleButtonControl;
         protected override AppBarButton DeleteButton => DeleteButtonControl;
         protected override Grid LoadingOverlay => LoadingOverlayControl;
+        protected override ComboBox WikiFilterComboBox => WikiFilterComboBoxControl;
+        protected override ComboBox SortComboBox => SortComboBoxControl;
+        protected override AutoSuggestBox SearchBox => SearchBoxControl;
 
         protected override Type GetArticleViewerPageType() => typeof(ArticleViewerPage);
+
         protected override Type GetEditPageType() => typeof(EditPage);
 
         protected override void ShowLoadingOverlay()
         {
-            var animation = this.Resources["FadeInAnimation"] as Windows.UI.Xaml.Media.Animation.Storyboard;
+            var animation =
+                this.Resources["FadeInAnimation"] as Windows.UI.Xaml.Media.Animation.Storyboard;
             LoadingOverlayControl.IsHitTestVisible = true;
             animation.Begin();
         }
 
         protected override void HideLoadingOverlay()
         {
-            var animation = this.Resources["FadeOutAnimation"] as Windows.UI.Xaml.Media.Animation.Storyboard;
+            var animation =
+                this.Resources["FadeOutAnimation"] as Windows.UI.Xaml.Media.Animation.Storyboard;
             void onAnimationCompleted(object s, object e)
             {
                 LoadingOverlayControl.IsHitTestVisible = false;

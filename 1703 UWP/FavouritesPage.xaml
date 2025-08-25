@@ -18,9 +18,9 @@
         <ScrollViewer x:Name="GridViewScrollViewerControl" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Visible">
             <GridView x:Name="FavouritesGridViewControl" Padding="24,0,24,48" IsItemClickEnabled="False" SelectionMode="Multiple" SelectionChanged="FavouritesGridView_SelectionChanged" HorizontalAlignment="Center" ContainerContentChanging="FavouritesControl_ContainerContentChanging">
                 <GridView.ItemContainerStyle>
-                        <Style TargetType="GridViewItem">
-                            <Setter Property="Margin" Value="8"/>
-                        </Style>
+                    <Style TargetType="GridViewItem">
+                        <Setter Property="Margin" Value="8"/>
+                    </Style>
                 </GridView.ItemContainerStyle>
                 <GridView.ItemTemplate>
                     <DataTemplate x:DataType="models:FavouriteItem">
@@ -88,13 +88,43 @@
         </ScrollViewer>
         <TextBlock x:Name="NoFavouritesTextBlockControl" Text="You haven't added any Favourites yet." Style="{ThemeResource SubtitleTextBlockStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
         <CommandBar x:Name="BottomCommandBarControl" VerticalAlignment="Bottom" Margin="0,0,15,0">
+            <AppBarButton Icon="Find" Label="Search">
+                <AppBarButton.Flyout>
+                    <Flyout Placement="Bottom" Opened="SearchFlyout_Opened">
+                        <AutoSuggestBox x:Name="SearchBoxControl"
+                            Width="240"
+                            PlaceholderText="Search favourites..."
+                            TextChanged="SearchBoxControl_TextChanged"/>
+                    </Flyout>
+                </AppBarButton.Flyout>
+            </AppBarButton>
+            <AppBarButton Icon="Filter" Label="Wiki">
+                <AppBarButton.Flyout>
+                    <MenuFlyout>
+                        <MenuFlyoutItem Text="All Wikis" Tag="" Click="WikiFilterMenuItem_Click"/>
+                    </MenuFlyout>
+                </AppBarButton.Flyout>
+            </AppBarButton>
+            <AppBarButton Icon="Sort" Label="Sort">
+                <AppBarButton.Flyout>
+                    <MenuFlyout>
+                        <MenuFlyoutItem Text="Title (A–Z)" Tag="TitleAsc" Click="SortMenuItem_Click"/>
+                        <MenuFlyoutItem Text="Title (Z–A)" Tag="TitleDesc" Click="SortMenuItem_Click"/>
+                        <MenuFlyoutItem Text="Wiki (A–Z)" Tag="WikiAsc" Click="SortMenuItem_Click"/>
+                        <MenuFlyoutItem Text="Wiki (Z–A)" Tag="WikiDesc" Click="SortMenuItem_Click"/>
+                    </MenuFlyout>
+                </AppBarButton.Flyout>
+            </AppBarButton>
             <AppBarButton x:Name="DeleteButtonControl" Icon="Delete" Label="Delete" Click="DeleteButton_Click" Visibility="Collapsed"/>
             <AppBarButton x:Name="ViewToggleButtonControl" Icon="List" Label="List View" Click="ViewToggleButton_Click"/>
         </CommandBar>
+
         <Grid x:Name="LoadingOverlayControl" Opacity="0" IsHitTestVisible="False" Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                 <ProgressRing IsActive="True" Width="60" Height="60"/>
             </StackPanel>
         </Grid>
+        <ComboBox x:Name="WikiFilterComboBoxControl" Visibility="Collapsed"/>
+        <ComboBox x:Name="SortComboBoxControl" Visibility="Collapsed"/>
     </Grid>
 </local:FavouritesPageBase>

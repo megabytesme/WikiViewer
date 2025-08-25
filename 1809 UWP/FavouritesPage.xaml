@@ -15,6 +15,7 @@
         </Storyboard>
     </Page.Resources>
     <Grid>
+
         <ScrollViewer x:Name="GridViewScrollViewerControl" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Visible">
             <GridView x:Name="FavouritesGridViewControl" Padding="24,52,24,48" IsItemClickEnabled="False" SelectionMode="Multiple" SelectionChanged="FavouritesGridView_SelectionChanged" HorizontalAlignment="Center" ContainerContentChanging="FavouritesControl_ContainerContentChanging">
                 <GridView.ItemContainerStyle>
@@ -28,7 +29,8 @@
                               BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                               BorderThickness="1"
                               Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                              CornerRadius="{ThemeResource ControlCornerRadius}">
+                              CornerRadius="{ThemeResource ControlCornerRadius}"
+                              Visibility="{x:Bind IsVisible, Converter={StaticResource GlobalBoolToVisibility}, Mode=OneWay}">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="180"/>
                                 <RowDefinition Height="Auto"/>
@@ -65,7 +67,7 @@
                 </ListView.ItemContainerStyle>
                 <ListView.ItemTemplate>
                     <DataTemplate x:DataType="models:FavouriteItem">
-                        <Grid Height="80" Padding="8">
+                        <Grid Height="80" Padding="8" Visibility="{x:Bind IsVisible, Converter={StaticResource GlobalBoolToVisibility}, Mode=OneWay}">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="80"/>
                                 <ColumnDefinition Width="*"/>
@@ -92,10 +94,48 @@
             </ListView>
         </ScrollViewer>
         <TextBlock x:Name="NoFavouritesTextBlockControl" Text="You haven't added any Favourites yet." Style="{ThemeResource SubtitleTextBlockStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
-        <Grid VerticalAlignment="Top" Style="{StaticResource PageTitleBarGridStyle}" Margin="0,0,15,0">
-            <TextBlock Text="Favourites" Style="{StaticResource PageTitleBarTextStyle}"/>
-        </Grid>
-        <CommandBar x:Name="BottomCommandBarControl" VerticalAlignment="Bottom" Background="{StaticResource PageTitleBarAcrylicBrush}" Margin="0,0,15,0">
+        <CommandBar Background="{ThemeResource PageTitleBarAcrylicBrush}"
+            DefaultLabelPosition="Right"
+            IsDynamicOverflowEnabled="True">
+            <CommandBar.Content>
+                <TextBlock Text="Favourites"
+                           Style="{StaticResource PageTitleBarTextStyle}"
+                           VerticalAlignment="Center"
+                           Margin="12,4" />
+            </CommandBar.Content>
+
+            <AppBarElementContainer>
+                <AutoSuggestBox x:Name="SearchBoxControl"
+                        Width="240"
+                        PlaceholderText="Search favourites..."
+                        TextChanged="SearchBoxControl_TextChanged"
+                        Margin="0,7,0,0"/>
+            </AppBarElementContainer>
+        </CommandBar>
+        <CommandBar x:Name="BottomCommandBarControl" VerticalAlignment="Bottom" Background="{StaticResource PageTitleBarAcrylicBrush}" Margin="0,0,0,0">
+            <AppBarElementContainer>
+                <ComboBox x:Name="WikiFilterComboBoxControl"
+                          Width="140"
+                          SelectionChanged="WikiFilterComboBox_SelectionChanged"
+                          Margin="7,7,0,0"
+                          SelectedItem="0">
+                    <ComboBoxItem Content="All Wikis" Tag=""/>
+                </ComboBox>
+            </AppBarElementContainer>
+
+            <AppBarElementContainer>
+                <ComboBox x:Name="SortComboBoxControl"
+                          Width="140"
+                          SelectionChanged="SortComboBox_SelectionChanged"
+                          Margin="7,7,0,0"
+                          SelectedItem="0">
+                    <ComboBoxItem Content="Title (A–Z)" Tag="TitleAsc"/>
+                    <ComboBoxItem Content="Title (Z–A)" Tag="TitleDesc"/>
+                    <ComboBoxItem Content="Wiki (A–Z)" Tag="WikiAsc"/>
+                    <ComboBoxItem Content="Wiki (Z–A)" Tag="WikiDesc"/>
+                </ComboBox>
+            </AppBarElementContainer>
+            
             <AppBarButton x:Name="DeleteButtonControl" Icon="Delete" Label="Delete" Click="DeleteButton_Click" Visibility="Collapsed"/>
             <AppBarButton x:Name="ViewToggleButtonControl" Icon="List" Label="List View" Click="ViewToggleButton_Click"/>
         </CommandBar>

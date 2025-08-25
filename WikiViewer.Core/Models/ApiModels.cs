@@ -346,6 +346,21 @@ namespace WikiViewer.Core.Models
         {
             DisplayTitle = baseTitle;
         }
+
+        private bool _isVisible = true;
+
+        public bool IsVisible
+        {
+            get => _isVisible;
+            set
+            {
+                if (_isVisible != value)
+                {
+                    _isVisible = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
     }
 
     public class ArticleCachedEventArgs : EventArgs
