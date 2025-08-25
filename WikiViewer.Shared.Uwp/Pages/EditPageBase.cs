@@ -241,7 +241,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                 {
                     Title = "Save Failed",
                     Content = $"The page could not be saved. The server reported the following error:\n\n{ex.Message}",
-                    CloseButtonText = "OK",
+                    PrimaryButtonText = "OK",
                 };
                 await errorDialog.ShowAsync();
             }
@@ -257,7 +257,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                     Title = "Discard Changes?",
                     Content = "You have unsaved changes. Are you sure you want to discard them?",
                     PrimaryButtonText = "Discard",
-                    CloseButtonText = "Cancel",
+                    SecondaryButtonText = "Cancel"
                 };
                 var result = await dialog.ShowAsync();
                 if (result != ContentDialogResult.Primary)

@@ -428,7 +428,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                         Content =
                             $"The page \"{pageTitle.Replace('_', ' ')}\" has not been created yet. Would you like to create it?",
                         PrimaryButtonText = "Create",
-                        CloseButtonText = "Cancel",
+                        SecondaryButtonText = "Cancel",
                     };
                     var result = await dialog.ShowAsync();
                     if (result == ContentDialogResult.Primary)
@@ -443,7 +443,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                                 Title = "Login Required",
                                 Content =
                                     "You must be logged in to create or edit pages on this wiki.",
-                                CloseButtonText = "OK",
+                                PrimaryButtonText = "OK",
                             }.ShowAsync();
                         }
                         else
@@ -467,7 +467,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                     Title = "An Error Occurred",
                     Content =
                         $"Could not verify the page's status. Please try again.\n\nError: {ex.Message}",
-                    CloseButtonText = "OK",
+                    PrimaryButtonText = "OK",
                 }.ShowAsync();
             }
             finally

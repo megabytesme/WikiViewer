@@ -58,7 +58,7 @@ namespace _1703_UWP
                 Title = "Two-Factor Authentication",
                 Content = panel,
                 PrimaryButtonText = "Submit",
-                CloseButtonText = "Cancel",
+                SecondaryButtonText = "Cancel"
             };
 
             var result = await dialog.ShowAsync();

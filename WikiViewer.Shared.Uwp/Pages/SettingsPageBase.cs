@@ -260,7 +260,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                         TextWrapping = TextWrapping.Wrap,
                     },
                 },
-                CloseButtonText = "OK",
+                PrimaryButtonText = "OK",
             }.ShowAsync();
 
         protected async void DisclaimerButton_Click(object sender, RoutedEventArgs e)
@@ -305,7 +305,7 @@ namespace WikiViewer.Shared.Uwp.Pages
             {
                 Title = "Disclaimer",
                 Content = new ScrollViewer { Content = textBlock },
-                CloseButtonText = "OK",
+                PrimaryButtonText = "OK",
             };
             await dialog.ShowAsync();
         }

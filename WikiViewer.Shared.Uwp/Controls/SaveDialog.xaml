@@ -4,8 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="Save Page"
     PrimaryButtonText="Save and Submit"
-    CloseButtonText="Cancel"
-    DefaultButton="Primary"
+    SecondaryButtonText="Cancel"
     PrimaryButtonClick="SaveDialog_PrimaryButtonClick">
 
     <StackPanel Margin="12">

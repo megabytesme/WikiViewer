@@ -330,7 +330,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                         Title = "Account Created",
                         Content =
                             $"Your account '{result.Username}' was created successfully. You can now log in.",
-                        CloseButtonText = "OK",
+                        PrimaryButtonText = "OK",
                     };
                     await successDialog.ShowAsync();
                     if (Frame.CanGoBack)

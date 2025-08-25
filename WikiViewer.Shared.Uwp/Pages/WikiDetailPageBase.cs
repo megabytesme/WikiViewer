@@ -120,7 +120,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                 {
                     Title = "Cannot Delete",
                     Content = "You cannot delete the last remaining wiki.",
-                    CloseButtonText = "OK",
+                    PrimaryButtonText = "OK",
                 };
                 await cantDeleteDialog.ShowAsync();
                 return;
@@ -132,7 +132,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                 Content =
                     "This will permanently delete the wiki, all associated accounts, and its favourites from the app. This action cannot be undone.",
                 PrimaryButtonText = "Delete",
-                CloseButtonText = "Cancel",
+                SecondaryButtonText = "Cancel",
             };
             if (await dialog.ShowAsync() == ContentDialogResult.Primary)
             {
@@ -241,12 +241,11 @@ namespace WikiViewer.Shared.Uwp.Pages
                                 + "4. Acceptable Use: You agree to use this service only for lawful purposes. You will not use it to access or distribute illegal content. The developer reserves the right to block access to the service in cases of misuse.\n\n"
                                 + "5. No Warranty: This service is provided 'as is', without any guarantees of availability, speed, or reliability. It may not work for all websites.\n\n"
                                 + "By clicking 'Agree and Enable', you acknowledge that you have read and understood these points and agree to use this service at your own risk.",
-                            TextWrapping = TextWrapping.Wrap,
-                        },
+                            TextWrapping = TextWrapping.Wrap
+                        }
                     },
                     PrimaryButtonText = "Agree and Enable",
-                    CloseButtonText = "Cancel",
-                    DefaultButton = ContentDialogButton.Close,
+                    SecondaryButtonText = "Cancel"
                 };
 
                 var result = await dialog.ShowAsync();

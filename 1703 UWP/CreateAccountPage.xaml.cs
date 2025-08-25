@@ -54,7 +54,7 @@ namespace _1703_UWP.Pages
             {
                 Title = title,
                 Content = webView,
-                CloseButtonText = "Close",
+                PrimaryButtonText = "Close",
             };
             await dialog.ShowAsync();
         }

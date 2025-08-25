@@ -87,7 +87,7 @@ namespace _1703_UWP.Pages
             {
                 Title = title,
                 Content = message,
-                CloseButtonText = "OK",
+                PrimaryButtonText = "OK"
             };
             await dialog.ShowAsync();
         }

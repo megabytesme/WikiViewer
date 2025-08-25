@@ -248,7 +248,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                     {
                         Title = "Connection Required",
                         Content = "An internet connection is required for the first launch.",
-                        CloseButtonText = "Close App",
+                        PrimaryButtonText = "Close App",
                     };
                     await dialog.ShowAsync();
                     Application.Current.Exit();

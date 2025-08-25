@@ -8,7 +8,7 @@
     mc:Ignorable="d"
     Title="Insert Special Character"
     PrimaryButtonText="Insert"
-    CloseButtonText="Cancel"
+    SecondaryButtonText="Cancel"
     PrimaryButtonClick="ContentDialog_PrimaryButtonClick">
 
     <Grid MinWidth="400" MaxWidth="600" MinHeight="300" MaxHeight="500">
