@@ -24,7 +24,7 @@
             <AutoSuggestBox.ItemTemplate>
                 <DataTemplate xmlns:vm="using:WikiViewer.Shared.Uwp.ViewModels" x:DataType="vm:SearchSuggestionViewModel">
                     <StackPanel Orientation="Horizontal" Margin="0,4">
-                        <BitmapIcon UriSource="{x:Bind IconUrl}" ShowAsMonochrome="False" Width="16" Height="16" Margin="0,0,8,0"/>
+                        <Image Source="{x:Bind IconUrl}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,8,0"/>
                         <StackPanel>
                             <TextBlock Text="{x:Bind Title}"/>
                             <TextBlock Text="{x:Bind WikiName}" Opacity="0.7" Style="{StaticResource CaptionTextBlockStyle}"/>
