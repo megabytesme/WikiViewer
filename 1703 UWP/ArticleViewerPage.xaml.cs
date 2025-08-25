@@ -113,10 +113,28 @@ namespace _1703_UWP.Pages
         {
             try
             {
-                if (ArticleDisplayWebView != null)
-                {
-                    await ArticleDisplayWebView.InvokeScriptAsync("eval", new[] { script });
-                }
+                if (ArticleDisplayWebView == null)
+                    return;
+
+                if (
+                    ArticleDisplayWebView.Source == null
+                    || ArticleDisplayWebView.Source.Scheme != "ms-appdata"
+                )
+                    return;
+
+                string wrappedScript =
+                    $@"
+            (function() {{
+                if (document.readyState === 'loading') {{
+                    document.addEventListener('DOMContentLoaded', function() {{
+                        {script}
+                    }});
+                }} else {{
+                    {script}
+                }}
+            }})();";
+
+                await ArticleDisplayWebView.InvokeScriptAsync("eval", new[] { wrappedScript });
             }
             catch (Exception ex)
             {
@@ -131,7 +149,16 @@ namespace _1703_UWP.Pages
             string fileName = System.IO.Path.GetFileName(localPath);
             string escapedOriginalUrl = JsonConvert.ToString(originalUrl);
             string escapedFileName = JsonConvert.ToString(fileName);
-            return $"var imgs = document.querySelectorAll('img[src=' + {escapedOriginalUrl} + ']'); for (var i = 0; i < imgs.length; i++) {{ imgs[i].src = {escapedFileName}; }}";
+
+            return $@"
+        (function() {{
+            var imgs = document.getElementsByTagName('img');
+            for (var i = 0; i < imgs.length; i++) {{
+                if (imgs[i].src && imgs[i].src.indexOf({escapedOriginalUrl}) !== -1) {{
+                    imgs[i].src = {escapedFileName};
+                }}
+            }}
+        }})();";
         }
 
         private async void ArticleDisplayWebView_NavigationStarting(
