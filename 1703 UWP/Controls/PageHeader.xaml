@@ -19,7 +19,7 @@
         </StackPanel>
 
         <AutoSuggestBox x:Name="NavSearchBox" Grid.Column="1" QueryIcon="Find" PlaceholderText="Search..." 
-              Width="320" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0"
+              Width="200" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0"
               UpdateTextOnSelect="False" TextMemberPath="Title">
             <AutoSuggestBox.ItemTemplate>
                 <DataTemplate xmlns:vm="using:WikiViewer.Shared.Uwp.ViewModels" x:DataType="vm:SearchSuggestionViewModel">
