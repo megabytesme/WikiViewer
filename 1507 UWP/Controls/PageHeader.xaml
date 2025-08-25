@@ -37,7 +37,7 @@
                 Width="200"
                 HorizontalAlignment="Right"
                 VerticalAlignment="Center"
-                Margin="0,0,8,0"
+                Margin="0,2,8,0"
                 UpdateTextOnSelect="False"
                 TextMemberPath="Title"
                 Visibility="Visible">

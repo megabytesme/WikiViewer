@@ -325,7 +325,21 @@ namespace WikiViewer.Shared.Uwp.Pages
             }
             catch (NeedsUserVerificationException ex)
             {
+#if UWP_1809
                 ShowVerificationPanel(ex.Url);
+
+#else
+                ArticleTitleTextBlock.Text = "Unable to load page";
+                LoadingTextBlock.Text = "A security check is preventing access.";
+                var dialog = new ContentDialog
+                {
+                    Title = "Verification Required",
+                    Content =
+                        "This site is protected by a security check that is incompatible with this version of WebView.\n\nPlease go to Settings -> Manage Wikis, edit this wiki, and switch its 'Connection Backend' to 'Proxy' to access this content.",
+                    PrimaryButtonText = "OK",
+                };
+                await dialog.ShowAsync();
+#endif
             }
             catch (Exception ex)
             {
