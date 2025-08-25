@@ -1,8 +1,8 @@
 using System;
 using System.Diagnostics;
-using Windows.Services.Store;
 using Windows.Storage;
 #if UWP_1809
+using Windows.Services.Store;
 using Windows.System;
 #endif
 
@@ -10,7 +10,10 @@ namespace WikiViewer.Shared.Uwp.Services
 {
     public static class ReviewRequestService
     {
+#if UWP_1809
         private static StoreContext _storeContext;
+#endif
+
         private static readonly ApplicationDataContainer _localSettings = ApplicationData
             .Current
             .LocalSettings;
@@ -25,8 +28,6 @@ namespace WikiViewer.Shared.Uwp.Services
                 User.GetDefault() != null
                     ? StoreContext.GetForUser(User.GetDefault())
                     : StoreContext.GetDefault();
-#else
-            _storeContext = StoreContext.GetDefault();
 #endif
         }
 
@@ -44,8 +45,10 @@ namespace WikiViewer.Shared.Uwp.Services
 
         public static async void TryRequestReview()
         {
+#if UWP_1809
             if (_storeContext == null)
                 return;
+#endif
             bool alreadyShown = _localSettings.Values[ReviewRequestShownKey] as bool? ?? false;
             int launchCount = _localSettings.Values[LaunchCountKey] as int? ?? 0;
             int pageLoadCount = _localSettings.Values[PageLoadCountKey] as int? ?? 0;
