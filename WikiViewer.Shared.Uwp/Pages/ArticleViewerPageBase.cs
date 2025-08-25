@@ -1,10 +1,11 @@
+using HtmlAgilityPack;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
-using HtmlAgilityPack;
-using Newtonsoft.Json;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
 using WikiViewer.Shared.Uwp.Services;
@@ -305,6 +306,7 @@ namespace WikiViewer.Shared.Uwp.Pages
 
                 await DisplayProcessedHtmlAsync(processedHtml);
                 EnhanceDisplayedHtmlWithCachedMediaAsync(html);
+                await UpdateEditButtonForPageAsync();
 
                 var lastUpdated = await ArticleProcessingService.FetchLastUpdatedTimestampAsync(
                     _pageTitleToFetch,
@@ -457,6 +459,106 @@ namespace WikiViewer.Shared.Uwp.Pages
             else
             {
                 request.FailWithDisplayText("There is no article loaded to share.");
+            }
+        }
+
+        private async Task UpdateEditButtonForPageAsync()
+        {
+            System.Diagnostics.Debug.WriteLine($"[EditCheck] Starting for '{_pageTitleToFetch}' on wiki '{_pageWikiContext?.Id}'");
+
+            if (_pageWikiContext == null || string.IsNullOrEmpty(_pageTitleToFetch))
+            {
+                System.Diagnostics.Debug.WriteLine("[EditCheck] Missing wiki context or page title — aborting.");
+                return;
+            }
+
+            try
+            {
+                var worker = SessionManager.GetAnonymousWorkerForWiki(_pageWikiContext);
+
+                var apiUrl =
+                    $"{_pageWikiContext.ApiEndpoint}?action=query&meta=userinfo&uiprop=rights|groups" +
+                    $"&prop=info&inprop=protection&titles={Uri.EscapeDataString(_pageTitleToFetch)}&format=json";
+
+                System.Diagnostics.Debug.WriteLine($"[EditCheck] API URL: {apiUrl}");
+
+                var json = await worker.GetJsonFromApiAsync(apiUrl);
+                System.Diagnostics.Debug.WriteLine($"[EditCheck] JSON length: {json?.Length ?? 0}");
+
+                dynamic result = Newtonsoft.Json.JsonConvert.DeserializeObject(json);
+
+                var rightsToken = result?.query?.userinfo?.rights;
+                var rights = rightsToken != null
+                    ? ((Newtonsoft.Json.Linq.JArray)rightsToken).Select(r => (string)r).ToList()
+                    : new List<string>();
+
+                System.Diagnostics.Debug.WriteLine($"[EditCheck] Rights: {(rights.Any() ? string.Join(", ", rights) : "(none)")}");
+                bool canEdit = rights.Contains("edit");
+                System.Diagnostics.Debug.WriteLine($"[EditCheck] Has 'edit' right: {canEdit}");
+
+                var pagesObj = result?.query?.pages as JObject;
+                var page = pagesObj?.Properties().FirstOrDefault()?.Value as JObject;
+
+                if (page != null && page.TryGetValue("protection", out var protectionToken) && protectionToken is JArray protection)
+                {
+                    Debug.WriteLine($"[EditCheck] Raw protection JSON: {protection}");
+                    Debug.WriteLine($"[EditCheck] Protection entries: {protection.Count}");
+
+                    var editProt = protection.FirstOrDefault(p => (string)p["type"] == "edit");
+                    if (editProt != null)
+                    {
+                        var level = (string)editProt["level"];
+                        Debug.WriteLine($"[EditCheck] Edit restriction level: {level}");
+
+                        var groupsToken = result?.query?.userinfo?.groups;
+                        var groups = groupsToken != null
+                            ? ((JArray)groupsToken).Select(g => (string)g).ToList()
+                            : new List<string>();
+
+                        Debug.WriteLine($"[EditCheck] Groups: {(groups.Any() ? string.Join(", ", groups) : "(none)")}");
+                        if (!groups.Contains(level))
+                        {
+                            Debug.WriteLine("[EditCheck] User does not meet restriction level — disabling edit.");
+                            canEdit = false;
+                        }
+                        else
+                        {
+                            Debug.WriteLine("[EditCheck] User meets restriction level.");
+                        }
+                    }
+                    else
+                    {
+                        Debug.WriteLine("[EditCheck] No edit-specific protection found.");
+                    }
+                }
+                else
+                {
+                    Debug.WriteLine("[EditCheck] No protection array present in API response.");
+                }
+
+                await Dispatcher.RunAsync(
+                    Windows.UI.Core.CoreDispatcherPriority.Normal,
+                    () =>
+                    {
+                        EditAppBarButton.Visibility = canEdit ? Visibility.Visible : Visibility.Collapsed;
+                        EditAppBarButton.IsEnabled = canEdit;
+                        System.Diagnostics.Debug.WriteLine($"[EditCheck] Edit button Visibility set to {EditAppBarButton.Visibility}, IsEnabled set to {canEdit}");
+                    }
+                );
+
+                System.Diagnostics.Debug.WriteLine("[EditCheck] Completed successfully.");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[EditCheck] FAILED: {ex}");
+                await Dispatcher.RunAsync(
+                    Windows.UI.Core.CoreDispatcherPriority.Normal,
+                    () =>
+                    {
+                        EditAppBarButton.Visibility = Visibility.Collapsed;
+                        EditAppBarButton.IsEnabled = false;
+                    }
+                );
             }
         }
     }
