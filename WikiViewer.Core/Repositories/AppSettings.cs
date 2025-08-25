@@ -1,5 +1,6 @@
 using System;
 using WikiViewer.Core.Interfaces;
+using Windows.UI.Xaml;
 
 namespace WikiViewer.Core
 {
@@ -21,6 +22,7 @@ namespace WikiViewer.Core
         private const string DisclaimerShownKey = "HasShownDisclaimer";
         private const string MaxConcurrentDownloadsKey = "MaxConcurrentDownloadsLevel";
         private const string ProxyDisclaimerKey = "HasAcceptedProxyDisclaimer";
+        private const string EditorThemeKey = "EditorTheme";
 
         private const string DefaultMainPageName = "Main Page";
 
@@ -46,6 +48,16 @@ namespace WikiViewer.Core
         {
             get => (ConcurrencyLevel)SettingsProvider.GetValue(MaxConcurrentDownloadsKey, (int)ConcurrencyLevel.Medium);
             set => SettingsProvider.SetValue(MaxConcurrentDownloadsKey, (int)value);
+        }
+
+        public static ElementTheme EditorTheme
+        {
+            get
+            {
+                var themeName = SettingsProvider.GetValue(EditorThemeKey, ElementTheme.Default.ToString());
+                return Enum.TryParse(themeName, out ElementTheme parsedTheme) ? parsedTheme : ElementTheme.Default;
+            }
+            set => SettingsProvider.SetValue(EditorThemeKey, value.ToString());
         }
 
         public static int MaxConcurrentDownloads

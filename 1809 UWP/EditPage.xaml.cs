@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using WikiViewer.Shared.Uwp.Controls;
 using WikiViewer.Shared.Uwp.Pages;
 using Windows.UI.Xaml;
@@ -11,29 +12,38 @@ namespace _1809_UWP.Pages
         public EditPage()
         {
             this.InitializeComponent();
+            AttachEditorFunctionality();
         }
 
-        protected override TextBox WikitextEditorTextBox => WikitextEditor;
-        protected override TextBlock PageTitleTextBlock => PageTitle;
+        protected override RichEditBox WikitextEditorTextBox => WikitextEditor;
+        protected override TextBlock PageTitleTextBlock => new TextBlock();
         protected override TextBlock LoadingTextBlock => LoadingText;
         protected override Grid LoadingOverlayGrid => LoadingOverlay;
         protected override Grid SplitterGrid => SplitGrid;
         protected override Button SaveAppBarButton => SaveButton;
         protected override Button PreviewAppBarButton => PreviewButton;
 
-        protected override async void ShowPreview(string htmlContent)
+        protected override async Task ShowPreview(string htmlContent)
         {
-            await PreviewWebView.EnsureCoreWebView2Async();
-            PreviewWebView.NavigateToString(htmlContent);
-            PreviewPlaceholder.Visibility = Windows.UI.Xaml.Visibility.Collapsed;
-            PreviewWebView.Visibility = Windows.UI.Xaml.Visibility.Visible;
+            try
+            {
+                await PreviewWebView.EnsureCoreWebView2Async();
+                PreviewWebView.NavigateToString(htmlContent);
+                PreviewPlaceholder.Visibility = Windows.UI.Xaml.Visibility.Collapsed;
+                PreviewWebView.Visibility = Windows.UI.Xaml.Visibility.Visible;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[WebView2] Failed to ensure core or navigate: {ex.Message}");
+                HidePreview($"Failed to generate preview: {ex.Message}");
+            }
         }
 
         protected override void HidePreview(string placeholderText)
         {
             PreviewPlaceholder.Text = placeholderText;
-            PreviewWebView.Visibility = Windows.UI.Xaml.Visibility.Collapsed;
-            PreviewPlaceholder.Visibility = Windows.UI.Xaml.Visibility.Visible;
+            PreviewWebView.Visibility = Visibility.Collapsed;
+            PreviewPlaceholder.Visibility = Visibility.Visible;
         }
 
         // --- Text Formatting ---
@@ -169,7 +179,10 @@ namespace _1809_UWP.Pages
         {
             var dialog = new SymbolPickerDialog();
             var result = await dialog.ShowAsync();
-            if (result == ContentDialogResult.Primary && !string.IsNullOrEmpty(dialog.SelectedEntity))
+            if (
+                result == ContentDialogResult.Primary
+                && !string.IsNullOrEmpty(dialog.SelectedEntity)
+            )
             {
                 InsertWikitext(dialog.SelectedEntity);
             }

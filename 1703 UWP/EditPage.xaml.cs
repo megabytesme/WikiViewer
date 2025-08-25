@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Threading.Tasks;
+using WikiViewer.Core;
 using WikiViewer.Shared.Uwp.Controls;
 using WikiViewer.Shared.Uwp.Pages;
 using Windows.UI.Xaml;
@@ -8,9 +10,14 @@ namespace _1703_UWP.Pages
 {
     public sealed partial class EditPage : EditPageBase
     {
-        public EditPage() => this.InitializeComponent();
+        public EditPage()
+        {
+            this.InitializeComponent();
+            AttachEditorFunctionality();
+            LoadEditorThemePreference();
+        }
 
-        protected override TextBox WikitextEditorTextBox => WikitextEditor;
+        protected override RichEditBox WikitextEditorTextBox => WikitextEditor;
         protected override TextBlock PageTitleTextBlock => new TextBlock();
         protected override TextBlock LoadingTextBlock => LoadingText;
         protected override Grid LoadingOverlayGrid => LoadingOverlay;
@@ -18,18 +25,57 @@ namespace _1703_UWP.Pages
         protected override Button SaveAppBarButton => SaveButton;
         protected override Button PreviewAppBarButton => PreviewButton;
 
-        protected override void ShowPreview(string htmlContent)
+        protected override async Task ShowPreview(string htmlContent)
         {
             PreviewWebView.NavigateToString(htmlContent);
-            PreviewPlaceholder.Visibility = Windows.UI.Xaml.Visibility.Collapsed;
-            PreviewWebView.Visibility = Windows.UI.Xaml.Visibility.Visible;
+            PreviewPlaceholder.Visibility = Visibility.Collapsed;
+            PreviewWebView.Visibility = Visibility.Visible;
+            await Task.CompletedTask;
         }
 
         protected override void HidePreview(string placeholderText)
         {
             PreviewPlaceholder.Text = placeholderText;
-            PreviewWebView.Visibility = Windows.UI.Xaml.Visibility.Collapsed;
-            PreviewPlaceholder.Visibility = Windows.UI.Xaml.Visibility.Visible;
+            PreviewWebView.Visibility = Visibility.Collapsed;
+            PreviewPlaceholder.Visibility = Visibility.Visible;
+        }
+
+        protected void LightModeToggle_Click(object sender, RoutedEventArgs e)
+        {
+            bool isLight = (sender as ToggleMenuFlyoutItem)?.IsChecked ?? false;
+
+            LightModeToggleMenuBarItem.IsChecked = isLight;
+            LightModeToggleMenuItem.IsChecked = isLight;
+
+            UpdateEditorTheme(isLight);
+
+        }
+
+        private void UpdateEditorTheme(bool isLight)
+        {
+            if (WikitextEditorTextBox == null) return;
+
+            if (isLight)
+            {
+                WikitextEditorTextBox.RequestedTheme = ElementTheme.Light;
+            }
+            else
+            {
+                WikitextEditorTextBox.RequestedTheme = ElementTheme.Dark;
+            }
+
+            AppSettings.EditorTheme = isLight ? ElementTheme.Light : ElementTheme.Default;
+        }
+
+        private void LoadEditorThemePreference()
+        {
+            var savedTheme = AppSettings.EditorTheme;
+            bool isLight = (savedTheme == ElementTheme.Light);
+
+            if (LightModeToggleMenuBarItem != null) LightModeToggleMenuBarItem.IsChecked = isLight;
+            if (LightModeToggleMenuItem != null) LightModeToggleMenuItem.IsChecked = isLight;
+
+            UpdateEditorTheme(isLight);
         }
 
         // --- Text Formatting ---
@@ -106,7 +152,7 @@ namespace _1703_UWP.Pages
 
         private void InsertCite_Click(object sender, RoutedEventArgs e) =>
             InsertWikitext("<cite>", "</cite>", "https://www.example.com");
-
+        
         // --- Signatures ---
         private void InsertSignature3_Click(object sender, RoutedEventArgs e) =>
             InsertWikitext("~~~");
@@ -165,7 +211,10 @@ namespace _1703_UWP.Pages
         {
             var dialog = new SymbolPickerDialog();
             var result = await dialog.ShowAsync();
-            if (result == ContentDialogResult.Primary && !string.IsNullOrEmpty(dialog.SelectedEntity))
+            if (
+                result == ContentDialogResult.Primary
+                && !string.IsNullOrEmpty(dialog.SelectedEntity)
+            )
             {
                 InsertWikitext(dialog.SelectedEntity);
             }
