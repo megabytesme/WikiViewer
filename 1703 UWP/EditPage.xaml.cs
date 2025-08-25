@@ -5,6 +5,8 @@ using WikiViewer.Shared.Uwp.Controls;
 using WikiViewer.Shared.Uwp.Pages;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Controls.Primitives;
+using Windows.UI.Xaml.Input;
 
 namespace _1703_UWP.Pages
 {
@@ -15,6 +17,19 @@ namespace _1703_UWP.Pages
             this.InitializeComponent();
             AttachEditorFunctionality();
             LoadEditorThemePreference();
+            WikitextEditor.IsRightTapEnabled = true;
+            WikitextEditor.ContextMenuOpening += (s, e) => e.Handled = true;
+            WikitextEditor.AddHandler(
+                UIElement.RightTappedEvent,
+                new RightTappedEventHandler(WikitextEditor_ContextMenu),
+                handledEventsToo: true
+            );
+
+            WikitextEditor.AddHandler(
+                UIElement.HoldingEvent,
+                new HoldingEventHandler(WikitextEditor_ContextMenu),
+                handledEventsToo: true
+            );
         }
 
         protected override RichEditBox WikitextEditorTextBox => WikitextEditor;
@@ -48,12 +63,12 @@ namespace _1703_UWP.Pages
             LightModeToggleMenuItem.IsChecked = isLight;
 
             UpdateEditorTheme(isLight);
-
         }
 
         private void UpdateEditorTheme(bool isLight)
         {
-            if (WikitextEditorTextBox == null) return;
+            if (WikitextEditorTextBox == null)
+                return;
 
             if (isLight)
             {
@@ -72,8 +87,10 @@ namespace _1703_UWP.Pages
             var savedTheme = AppSettings.EditorTheme;
             bool isLight = (savedTheme == ElementTheme.Light);
 
-            if (LightModeToggleMenuBarItem != null) LightModeToggleMenuBarItem.IsChecked = isLight;
-            if (LightModeToggleMenuItem != null) LightModeToggleMenuItem.IsChecked = isLight;
+            if (LightModeToggleMenuBarItem != null)
+                LightModeToggleMenuBarItem.IsChecked = isLight;
+            if (LightModeToggleMenuItem != null)
+                LightModeToggleMenuItem.IsChecked = isLight;
 
             UpdateEditorTheme(isLight);
         }
@@ -152,7 +169,7 @@ namespace _1703_UWP.Pages
 
         private void InsertCite_Click(object sender, RoutedEventArgs e) =>
             InsertWikitext("<cite>", "</cite>", "https://www.example.com");
-        
+
         // --- Signatures ---
         private void InsertSignature3_Click(object sender, RoutedEventArgs e) =>
             InsertWikitext("~~~");
@@ -218,6 +235,31 @@ namespace _1703_UWP.Pages
             {
                 InsertWikitext(dialog.SelectedEntity);
             }
+        }
+
+        private void WikitextEditor_ContextMenu(object sender, RightTappedRoutedEventArgs e)
+        {
+            FlyoutBase.ShowAttachedFlyout((FrameworkElement)sender);
+        }
+
+        private void WikitextEditor_ContextMenu(object sender, HoldingRoutedEventArgs e)
+        {
+            FlyoutBase.ShowAttachedFlyout((FrameworkElement)sender);
+        }
+
+        private void Cut_Click(object sender, RoutedEventArgs e)
+        {
+            WikitextEditor.Document.Selection.Cut();
+        }
+
+        private void Copy_Click(object sender, RoutedEventArgs e)
+        {
+            WikitextEditor.Document.Selection.Copy();
+        }
+
+        private void Paste_Click(object sender, RoutedEventArgs e)
+        {
+            WikitextEditor.Document.Selection.Paste(0);
         }
     }
 }

@@ -78,6 +78,10 @@
                 <MenuFlyoutItem Text="Username &amp; Timestamp (~~~~)" Click="InsertSignature4_Click" />
                 <MenuFlyoutItem Text="Timestamp Only (~~~~~)" Click="InsertSignature5_Click" />
             </MenuFlyoutSubItem>
+            <MenuFlyoutSeparator />
+            <MenuFlyoutItem Text="Cut" Click="Cut_Click" />
+            <MenuFlyoutItem Text="Copy" Click="Copy_Click" />
+            <MenuFlyoutItem Text="Paste" Click="Paste_Click" />
         </MenuFlyout>
     </Page.Resources>
 
@@ -94,7 +98,7 @@
                 <ColumnDefinition Width="12"/>
                 <ColumnDefinition Width="*" MinWidth="150"/>
             </Grid.ColumnDefinitions>
-            <RichEditBox x:Name="WikitextEditor" Grid.Column="0" AcceptsReturn="True" TextWrapping="Wrap" Padding="12" FontFamily="Consolas, Courier New" PlaceholderText="Loading Wikitext..." BorderThickness="0,0,1,0" ContextFlyout="{StaticResource SharedEditorMenu}" />
+            <RichEditBox x:Name="WikitextEditor" Grid.Column="0" AcceptsReturn="True" TextWrapping="Wrap" Padding="12" FontFamily="Consolas, Courier New" PlaceholderText="Loading Wikitext..." BorderThickness="0,0,1,0" RightTapped="WikitextEditor_ContextMenu" Holding="WikitextEditor_ContextMenu" FlyoutBase.AttachedFlyout="{StaticResource SharedEditorMenu}" />
             <Rectangle Grid.Column="1" Fill="{ThemeResource SystemControlForegroundBaseLowBrush}" PointerPressed="Splitter_PointerPressed" PointerMoved="Splitter_PointerMoved" PointerReleased="Splitter_PointerReleased" PointerEntered="Splitter_PointerEntered" PointerExited="Splitter_PointerExited"/>
             <Grid Grid.Column="2">
                 <WebView x:Name="PreviewWebView" Visibility="Collapsed"/>
