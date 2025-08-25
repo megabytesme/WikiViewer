@@ -4,6 +4,7 @@ using System.Numerics;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using WikiViewer.Shared.Uwp.Converters;
 using Windows.Foundation;
 using Windows.Storage;
 using Windows.UI.Composition;
@@ -11,6 +12,7 @@ using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Hosting;
 using Windows.UI.Xaml.Media;
+using Windows.UI.Xaml.Media.Animation;
 using Windows.UI.Xaml.Media.Imaging;
 
 namespace WikiViewer.Shared.Uwp.Helpers
@@ -59,6 +61,7 @@ namespace WikiViewer.Shared.Uwp.Helpers
             public float MaxPx;
             public float OffsetPx;
             public readonly Random Rand = new Random();
+            public Uri ImageUri { get; set; }
         }
 
         private static readonly DependencyProperty StateProperty =
@@ -72,6 +75,21 @@ namespace WikiViewer.Shared.Uwp.Helpers
         private static State GetState(DependencyObject d) => (State)d.GetValue(StateProperty);
 
         private static void SetState(DependencyObject d, State s) => d.SetValue(StateProperty, s);
+
+        private static bool IsSvgUri(string uri) =>
+            !string.IsNullOrEmpty(uri) && uri.EndsWith(".svg", StringComparison.OrdinalIgnoreCase);
+
+        private static bool IsSvgUri(Uri uri) =>
+            uri != null && uri.AbsolutePath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase);
+
+        private static void ReplaceImageWithWebView(FrameworkElement container, WebView webView)
+        {
+            if (container is Panel panel)
+            {
+                panel.Children.Clear();
+                panel.Children.Add(webView);
+            }
+        }
 
         private static void OnSourceUriChanged(
             DependencyObject d,
@@ -102,7 +120,7 @@ namespace WikiViewer.Shared.Uwp.Helpers
 
             var state = new State { Image = image };
             SetState(image, state);
-
+            state.ImageUri = new Uri(uri);
             state.Container = image.Parent as FrameworkElement ?? image;
             ApplyClip(state.Container);
 
@@ -113,9 +131,21 @@ namespace WikiViewer.Shared.Uwp.Helpers
             image.Unloaded += Image_Unloaded;
 
             Log($"SourceUri set to {uri}", state);
-
+#if UWP_1809
             if (uri.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
                 image.Source = new SvgImageSource(new Uri(uri));
+#else
+            if (uri.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
+            {
+                var webView = new WebView(WebViewExecutionMode.SeparateThread);
+                WikiViewer.Shared.Uwp.Helpers.AnimatedImageLoader.SetSourceObject(
+                    webView,
+                    new NotifyTaskCompletion<string>(Task.FromResult(uri))
+                );
+
+                ReplaceImageWithWebView(state.Container, webView);
+            }
+#endif
             else
                 image.Source = new BitmapImage(new Uri(uri));
 
@@ -238,6 +268,7 @@ namespace WikiViewer.Shared.Uwp.Helpers
                 s.ImagePxW = bs.PixelWidth;
                 s.ImagePxH = bs.PixelHeight;
             }
+#if UWP_1809
             else if (s.Image?.Source is SvgImageSource svg && svg.UriSource != null)
             {
                 var aspect = await GetSvgAspectRatioAsync(svg.UriSource);
@@ -252,6 +283,21 @@ namespace WikiViewer.Shared.Uwp.Helpers
                     s.ImagePxH = s.ContainerH > 0 ? s.ContainerH : 200;
                 }
             }
+#else
+            else if (IsSvgUri(s.ImageUri))
+            {
+                var webView = new WebView(WebViewExecutionMode.SeparateThread);
+                AnimatedImageLoader.SetSourceObject(
+                    webView,
+                    new NotifyTaskCompletion<string>(Task.FromResult(s.ImageUri.ToString()))
+                );
+
+                ReplaceImageWithWebView(s.Container, webView);
+
+                s.ImagePxW = s.ContainerW > 0 ? s.ContainerW : 300;
+                s.ImagePxH = s.ContainerH > 0 ? s.ContainerH : 200;
+            }
+#endif
             s.ReadyImage = s.ImagePxW > 0 && s.ImagePxH > 0;
             Log($"ImagePixels Primed (async): px={s.ImagePxW}x{s.ImagePxH}", s);
             MaybeInit(s);
@@ -340,8 +386,12 @@ namespace WikiViewer.Shared.Uwp.Helpers
 
             s.OffsetPx = s.MaxPx / 2f;
 
-            if (s.Visual == null)
-                s.Visual = ElementCompositionPreview.GetElementVisual(s.Image);
+            var transform = s.Image.RenderTransform as TranslateTransform;
+            if (transform == null)
+            {
+                transform = new TranslateTransform();
+                s.Image.RenderTransform = transform;
+            }
 
             if (forceReinit)
             {
@@ -363,15 +413,13 @@ namespace WikiViewer.Shared.Uwp.Helpers
 
         private static async Task RunLoopAsync(State s)
         {
-            var compositor = s.Visual?.Compositor;
-            if (compositor == null)
-                return;
             var token = s.Cts.Token;
 
+            var transform = (TranslateTransform)s.Image.RenderTransform;
             if (s.IsHorizontal)
-                s.Visual.Offset = new Vector3(-s.OffsetPx, 0, 0);
+                transform.X = -s.OffsetPx;
             else
-                s.Visual.Offset = new Vector3(0, -s.OffsetPx, 0);
+                transform.Y = -s.OffsetPx;
 
             while (!token.IsCancellationRequested)
             {
@@ -380,19 +428,20 @@ namespace WikiViewer.Shared.Uwp.Helpers
                     target = (s.OffsetPx > s.MaxPx / 2) ? 0 : s.MaxPx;
 
                 var duration = TimeSpan.FromSeconds(s.Rand.Next(4, 11));
-                var easing = compositor.CreateCubicBezierEasingFunction(
-                    new Vector2(0.42f, 0f),
-                    new Vector2(0.58f, 1f)
-                );
 
-                var anim = compositor.CreateScalarKeyFrameAnimation();
-                anim.InsertKeyFrame(1f, -target, easing);
-                anim.Duration = duration;
+                var da = new DoubleAnimation
+                {
+                    To = -target,
+                    Duration = new Duration(duration),
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut },
+                };
 
-                if (s.IsHorizontal)
-                    s.Visual.StartAnimation(nameof(s.Visual.Offset) + ".X", anim);
-                else
-                    s.Visual.StartAnimation(nameof(s.Visual.Offset) + ".Y", anim);
+                Storyboard.SetTarget(da, transform);
+                Storyboard.SetTargetProperty(da, s.IsHorizontal ? "X" : "Y");
+
+                var sb = new Storyboard();
+                sb.Children.Add(da);
+                sb.Begin();
 
                 s.OffsetPx = target;
 
