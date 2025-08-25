@@ -11,9 +11,9 @@ namespace WikiViewer.Core.Services
 {
     public static class FavouritesService
     {
-        private const string FavouritesFileName = "favourites_v2.json";
-        private const string PendingAddsFileName = "pending_adds_v2.json";
-        private const string PendingDeletesFileName = "pending_deletes_v2.json";
+        private const string FavouritesFileName = "favourites.json";
+        private const string PendingAddsFileName = "pending_adds.json";
+        private const string PendingDeletesFileName = "pending_deletes.json";
 
         private static Dictionary<Guid, HashSet<string>> _favouritesByWiki;
         private static Dictionary<Guid, HashSet<string>> _pendingAddsByWiki;
