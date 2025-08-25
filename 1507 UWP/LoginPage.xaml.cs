@@ -7,7 +7,7 @@ using WikiViewer.Shared.Uwp.Pages;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 
-namespace _1703_UWP
+namespace _1507_UWP
 {
     public sealed partial class LoginPage : LoginPageBase
     {

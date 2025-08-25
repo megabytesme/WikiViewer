@@ -44,7 +44,7 @@ namespace WikiViewer.Shared.Uwp
             Frame rootFrame = new Frame();
             Window.Current.Content = rootFrame;
 #if UWP_1703
-            rootFrame.Navigate(typeof(_1703_UWP.Pages.MainPage));
+            rootFrame.Navigate(typeof(_1507_UWP.Pages.MainPage));
 #else
             rootFrame.Navigate(typeof(_1809_UWP.Pages.MainPage));
 #endif
@@ -56,7 +56,7 @@ namespace WikiViewer.Shared.Uwp
             ReviewRequestService.IncrementLaunchCount();
             ReviewRequestService.Initialize();
 #if UWP_1703
-            ApiWorkerFactory = new _1703_UWP.Services.ApiWorkerFactory();
+            ApiWorkerFactory = new _1507_UWP.Services.ApiWorkerFactory();
 #else
             ApiWorkerFactory = new _1809_UWP.Services.ApiWorkerFactory();
 #endif
@@ -98,7 +98,7 @@ namespace WikiViewer.Shared.Uwp
                 if (rootFrame.Content == null)
                 {
 #if UWP_1703
-                    rootFrame.Navigate(typeof(_1703_UWP.Pages.MainPage), e.Arguments);
+                    rootFrame.Navigate(typeof(_1507_UWP.Pages.MainPage), e.Arguments);
 #else
                     rootFrame.Navigate(typeof(_1809_UWP.Pages.MainPage), e.Arguments);
 #endif

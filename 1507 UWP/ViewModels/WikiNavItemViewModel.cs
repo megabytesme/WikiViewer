@@ -2,7 +2,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using WikiViewer.Core.Models;
 
-namespace _1703_UWP.ViewModels
+namespace _1507_UWP.ViewModels
 {
     public class WikiNavItemViewModel : INotifyPropertyChanged
     {

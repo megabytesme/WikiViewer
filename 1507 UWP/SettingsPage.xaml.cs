@@ -2,7 +2,7 @@
 using WikiViewer.Shared.Uwp.Pages;
 using Windows.UI.Xaml.Controls;
 
-namespace _1703_UWP.Pages
+namespace _1507_UWP.Pages
 {
     public sealed partial class SettingsPage : SettingsPageBase
     {

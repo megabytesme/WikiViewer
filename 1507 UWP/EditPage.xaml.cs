@@ -8,7 +8,7 @@ using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Controls.Primitives;
 using Windows.UI.Xaml.Input;
 
-namespace _1703_UWP.Pages
+namespace _1507_UWP.Pages
 {
     public sealed partial class EditPage : EditPageBase
     {

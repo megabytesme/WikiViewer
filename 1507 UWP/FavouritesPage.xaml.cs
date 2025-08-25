@@ -5,7 +5,7 @@ using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Navigation;
 
-namespace _1703_UWP.Pages
+namespace _1507_UWP.Pages
 {
     public sealed partial class FavouritesPage : FavouritesPageBase
     {

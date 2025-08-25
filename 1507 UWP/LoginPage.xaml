@@ -1,5 +1,5 @@
 ﻿<local:LoginPageBase
-    x:Class="_1703_UWP.LoginPage"
+    x:Class="_1507_UWP.LoginPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:WikiViewer.Shared.Uwp.Pages"

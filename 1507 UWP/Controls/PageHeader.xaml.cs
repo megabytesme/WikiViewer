@@ -3,7 +3,7 @@ using Windows.Foundation;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 
-namespace _1703_UWP.Controls
+namespace _1507_UWP.Controls
 {
     public sealed partial class PageHeader : UserControl
     {

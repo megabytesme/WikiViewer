@@ -1,7 +1,7 @@
 using System;
 using Windows.UI.Xaml.Data;
 
-namespace _1703_UWP.Converters
+namespace _1507_UWP.Converters
 {
     public class BoolToExpandCollapseSymbolConverter : IValueConverter
     {

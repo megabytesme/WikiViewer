@@ -4,7 +4,7 @@ using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
 
-namespace _1703_UWP.Services
+namespace _1507_UWP.Services
 {
     public class ApiWorkerFactory : IApiWorkerFactory
     {

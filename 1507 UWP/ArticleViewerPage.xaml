@@ -1,9 +1,9 @@
 ﻿<local:ArticleViewerPageBase
-    x:Class="_1703_UWP.Pages.ArticleViewerPage"
+    x:Class="_1507_UWP.Pages.ArticleViewerPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:WikiViewer.Shared.Uwp.Pages"
-    xmlns:controls="using:_1703_UWP.Controls"
+    xmlns:controls="using:_1507_UWP.Controls"
     Background="Transparent">
 
     <Page.Resources>

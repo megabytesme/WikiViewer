@@ -4,7 +4,7 @@ using Windows.Foundation;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 
-namespace _1703_UWP
+namespace _1507_UWP
 {
     public sealed partial class WikiDetailPage : WikiDetailPageBase
     {

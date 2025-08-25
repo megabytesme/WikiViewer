@@ -1,13 +1,13 @@
 ﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
-using _1703_UWP.ViewModels;
+using _1507_UWP.ViewModels;
 using WikiViewer.Core.Models;
 using WikiViewer.Shared.Uwp.Pages;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 
-namespace _1703_UWP.Pages
+namespace _1507_UWP.Pages
 {
     public sealed partial class MainPage : MainPageBase
     {
@@ -31,7 +31,7 @@ namespace _1703_UWP.Pages
 
         protected override Type GetFavouritesPageType() => typeof(FavouritesPage);
 
-        protected override Type GetLoginPageType() => typeof(_1703_UWP.LoginPage);
+        protected override Type GetLoginPageType() => typeof(_1507_UWP.LoginPage);
 
         protected override Type GetSettingsPageType() => typeof(SettingsPage);
 

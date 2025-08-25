@@ -30,7 +30,7 @@
   <Applications>
     <Application Id="App"
       Executable="$targetnametoken$.exe"
-      EntryPoint="_1703_UWP.App">
+      EntryPoint="_1507_UWP.App">
       <uap:VisualElements
         DisplayName="Wiki Viewer"
         Square150x150Logo="Assets\Square150x150Logo.png"

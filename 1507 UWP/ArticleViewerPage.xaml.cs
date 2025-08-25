@@ -9,7 +9,7 @@ using Windows.UI.ViewManagement;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 
-namespace _1703_UWP.Pages
+namespace _1507_UWP.Pages
 {
     public sealed partial class ArticleViewerPage
     {

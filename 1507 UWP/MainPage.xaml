@@ -1,11 +1,11 @@
 ﻿<local:MainPageBase
-    x:Class="_1703_UWP.Pages.MainPage"
+    x:Class="_1507_UWP.Pages.MainPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:WikiViewer.Shared.Uwp.Pages"
-    xmlns:controls="using:_1703_UWP.Controls"
-    xmlns:viewModels="using:_1703_UWP.ViewModels"
-    xmlns:converters="using:_1703_UWP.Converters">
+    xmlns:controls="using:_1507_UWP.Controls"
+    xmlns:viewModels="using:_1507_UWP.ViewModels"
+    xmlns:converters="using:_1507_UWP.Converters">
 
     <Page.Resources>
         <converters:BoolToExpandCollapseSymbolConverter x:Key="ExpandCollapseConverter" />

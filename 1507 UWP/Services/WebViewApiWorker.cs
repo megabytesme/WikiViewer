@@ -15,7 +15,7 @@ using Windows.Web;
 using Windows.Web.Http;
 using Windows.Web.Http.Filters;
 
-namespace _1703_UWP.Services
+namespace _1507_UWP.Services
 {
     public class WebViewApiWorker : IApiWorker
     {
