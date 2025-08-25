@@ -11,7 +11,7 @@ namespace WikiViewer.Core
         High,
         Double,
         Extreme,
-        Unlimited
+        Unlimited,
     }
 
     public static class AppSettings
@@ -23,6 +23,7 @@ namespace WikiViewer.Core
         private const string MaxConcurrentDownloadsKey = "MaxConcurrentDownloadsLevel";
         private const string ProxyDisclaimerKey = "HasAcceptedProxyDisclaimer";
         private const string EditorThemeKey = "EditorTheme";
+        private const string ShowCssRefreshButtonKey = "ShowCssRefreshButton";
 
         private const string DefaultMainPageName = "Main Page";
 
@@ -46,7 +47,12 @@ namespace WikiViewer.Core
 
         public static ConcurrencyLevel DownloadConcurrencyLevel
         {
-            get => (ConcurrencyLevel)SettingsProvider.GetValue(MaxConcurrentDownloadsKey, (int)ConcurrencyLevel.Medium);
+            get =>
+                (ConcurrencyLevel)
+                    SettingsProvider.GetValue(
+                        MaxConcurrentDownloadsKey,
+                        (int)ConcurrencyLevel.Medium
+                    );
             set => SettingsProvider.SetValue(MaxConcurrentDownloadsKey, (int)value);
         }
 
@@ -54,10 +60,21 @@ namespace WikiViewer.Core
         {
             get
             {
-                var themeName = SettingsProvider.GetValue(EditorThemeKey, ElementTheme.Default.ToString());
-                return Enum.TryParse(themeName, out ElementTheme parsedTheme) ? parsedTheme : ElementTheme.Default;
+                var themeName = SettingsProvider.GetValue(
+                    EditorThemeKey,
+                    ElementTheme.Default.ToString()
+                );
+                return Enum.TryParse(themeName, out ElementTheme parsedTheme)
+                    ? parsedTheme
+                    : ElementTheme.Default;
             }
             set => SettingsProvider.SetValue(EditorThemeKey, value.ToString());
+        }
+
+        public static bool ShowCssRefreshButton
+        {
+            get => SettingsProvider.GetValue(ShowCssRefreshButtonKey, false);
+            set => SettingsProvider.SetValue(ShowCssRefreshButtonKey, value);
         }
 
         public static int MaxConcurrentDownloads

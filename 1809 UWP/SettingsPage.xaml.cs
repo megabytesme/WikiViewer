@@ -17,6 +17,7 @@ namespace _1809_UWP.Pages
         protected override Button ClearCacheButtonControl => this.ClearCacheButton;
         protected override ListView WikiListViewControl => this.WikiListView;
         protected override TextBlock ConcurrencyDescriptionTextControl => this.ConcurrencyDescriptionText;
+        protected override ToggleSwitch ShowCssRefreshButtonToggleControl => ShowCssRefreshToggle;
 
         protected override Type GetWikiDetailPageType() => typeof(WikiDetailPage);
     }

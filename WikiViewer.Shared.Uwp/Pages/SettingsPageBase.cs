@@ -24,6 +24,7 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected abstract Button ClearCacheButtonControl { get; }
         protected abstract ListView WikiListViewControl { get; }
         protected abstract TextBlock ConcurrencyDescriptionTextControl { get; }
+        protected abstract ToggleSwitch ShowCssRefreshButtonToggleControl { get; }
 
         public SettingsPageBase()
         {
@@ -52,11 +53,21 @@ namespace WikiViewer.Shared.Uwp.Pages
             LoadWikis();
             WikiListViewControl.ItemsSource = Wikis;
             WikiManager.WikisChanged += OnWikisChanged;
+
+            ShowCssRefreshButtonToggleControl.IsOn = AppSettings.ShowCssRefreshButton;
+            ShowCssRefreshButtonToggleControl.Toggled += ShowCssRefreshButtonToggle_Toggled;
         }
 
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
             WikiManager.WikisChanged -= OnWikisChanged;
+            ShowCssRefreshButtonToggleControl.Toggled -= ShowCssRefreshButtonToggle_Toggled;
+        }
+
+        protected void ShowCssRefreshButtonToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            var toggle = sender as ToggleSwitch;
+            AppSettings.ShowCssRefreshButton = toggle.IsOn;
         }
 
         private void PopulateConcurrencyComboBox()

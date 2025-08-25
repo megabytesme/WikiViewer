@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using HtmlAgilityPack;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using WikiViewer.Core;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
 using WikiViewer.Shared.Uwp.Services;
@@ -45,6 +46,7 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected abstract string GetImageUpdateScript(string originalUrl, string localPath);
         protected abstract Type GetLoginPageType();
         protected abstract Type GetCreateAccountPageType();
+        protected abstract void UpdateRefreshButtonVisibility();
 
         public ArticleViewerPageBase()
         {
@@ -216,6 +218,7 @@ namespace WikiViewer.Shared.Uwp.Pages
 
             InitializePlatformControls();
             _isInitialized = true;
+            UpdateRefreshButtonVisibility();
             if (
                 _pageWikiContext != null
                 && (

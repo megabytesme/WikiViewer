@@ -2,6 +2,7 @@
 using System.Threading.Tasks;
 using Microsoft.Web.WebView2.Core;
 using Newtonsoft.Json;
+using WikiViewer.Core;
 using WikiViewer.Shared.Uwp.Pages;
 using WikiViewer.Shared.Uwp.Services;
 using Windows.Foundation;
@@ -213,6 +214,14 @@ namespace _1809_UWP.Pages
             }
 
             await Windows.System.Launcher.LaunchUriAsync(uri);
+        }
+
+        protected override void UpdateRefreshButtonVisibility()
+        {
+            RefreshAppBarButton.Visibility =
+                AppSettings.ShowCssRefreshButton
+                    ? Windows.UI.Xaml.Visibility.Visible
+                    : Windows.UI.Xaml.Visibility.Collapsed;
         }
     }
 }
