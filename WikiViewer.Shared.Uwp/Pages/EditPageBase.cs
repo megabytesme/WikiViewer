@@ -26,45 +26,101 @@ namespace WikiViewer.Shared.Uwp.Pages
         private double initialX;
         private GridLength leftColInitialWidth;
 
-        private readonly List<(string Open, string Close)> _wikitextPairs = new List<(
-            string,
-            string
-        )>
+        private class WikitextPair
         {
-            ("======", "======"),
-            ("=====", "====="),
-            ("====", "===="),
-            ("===", "==="),
-            ("==", "=="),
-            ("'''''", "'''''"),
-            ("'''", "'''"),
-            ("''", "''"),
-            ("{{", "}}"),
-            ("[[", "]]"),
-            ("<!--", "-->"),
-            ("<ins>", "</ins>"),
-            ("<del>", "</del>"),
-            ("<sup>", "</sup>"),
-            ("<sub>", "</sub>"),
-            ("<small>", "</small>"),
-            ("<span style=\"font-size:larger;\">", "</span>"),
-            ("<ref>", "</ref>"),
-            ("<cite>", "</cite>"),
-            ("<nowiki>", "</nowiki>"),
-            ("<code>", "</code>"),
-            ("<pre>", "</pre>"),
-            ("<blockquote>", "</blockquote>"),
-            ("<u>", "</u>"),
-            ("<s>", "</s>"),
-            ("{", "}"),
-            ("[", "]"),
-            ("(", ")"),
+            public string Name { get; }
+            public System.Text.RegularExpressions.Regex OpenPattern { get; }
+            public System.Text.RegularExpressions.Regex ClosePattern { get; }
+            public string OpenString { get; }
+            public string CloseString { get; }
+            public bool IsRawContent { get; }
+
+            public WikitextPair(string open, string close, bool isRaw = false)
+            {
+                Name = open;
+                OpenPattern = new System.Text.RegularExpressions.Regex(
+                    System.Text.RegularExpressions.Regex.Escape(open),
+                    System.Text.RegularExpressions.RegexOptions.Compiled
+                );
+                ClosePattern = new System.Text.RegularExpressions.Regex(
+                    System.Text.RegularExpressions.Regex.Escape(close),
+                    System.Text.RegularExpressions.RegexOptions.Compiled
+                );
+                OpenString = open;
+                CloseString = close;
+                IsRawContent = isRaw;
+            }
+
+            public WikitextPair(
+                string name,
+                string openRegex,
+                string closeRegex,
+                string simpleOpen,
+                string simpleClose,
+                bool isRaw = false
+            )
+            {
+                Name = name;
+                OpenPattern = new System.Text.RegularExpressions.Regex(
+                    openRegex,
+                    System.Text.RegularExpressions.RegexOptions.Compiled
+                );
+                ClosePattern = new System.Text.RegularExpressions.Regex(
+                    closeRegex,
+                    System.Text.RegularExpressions.RegexOptions.Compiled
+                );
+                OpenString = simpleOpen;
+                CloseString = simpleClose;
+                IsRawContent = isRaw;
+            }
+        }
+
+        private readonly List<WikitextPair> _wikitextPairs = new List<WikitextPair>
+        {
+            new WikitextPair("======", "======"),
+            new WikitextPair("=====", "====="),
+            new WikitextPair("====", "===="),
+            new WikitextPair("===", "==="),
+            new WikitextPair("==", "=="),
+            new WikitextPair("'''", "'''"),
+            new WikitextPair("''", "''"),
+            new WikitextPair("ref", @"<ref\b[^>]*>", @"</ref>", "<ref>", "</ref>", isRaw: true),
+            new WikitextPair("<nowiki>", "</nowiki>", isRaw: true),
+            new WikitextPair("<code>", "</code>", isRaw: true),
+            new WikitextPair("<pre>", "</pre>", isRaw: true),
+            new WikitextPair("{{", "}}"),
+            new WikitextPair("[[", "]]"),
+            new WikitextPair("<!--", "-->"),
+            new WikitextPair("<ins>", "</ins>"),
+            new WikitextPair("<del>", "</del>"),
+            new WikitextPair("<sup>", "</sup>"),
+            new WikitextPair("<sub>", "</sub>"),
+            new WikitextPair("<small>", "</small>"),
+            new WikitextPair("<blockquote>", "</blockquote>"),
+            new WikitextPair("<u>", "</u>"),
+            new WikitextPair("<s>", "</s>"),
+            new WikitextPair("{", "}"),
+            new WikitextPair("[", "]"),
+            new WikitextPair("(", ")"),
         };
+
+        private class TokenMatch
+        {
+            public int Position;
+            public int Length;
+            public bool IsOpening;
+            public bool IsMatched;
+            public int MatchPosition;
+            public WikitextPair Pair { get; set; }
+        }
 
         private ITextRange _lastLeftBracket,
             _lastRightBracket;
         private readonly List<ITextRange> _lastUnmatchedRanges = new List<ITextRange>();
-        private DispatcherTimer _highlightTimer;
+        private bool _isUpdatingText = false;
+        private DispatcherTimer _highlightDebounceTimer;
+        private string _lastHighlightText = null;
+        private int _lastHighlightCaretPosition = -1;
 
         protected abstract RichEditBox WikitextEditorTextBox { get; }
         protected abstract TextBlock PageTitleTextBlock { get; }
@@ -79,7 +135,6 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
-
             ArticleNavigationParameter navParam = null;
             if (e.Parameter is string jsonParam)
             {
@@ -123,52 +178,257 @@ namespace WikiViewer.Shared.Uwp.Pages
             _ = LoadContentAsync();
         }
 
-        private class TokenMatch
+        private async Task LoadContentAsync()
         {
-            public int Position;
-            public int Length;
-            public bool IsOpening;
-            public bool IsMatched;
-            public int MatchPosition;
-            public (string Open, string Close) Pair;
+            try
+            {
+                var worker = SessionManager.GetAnonymousWorkerForWiki(_pageWikiContext);
+                await worker.InitializeAsync(_pageWikiContext.BaseUrl);
+                string url =
+                    $"{_pageWikiContext.ApiEndpoint}?action=query&prop=revisions&titles={Uri.EscapeDataString(_pageTitle)}&rvprop=content&format=json";
+                string json = await worker.GetJsonFromApiAsync(url);
+                var root = JObject.Parse(json);
+                var page = root["query"]["pages"].First.First;
+                var content = page["revisions"][0]["*"].ToString();
+                _originalWikitext = content;
+                WikitextEditorTextBox.Document.SetText(TextSetOptions.None, _originalWikitext);
+            }
+            catch (Exception ex)
+            {
+                LoadingTextBlock.Text = $"Error: {ex.Message}";
+                WikitextEditorTextBox.Document.SetText(
+                    TextSetOptions.None,
+                    $"Failed to load page content. Please go back and try again.\n\nError: {ex.Message}"
+                );
+                WikitextEditorTextBox.IsReadOnly = true;
+                SaveAppBarButton.IsEnabled = false;
+                PreviewAppBarButton.IsEnabled = false;
+            }
+            finally
+            {
+                LoadingOverlayGrid.Visibility = Visibility.Collapsed;
+                AttachEditorFunctionality();
+                UpdateBracketHighlighting();
+            }
         }
 
         protected void AttachEditorFunctionality()
         {
             if (WikitextEditorTextBox == null)
                 return;
-
-            if (_highlightTimer == null)
+            _highlightDebounceTimer = new DispatcherTimer
             {
-                _highlightTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
-                _highlightTimer.Tick += (sender, args) =>
+                Interval = TimeSpan.FromMilliseconds(150),
+            };
+            _highlightDebounceTimer.Tick += HighlightDebounceTimer_Tick;
+            WikitextEditorTextBox.TextChanged += Editor_TextChanged;
+            WikitextEditorTextBox.SelectionChanged += Editor_SelectionChanged;
+            Window.Current.CoreWindow.KeyDown += CoreWindow_KeyDown;
+        }
+
+        protected override void OnNavigatingFrom(NavigatingCancelEventArgs e)
+        {
+            Window.Current.CoreWindow.KeyDown -= CoreWindow_KeyDown;
+            base.OnNavigatingFrom(e);
+        }
+
+        private void CoreWindow_KeyDown(CoreWindow sender, KeyEventArgs e)
+        {
+            if (FocusManager.GetFocusedElement() != WikitextEditorTextBox) return;
+
+            var coreWindow = Window.Current.CoreWindow;
+            var ctrlState = coreWindow.GetKeyState(Windows.System.VirtualKey.Control);
+            bool isCtrlDown = (ctrlState & CoreVirtualKeyStates.Down) == CoreVirtualKeyStates.Down;
+
+            if (isCtrlDown)
+            {
+                if (e.VirtualKey == Windows.System.VirtualKey.Z)
                 {
-                    _highlightTimer.Stop();
-                    UpdateBracketHighlighting();
-                };
+                    var document = WikitextEditorTextBox.Document;
+                    if (document.CanUndo())
+                    {
+                        _isUpdatingText = true;
+                        e.Handled = true;
+
+                        document.GetText(TextGetOptions.None, out string initialText);
+                        while (document.CanUndo())
+                        {
+                            document.Undo();
+                            document.GetText(TextGetOptions.None, out string newText);
+                            if (initialText != newText)
+                            {
+                                break;
+                            }
+                        }
+                    }
+                    return;
+                }
+
+                if (e.VirtualKey == Windows.System.VirtualKey.Y)
+                {
+                    var document = WikitextEditorTextBox.Document;
+                    if (document.CanRedo())
+                    {
+                        _isUpdatingText = true;
+                        e.Handled = true;
+
+                        document.GetText(TextGetOptions.None, out string initialText);
+                        while (document.CanRedo())
+                        {
+                            document.Redo();
+                            document.GetText(TextGetOptions.None, out string newText);
+                            if (initialText != newText)
+                            {
+                                break;
+                            }
+                        }
+                    }
+                    return;
+                }
             }
 
-            WikitextEditorTextBox.SelectionChanged += (s, e) =>
+            if (e.VirtualKey == Windows.System.VirtualKey.Back && !_isUpdatingText)
             {
-                _highlightTimer.Stop();
-                _highlightTimer.Start();
-            };
+                var document = WikitextEditorTextBox.Document;
+                var selection = document.Selection;
+                if (selection.Length > 0) return;
+                var caretPos = selection.StartPosition;
+                document.GetText(TextGetOptions.None, out var text);
+                if (caretPos == 0 || caretPos >= text.Length) return;
+                foreach (var pair in _wikitextPairs)
+                {
+                    if (caretPos >= pair.OpenString.Length && text.Substring(caretPos - pair.OpenString.Length, pair.OpenString.Length) == pair.OpenString &&
+                        caretPos + pair.CloseString.Length <= text.Length && text.Substring(caretPos, pair.CloseString.Length) == pair.CloseString)
+                    {
+                        try
+                        {
+                            _isUpdatingText = true;
+                            document.BeginUndoGroup();
+                            var rangeToDelete = document.GetRange(caretPos - pair.OpenString.Length, caretPos + pair.CloseString.Length);
+                            rangeToDelete.Text = string.Empty;
+                        }
+                        finally { document.EndUndoGroup(); }
+                        e.Handled = true;
+                        return;
+                    }
+                }
+            }
+        }
 
-            WikitextEditorTextBox.TextChanged += (s, e) =>
+        private void HighlightDebounceTimer_Tick(object sender, object e)
+        {
+            _highlightDebounceTimer.Stop();
+            if (_isUpdatingText)
+                return;
+
+            WikitextEditorTextBox.Document.GetText(TextGetOptions.None, out var currentText);
+            var currentCaretPosition = WikitextEditorTextBox.Document.Selection.StartPosition;
+
+            if (
+                currentText == _lastHighlightText
+                && currentCaretPosition == _lastHighlightCaretPosition
+            )
             {
-                _highlightTimer.Stop();
-                _highlightTimer.Start();
-            };
+                return;
+            }
+
+            try
+            {
+                _isUpdatingText = true;
+                WikitextEditorTextBox.Document.BeginUndoGroup();
+                UpdateBracketHighlighting();
+                _lastHighlightText = currentText;
+                _lastHighlightCaretPosition = currentCaretPosition;
+            }
+            finally
+            {
+                WikitextEditorTextBox.Document.EndUndoGroup();
+                _isUpdatingText = false;
+            }
+        }
+
+        private void Editor_TextChanged(object sender, RoutedEventArgs e)
+        {
+            if (_isUpdatingText)
+            {
+                _isUpdatingText = false;
+                return;
+            }
+            HandleAutoCompletion();
+            _highlightDebounceTimer.Start();
+        }
+
+        private void Editor_SelectionChanged(object sender, RoutedEventArgs e)
+        {
+            _highlightDebounceTimer.Start();
+        }
+
+        private void HandleAutoCompletion()
+        {
+            var document = WikitextEditorTextBox.Document;
+            var selection = document.Selection;
+            var caretPos = selection.StartPosition;
+            if (selection.Length > 0 || caretPos == 0)
+                return;
+            document.GetText(TextGetOptions.None, out var text);
+
+            var openTokens = _wikitextPairs
+                .Where(p => p.OpenString != p.CloseString)
+                .Select(p => p.OpenString)
+                .OrderByDescending(s => s.Length)
+                .ToList();
+
+            foreach (var openToken in openTokens)
+            {
+                if (
+                    caretPos >= openToken.Length
+                    && text.Substring(caretPos - openToken.Length, openToken.Length) == openToken
+                )
+                {
+                    var pair = _wikitextPairs.First(p => p.OpenString == openToken);
+                    string requiredCloser = pair.CloseString;
+                    string textAfterCursor =
+                        text.Length > caretPos ? text.Substring(caretPos) : string.Empty;
+
+                    if (!textAfterCursor.StartsWith(requiredCloser))
+                    {
+                        int matchingChars = 0;
+                        while (
+                            matchingChars < requiredCloser.Length
+                            && matchingChars < textAfterCursor.Length
+                            && requiredCloser[matchingChars] == textAfterCursor[matchingChars]
+                        )
+                        {
+                            matchingChars++;
+                        }
+                        string missingCloserPart = requiredCloser.Substring(matchingChars);
+
+                        if (!string.IsNullOrEmpty(missingCloserPart))
+                        {
+                            try
+                            {
+                                _isUpdatingText = true;
+                                document.BeginUndoGroup();
+                                selection.TypeText(missingCloserPart);
+                                selection.StartPosition = caretPos;
+                                selection.EndPosition = caretPos;
+                            }
+                            finally
+                            {
+                                document.EndUndoGroup();
+                            }
+                        }
+                    }
+                    return;
+                }
+            }
         }
 
         private void UpdateBracketHighlighting()
         {
             ClearBracketHighlight();
-
             var defaultBackgroundColor = Colors.Transparent;
-
             WikitextEditorTextBox.Document.GetText(TextGetOptions.None, out var text);
-
             foreach (var range in _lastUnmatchedRanges)
             {
                 if (range.StartPosition < text.Length)
@@ -180,7 +440,6 @@ namespace WikiViewer.Shared.Uwp.Pages
 
             if (string.IsNullOrEmpty(text))
                 return;
-
             var allTokens = ScanDocumentForAllTokens(text);
 
             foreach (var t in allTokens.Where(t => !t.IsMatched))
@@ -202,106 +461,134 @@ namespace WikiViewer.Shared.Uwp.Pages
             if (tokenUnderCaret != null && tokenUnderCaret.IsMatched)
             {
                 var accentColor = (Color)Application.Current.Resources["SystemAccentColorLight2"];
-
                 _lastLeftBracket = PaintToken(
                     tokenUnderCaret.Position,
                     tokenUnderCaret.Length,
                     accentColor
                 );
 
-                var matchLength = tokenUnderCaret.IsOpening
-                    ? tokenUnderCaret.Pair.Close.Length
-                    : tokenUnderCaret.Pair.Open.Length;
-                _lastRightBracket = PaintToken(
-                    tokenUnderCaret.MatchPosition,
-                    matchLength,
-                    accentColor
+                var matchingToken = allTokens.FirstOrDefault(t =>
+                    t.Position == tokenUnderCaret.MatchPosition
                 );
+                if (matchingToken != null)
+                {
+                    _lastRightBracket = PaintToken(
+                        matchingToken.Position,
+                        matchingToken.Length,
+                        accentColor
+                    );
+                }
             }
         }
 
         private List<TokenMatch> ScanDocumentForAllTokens(string text)
         {
-            var allKnownTokens = _wikitextPairs
-                .SelectMany(p => new[] { p.Open, p.Close })
-                .Distinct()
-                .OrderByDescending(t => t.Length)
-                .ToList();
-
             var matches = new List<TokenMatch>();
             var stack = new Stack<TokenMatch>();
             int index = 0;
-
             while (index < text.Length)
             {
-                string matchedToken = null;
-
-                foreach (var tokenStr in allKnownTokens)
+                bool matchedThisTurn = false;
+                if (stack.Any() && stack.Peek().Pair.IsRawContent)
                 {
-                    if (
-                        index + tokenStr.Length <= text.Length
-                        && text.Substring(index, tokenStr.Length) == tokenStr
-                    )
+                    var currentPair = stack.Peek().Pair;
+                    var closeMatch = currentPair.ClosePattern.Match(text, index);
+                    if (closeMatch.Success && closeMatch.Index == index)
                     {
-                        matchedToken = tokenStr;
-                        break;
-                    }
-                }
-
-                if (matchedToken != null)
-                {
-                    var pair = _wikitextPairs.First(p =>
-                        p.Open == matchedToken || p.Close == matchedToken
-                    );
-                    bool isOpening = matchedToken == pair.Open;
-
-                    if (pair.Open == pair.Close)
-                    {
-                        isOpening = !(stack.Count > 0 && stack.Peek().Pair.Open == matchedToken);
-                    }
-
-                    if (IsTokenAllowedHere(text, index, matchedToken, isOpening))
-                    {
+                        var opener = stack.Pop();
                         var token = new TokenMatch
                         {
                             Position = index,
-                            Length = matchedToken.Length,
-                            IsOpening = isOpening,
-                            Pair = pair,
+                            Length = closeMatch.Length,
+                            IsOpening = false,
+                            Pair = currentPair,
+                            IsMatched = true,
+                            MatchPosition = opener.Position,
                         };
-
-                        if (isOpening)
-                        {
-                            stack.Push(token);
-                        }
-                        else if (stack.Count > 0 && stack.Peek().Pair.Open == pair.Open)
-                        {
-                            var opener = stack.Pop();
-                            opener.IsMatched = true;
-                            opener.MatchPosition = index;
-                            token.IsMatched = true;
-                            token.MatchPosition = opener.Position;
-                        }
+                        opener.IsMatched = true;
+                        opener.MatchPosition = index;
                         matches.Add(token);
+                        index += closeMatch.Length;
+                        matchedThisTurn = true;
                     }
-                    index += matchedToken.Length;
                 }
                 else
+                {
+                    foreach (var pair in _wikitextPairs)
+                    {
+                        var openMatch = pair.OpenPattern.Match(text, index);
+                        if (openMatch.Success && openMatch.Index == index)
+                        {
+                            bool isOpening = !(
+                                stack.Any()
+                                && stack.Peek().Pair.Name == pair.Name
+                                && pair.OpenPattern.ToString() == pair.ClosePattern.ToString()
+                            );
+                            if (isOpening)
+                            {
+                                var token = new TokenMatch
+                                {
+                                    Position = index,
+                                    Length = openMatch.Length,
+                                    IsOpening = true,
+                                    Pair = pair,
+                                };
+                                stack.Push(token);
+                                matches.Add(token);
+                            }
+                            else
+                            {
+                                var opener = stack.Pop();
+                                var token = new TokenMatch
+                                {
+                                    Position = index,
+                                    Length = openMatch.Length,
+                                    IsOpening = false,
+                                    Pair = pair,
+                                    IsMatched = true,
+                                    MatchPosition = opener.Position,
+                                };
+                                opener.IsMatched = true;
+                                opener.MatchPosition = index;
+                                matches.Add(token);
+                            }
+                            index += openMatch.Length;
+                            matchedThisTurn = true;
+                            break;
+                        }
+                        var closeMatch = pair.ClosePattern.Match(text, index);
+                        if (
+                            stack.Any()
+                            && stack.Peek().Pair.Name == pair.Name
+                            && closeMatch.Success
+                            && closeMatch.Index == index
+                        )
+                        {
+                            var opener = stack.Pop();
+                            var token = new TokenMatch
+                            {
+                                Position = index,
+                                Length = closeMatch.Length,
+                                IsOpening = false,
+                                Pair = pair,
+                                IsMatched = true,
+                                MatchPosition = opener.Position,
+                            };
+                            opener.IsMatched = true;
+                            opener.MatchPosition = index;
+                            matches.Add(token);
+                            index += closeMatch.Length;
+                            matchedThisTurn = true;
+                            break;
+                        }
+                    }
+                }
+                if (!matchedThisTurn)
                 {
                     index++;
                 }
             }
             return matches;
-        }
-
-        private bool IsTokenAllowedHere(string text, int index, string token, bool isOpening)
-        {
-            if (token.StartsWith("=") && isOpening)
-            {
-                return index == 0 || text[index - 1] == '\n' || text[index - 1] == '\r';
-            }
-
-            return true;
         }
 
         private void ClearBracketHighlight()
@@ -311,7 +598,6 @@ namespace WikiViewer.Shared.Uwp.Pages
                 _lastLeftBracket.CharacterFormat.BackgroundColor = defaultBackgroundColor;
             if (_lastRightBracket != null)
                 _lastRightBracket.CharacterFormat.BackgroundColor = defaultBackgroundColor;
-
             _lastLeftBracket = null;
             _lastRightBracket = null;
         }
@@ -319,8 +605,7 @@ namespace WikiViewer.Shared.Uwp.Pages
         private ITextRange PaintToken(int pos, int length, Color color)
         {
             var document = WikitextEditorTextBox.Document;
-            string fullText;
-            document.GetText(TextGetOptions.None, out fullText);
+            document.GetText(TextGetOptions.None, out string fullText);
             if (pos + length > fullText.Length)
                 return null;
             var range = document.GetRange(pos, pos + length);
@@ -361,39 +646,6 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected void Splitter_PointerExited(object sender, PointerRoutedEventArgs e) =>
             Window.Current.CoreWindow.PointerCursor = new CoreCursor(CoreCursorType.Arrow, 0);
 
-        private async Task LoadContentAsync()
-        {
-            try
-            {
-                var worker = SessionManager.GetAnonymousWorkerForWiki(_pageWikiContext);
-                await worker.InitializeAsync(_pageWikiContext.BaseUrl);
-                string url =
-                    $"{_pageWikiContext.ApiEndpoint}?action=query&prop=revisions&titles={Uri.EscapeDataString(_pageTitle)}&rvprop=content&format=json";
-                string json = await worker.GetJsonFromApiAsync(url);
-                var root = JObject.Parse(json);
-                var page = root["query"]["pages"].First.First;
-                var content = page["revisions"][0]["*"].ToString();
-                _originalWikitext = content;
-                WikitextEditorTextBox.Document.SetText(TextSetOptions.None, _originalWikitext);
-            }
-            catch (Exception ex)
-            {
-                LoadingTextBlock.Text = $"Error: {ex.Message}";
-                WikitextEditorTextBox.Document.SetText(
-                    TextSetOptions.None,
-                    $"Failed to load page content. Please go back and try again.\n\nError: {ex.Message}"
-                );
-                WikitextEditorTextBox.IsReadOnly = true;
-                SaveAppBarButton.IsEnabled = false;
-                PreviewAppBarButton.IsEnabled = false;
-            }
-            finally
-            {
-                LoadingOverlayGrid.Visibility = Visibility.Collapsed;
-                UpdateBracketHighlighting();
-            }
-        }
-
         protected async void PreviewButton_Click(object sender, RoutedEventArgs e)
         {
             PreviewAppBarButton.IsEnabled = false;
@@ -406,14 +658,12 @@ namespace WikiViewer.Shared.Uwp.Pages
                 IApiWorker worker =
                     account?.AuthenticatedApiWorker
                     ?? SessionManager.GetAnonymousWorkerForWiki(_pageWikiContext);
-
                 if (worker == null)
                 {
                     throw new InvalidOperationException(
                         "Could not obtain an API worker for the preview."
                     );
                 }
-
                 WikitextEditorTextBox.Document.GetText(TextGetOptions.None, out var wikitext);
                 string fullHtml = await WikitextParsingService.ParseWikitextToPreviewHtmlAsync(
                     wikitext,
@@ -439,7 +689,6 @@ namespace WikiViewer.Shared.Uwp.Pages
             var dialogResult = await dialog.ShowAsync();
             if (dialogResult != ContentDialogResult.Primary)
                 return;
-
             LoadingOverlayGrid.Visibility = Visibility.Visible;
             LoadingTextBlock.Text = "Saving...";
             try
@@ -449,7 +698,6 @@ namespace WikiViewer.Shared.Uwp.Pages
                 var account = AccountManager
                     .GetAccountsForWiki(_pageWikiContext.Id)
                     .FirstOrDefault(a => a.IsLoggedIn);
-
                 if (account != null)
                 {
                     var authService = new AuthenticationService(
@@ -491,7 +739,6 @@ namespace WikiViewer.Shared.Uwp.Pages
                     var parsed = JObject.Parse(resultJson);
                     saveSuccess = parsed?["edit"]?["result"]?.ToString() == "Success";
                 }
-
                 if (saveSuccess)
                 {
                     _originalWikitext = wikitext;
@@ -543,7 +790,6 @@ namespace WikiViewer.Shared.Uwp.Pages
             var selection = document.Selection;
             if (selection == null)
                 return;
-
             if (selection.Length > 0)
             {
                 selection.Text = $"{prefix}{selection.Text}{suffix}";
