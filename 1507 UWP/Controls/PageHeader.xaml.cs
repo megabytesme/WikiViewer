@@ -45,11 +45,29 @@ namespace _1507_UWP.Controls
             this.InitializeComponent();
             this.NavSearchBox.TextChanged += (s, e) => SearchTextChanged?.Invoke(s, e);
             this.NavSearchBox.QuerySubmitted += (s, e) => SearchQuerySubmitted?.Invoke(s, e);
+            Loaded += (s, e) => SizeChanged += PageHeader_SizeChanged;
         }
 
         private void HamburgerButton_Click(object sender, RoutedEventArgs e)
         {
             HamburgerClick?.Invoke(this, e);
+        }
+
+        private void PageHeader_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            double available = e.NewSize.Width - (HamburgerButton.ActualWidth + NavSearchBox.ActualWidth + 16);
+            PageTitleTextBlock.MaxWidth = available;
+
+            if (available < 220)
+            {
+                NavSearchBox.Visibility = Visibility.Collapsed;
+                SearchIconButton.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                NavSearchBox.Visibility = Visibility.Visible;
+                SearchIconButton.Visibility = Visibility.Collapsed;
+            }
         }
     }
 }

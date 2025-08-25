@@ -6,23 +6,44 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
-    <Grid Height="48" Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}"
-          BorderBrush="{ThemeResource SystemControlForegroundBaseLowBrush}" BorderThickness="0,0,0,1">
+    <Grid Height="48"
+      Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}"
+      BorderBrush="{ThemeResource SystemControlForegroundBaseLowBrush}"
+      BorderThickness="0,0,0,1">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/>
             <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
         </Grid.ColumnDefinitions>
 
         <StackPanel Orientation="Horizontal">
-            <Button x:Name="HamburgerButton" Click="HamburgerButton_Click" Width="44" Height="44" Background="Transparent" BorderThickness="0" FontFamily="Segoe MDL2 Assets" Content="&#xE700;"/>
-            <TextBlock x:Name="PageTitleTextBlock" Style="{StaticResource PageTitleBarTextStyle}" TextWrapping="Wrap" Visibility="Collapsed"/>
+            <Button x:Name="HamburgerButton"
+                Click="HamburgerButton_Click"
+                Width="44" Height="44"
+                Background="Transparent"
+                FontFamily="Segoe MDL2 Assets"
+                Content="&#xE700;"/>
+            <TextBlock x:Name="PageTitleTextBlock"
+                       Grid.Column="1"
+                       Style="{StaticResource PageTitleBarTextStyle}"
+                       TextTrimming="CharacterEllipsis"
+                       TextWrapping="NoWrap"/>
         </StackPanel>
 
-        <AutoSuggestBox x:Name="NavSearchBox" Grid.Column="1" QueryIcon="Find" PlaceholderText="Search..." 
-              Width="200" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0"
-              UpdateTextOnSelect="False" TextMemberPath="Title">
+        <AutoSuggestBox x:Name="NavSearchBox"
+                Grid.Column="2"
+                QueryIcon="Find"
+                PlaceholderText="Search..."
+                Width="200"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Center"
+                Margin="0,0,8,0"
+                UpdateTextOnSelect="False"
+                TextMemberPath="Title"
+                Visibility="Visible">
             <AutoSuggestBox.ItemTemplate>
-                <DataTemplate xmlns:vm="using:WikiViewer.Shared.Uwp.ViewModels" x:DataType="vm:SearchSuggestionViewModel">
+                <DataTemplate xmlns:vm="using:WikiViewer.Shared.Uwp.ViewModels" 
+                      x:DataType="vm:SearchSuggestionViewModel">
                     <StackPanel Orientation="Horizontal" Margin="0,4">
                         <Image Source="{x:Bind IconUrl}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,8,0"/>
                         <StackPanel>
