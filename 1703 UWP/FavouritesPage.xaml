@@ -15,86 +15,83 @@
         </Storyboard>
     </Page.Resources>
     <Grid>
-        <ScrollViewer x:Name="GridViewScrollViewerControl" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Visible">
-            <GridView x:Name="FavouritesGridViewControl" Padding="24,0,24,48" IsItemClickEnabled="False" SelectionMode="Multiple" SelectionChanged="FavouritesGridView_SelectionChanged" HorizontalAlignment="Center" ContainerContentChanging="FavouritesControl_ContainerContentChanging">
-                <GridView.ItemContainerStyle>
-                    <Style TargetType="GridViewItem">
-                        <Setter Property="Margin" Value="8"/>
-                    </Style>
-                </GridView.ItemContainerStyle>
-                <GridView.ItemTemplate>
-                    <DataTemplate x:DataType="models:FavouriteItem">
-                        <Grid Width="300"
-                              BorderThickness="1"
-                              Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="180"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-
-                            <Canvas x:Name="Viewport" Grid.Row="0" Width="300" Height="180">
-                                <Image x:Name="LeadImage"
-                                       helpers:NativeAnimatedImageLoader.SourceUri="{x:Bind ImageUrl, Mode=OneWay}"/>
-                            </Canvas>
-
-                            <StackPanel Grid.Row="1" Padding="12">
-                                <TextBlock Text="{x:Bind DisplayTitle}" Style="{ThemeResource SubtitleTextBlockStyle}" TextWrapping="Wrap"/>
-                                <TextBlock Text="{x:Bind WikiName}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource SystemAccentColor}" Margin="0,4,0,0"/>
-                                <Grid Margin="0,8,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Button Grid.Column="0" Content="Article" Click="ArticleButton_Click" DataContext="{x:Bind}" Visibility="{x:Bind IsArticleAvailable, Converter={StaticResource GlobalBoolToVisibility}}"/>
-                                    <Button Grid.Column="1" Content="Talk" Margin="8,0,0,0" Click="TalkButton_Click" DataContext="{x:Bind}" Visibility="{x:Bind IsTalkAvailable, Converter={StaticResource GlobalBoolToVisibility}}"/>
-                                </Grid>
-                            </StackPanel>
-                        </Grid>
-                    </DataTemplate>
-                </GridView.ItemTemplate>
-            </GridView>
-        </ScrollViewer>
-        <ScrollViewer x:Name="ListViewScrollViewerControl" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Visible" Visibility="Collapsed">
-            <ListView x:Name="FavouritesListViewControl" Padding="12,12,12,58" SelectionMode="Multiple" SelectionChanged="FavouritesListView_SelectionChanged" ContainerContentChanging="FavouritesControl_ContainerContentChanging">
-                <ListView.ItemContainerStyle>
-                    <Style TargetType="ListViewItem">
-                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                    </Style>
-                </ListView.ItemContainerStyle>
-                <ListView.ItemTemplate>
-                    <DataTemplate x:DataType="models:FavouriteItem">
-                        <Grid Height="80" Padding="8">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="80"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <Canvas x:Name="ThumbViewport" Grid.Column="0" Width="64" Height="64" VerticalAlignment="Center">
-                                <Image x:Name="ThumbImage"
-                                       helpers:NativeAnimatedImageLoader.SourceUri="{x:Bind ImageUrl, Mode=OneWay}"/>
-                            </Canvas>
-                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0">
-                                <TextBlock Text="{x:Bind DisplayTitle}" Style="{ThemeResource BodyTextBlockStyle}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
-                                <TextBlock Text="{x:Bind WikiName}" Style="{ThemeResource CaptionTextBlockStyle}" Opacity="0.7"/>
-                            </StackPanel>
-                            <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="8" VerticalAlignment="Center">
-                                <Button Content="Article" Click="ArticleButton_Click" DataContext="{x:Bind}" Visibility="{x:Bind IsArticleAvailable, Converter={StaticResource GlobalBoolToVisibility}}"/>
-                                <Button Content="Talk" Click="TalkButton_Click" DataContext="{x:Bind}" Visibility="{x:Bind IsTalkAvailable, Converter={StaticResource GlobalBoolToVisibility}}"/>
-                            </StackPanel>
-                        </Grid>
-                    </DataTemplate>
-                </ListView.ItemTemplate>
-            </ListView>
-        </ScrollViewer>
-        <TextBlock x:Name="NoFavouritesTextBlockControl" Text="You haven't added any Favourites yet." Style="{ThemeResource SubtitleTextBlockStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
-        <CommandBar x:Name="BottomCommandBarControl" VerticalAlignment="Bottom" Margin="0,0,15,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid Grid.Row="0">
+            <ScrollViewer x:Name="GridViewScrollViewerControl" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Visible">
+                <GridView x:Name="FavouritesGridViewControl" Padding="24,0,24,48" IsItemClickEnabled="False" SelectionMode="Multiple" SelectionChanged="FavouritesGridView_SelectionChanged" HorizontalAlignment="Center" ContainerContentChanging="FavouritesControl_ContainerContentChanging">
+                    <GridView.ItemContainerStyle>
+                        <Style TargetType="GridViewItem">
+                            <Setter Property="Margin" Value="8"/>
+                        </Style>
+                    </GridView.ItemContainerStyle>
+                    <GridView.ItemTemplate>
+                        <DataTemplate x:DataType="models:FavouriteItem">
+                            <Grid Width="300" BorderThickness="1" Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="180"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <Canvas x:Name="Viewport" Grid.Row="0" Width="300" Height="180">
+                                    <Image x:Name="LeadImage" helpers:NativeAnimatedImageLoader.SourceUri="{x:Bind ImageUrl, Mode=OneWay}"/>
+                                </Canvas>
+                                <StackPanel Grid.Row="1" Padding="12">
+                                    <TextBlock Text="{x:Bind DisplayTitle}" Style="{ThemeResource SubtitleTextBlockStyle}" TextWrapping="Wrap"/>
+                                    <TextBlock Text="{x:Bind WikiName}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource SystemAccentColor}" Margin="0,4,0,0"/>
+                                    <Grid Margin="0,8,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Button Grid.Column="0" Content="Article" Click="ArticleButton_Click" DataContext="{x:Bind}" Visibility="{x:Bind IsArticleAvailable, Converter={StaticResource GlobalBoolToVisibility}}"/>
+                                        <Button Grid.Column="1" Content="Talk" Margin="8,0,0,0" Click="TalkButton_Click" DataContext="{x:Bind}" Visibility="{x:Bind IsTalkAvailable, Converter={StaticResource GlobalBoolToVisibility}}"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </GridView.ItemTemplate>
+                </GridView>
+            </ScrollViewer>
+            <ScrollViewer x:Name="ListViewScrollViewerControl" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Visible" Visibility="Collapsed">
+                <ListView x:Name="FavouritesListViewControl" Padding="12,12,12,58" SelectionMode="Multiple" SelectionChanged="FavouritesListView_SelectionChanged" ContainerContentChanging="FavouritesControl_ContainerContentChanging">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="models:FavouriteItem">
+                            <Grid Height="80" Padding="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="80"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Canvas x:Name="ThumbViewport" Grid.Column="0" Width="64" Height="64" VerticalAlignment="Center">
+                                    <Image x:Name="ThumbImage" helpers:NativeAnimatedImageLoader.SourceUri="{x:Bind ImageUrl, Mode=OneWay}"/>
+                                </Canvas>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0">
+                                    <TextBlock Text="{x:Bind DisplayTitle}" Style="{ThemeResource BodyTextBlockStyle}" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="{x:Bind WikiName}" Style="{ThemeResource CaptionTextBlockStyle}" Opacity="0.7"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="8" VerticalAlignment="Center">
+                                    <Button Content="Article" Click="ArticleButton_Click" DataContext="{x:Bind}" Visibility="{x:Bind IsArticleAvailable, Converter={StaticResource GlobalBoolToVisibility}}" Margin="0,0,8,0"/>
+                                    <Button Content="Talk" Click="TalkButton_Click" DataContext="{x:Bind}" Visibility="{x:Bind IsTalkAvailable, Converter={StaticResource GlobalBoolToVisibility}}"/>
+                                </StackPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </ScrollViewer>
+            <TextBlock x:Name="NoFavouritesTextBlockControl" Text="You haven't added any Favourites yet." Style="{ThemeResource SubtitleTextBlockStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
+        </Grid>
+        <CommandBar x:Name="BottomCommandBarControl" Grid.Row="1" VerticalAlignment="Bottom">
             <AppBarButton Icon="Find" Label="Search">
                 <AppBarButton.Flyout>
                     <Flyout Placement="Bottom" Opened="SearchFlyout_Opened">
-                        <AutoSuggestBox x:Name="SearchBoxControl"
-                            Width="240"
-                            PlaceholderText="Search favourites..."
-                            TextChanged="SearchBoxControl_TextChanged"/>
+                        <AutoSuggestBox x:Name="SearchBoxControl" Width="240" PlaceholderText="Search favourites..." TextChanged="SearchBoxControl_TextChanged"/>
                     </Flyout>
                 </AppBarButton.Flyout>
             </AppBarButton>
@@ -118,8 +115,7 @@
             <AppBarButton x:Name="DeleteButtonControl" Icon="Delete" Label="Delete" Click="DeleteButton_Click" Visibility="Collapsed"/>
             <AppBarButton x:Name="ViewToggleButtonControl" Icon="List" Label="List View" Click="ViewToggleButton_Click"/>
         </CommandBar>
-
-        <Grid x:Name="LoadingOverlayControl" Opacity="0" IsHitTestVisible="False" Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}">
+        <Grid x:Name="LoadingOverlayControl" Grid.RowSpan="2" Opacity="0" IsHitTestVisible="False" Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                 <ProgressRing IsActive="True" Width="60" Height="60"/>
             </StackPanel>

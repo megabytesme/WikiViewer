@@ -117,8 +117,8 @@
                 <ComboBox x:Name="WikiFilterComboBoxControl"
                           Width="140"
                           SelectionChanged="WikiFilterComboBox_SelectionChanged"
-                          Margin="7,7,0,0"
-                          SelectedItem="0">
+                          Margin="0,6,0,0"
+                          Height="36"                          SelectedItem="0">
                     <ComboBoxItem Content="All Wikis" Tag=""/>
                 </ComboBox>
             </AppBarElementContainer>
@@ -127,7 +127,8 @@
                 <ComboBox x:Name="SortComboBoxControl"
                           Width="140"
                           SelectionChanged="SortComboBox_SelectionChanged"
-                          Margin="7,7,0,0"
+                          Margin="4,6,2,0"
+                          Height="36"
                           SelectedItem="0">
                     <ComboBoxItem Content="Title (A–Z)" Tag="TitleAsc"/>
                     <ComboBoxItem Content="Title (Z–A)" Tag="TitleDesc"/>
