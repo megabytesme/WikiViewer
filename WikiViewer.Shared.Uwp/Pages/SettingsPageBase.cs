@@ -327,7 +327,7 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         private string GetAppName()
         {
-#if UWP_1703
+#if UWP_1507
             return "1507_UWP";
 #else
             return "1809_UWP";
@@ -336,7 +336,7 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         private string GetAppVersion()
         {
-#if UWP_1703
+#if UWP_1507
             return "1.0.1.0";
 #else
             return "2.0.1.0";
