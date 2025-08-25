@@ -24,16 +24,36 @@
     </Page.Resources>
 
     <Grid>
-        <WebView x:Name="ArticleDisplayWebView" ScrollViewer.VerticalScrollBarVisibility="Visible" DefaultBackgroundColor="Transparent"/>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
 
+        <WebView x:Name="ArticleDisplayWebView"
+                 Grid.Row="0"
+                 ScrollViewer.VerticalScrollBarVisibility="Visible"
+                 DefaultBackgroundColor="Transparent" />
 
-        <CommandBar VerticalAlignment="Bottom" Margin="0,0,15,0">
-            <AppBarButton x:Name="EditButton" Icon="Edit" Label="Edit" Click="EditButton_Click" Visibility="Collapsed"/>
-            <AppBarButton x:Name="FavoriteButton" Icon="Favorite" Label="Add to Favourites" Click="FavoriteButton_Click"/>
-            <AppBarButton x:Name="ShareButton" Icon="ReShare" Label="Share" Click="ShareButton_Click"/>
+        <CommandBar Grid.Row="1"
+                    VerticalAlignment="Bottom"
+                    HorizontalAlignment="Stretch">
+            <AppBarButton x:Name="EditButton"
+                          Icon="Edit"
+                          Label="Edit"
+                          Click="EditButton_Click"
+                          Visibility="Collapsed"/>
+            <AppBarButton x:Name="FavoriteButton"
+                          Icon="Favorite"
+                          Label="Add to Favourites"
+                          Click="FavoriteButton_Click"/>
+            <AppBarButton x:Name="ShareButton"
+                          Icon="ReShare"
+                          Label="Share"
+                          Click="ShareButton_Click"/>
         </CommandBar>
 
         <Grid x:Name="LoadingOverlay"
+              Grid.RowSpan="2"
               Opacity="0"
               IsHitTestVisible="False"
               Background="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}">
@@ -53,6 +73,7 @@
         </Grid>
 
         <Grid x:Name="VerificationPanel"
+              Grid.RowSpan="2"
               Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
               Visibility="Collapsed">
             <Grid.RowDefinitions>
@@ -60,12 +81,16 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
             <StackPanel Margin="12">
-                <TextBlock Text="Please complete the security check" Style="{ThemeResource TitleTextBlockStyle}"/>
+                <TextBlock Text="Please complete the security check"
+                           Style="{ThemeResource TitleTextBlockStyle}"/>
                 <TextBlock Text="The app will continue automatically once you finish."
                            Style="{ThemeResource BodyTextBlockStyle}"
                            TextWrapping="Wrap"/>
             </StackPanel>
-            <WebView x:Name="VerificationWebView" Grid.Row="1" ScrollViewer.VerticalScrollBarVisibility="Visible" DefaultBackgroundColor="Transparent"/>
+            <WebView x:Name="VerificationWebView"
+                     Grid.Row="1"
+                     ScrollViewer.VerticalScrollBarVisibility="Visible"
+                     DefaultBackgroundColor="Transparent"/>
         </Grid>
     </Grid>
 </local:ArticleViewerPageBase>
