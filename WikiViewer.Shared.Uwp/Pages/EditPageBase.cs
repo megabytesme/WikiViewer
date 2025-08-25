@@ -204,31 +204,63 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected async void SaveButton_Click(object sender, RoutedEventArgs e)
         {
             var dialog = new WikiViewer.Shared.Uwp.Controls.SaveDialog();
-            var result = await dialog.ShowAsync();
-
-            if (result != ContentDialogResult.Primary)
-            {
+            var dialogResult = await dialog.ShowAsync();
+            if (dialogResult != ContentDialogResult.Primary)
                 return;
-            }
 
             LoadingOverlayGrid.Visibility = Visibility.Visible;
             LoadingTextBlock.Text = "Saving...";
             try
             {
-                var account = AccountManager.GetAccountsForWiki(_pageWikiContext.Id).FirstOrDefault(a => a.IsLoggedIn);
-                if (account == null) throw new InvalidOperationException("User must be logged in to save a page.");
-
-                var authService = new AuthenticationService(account, _pageWikiContext, App.ApiWorkerFactory);
                 WikitextEditorTextBox.Document.GetText(TextGetOptions.None, out var wikitext);
+                bool saveSuccess = false;
+                var account = AccountManager
+                    .GetAccountsForWiki(_pageWikiContext.Id)
+                    .FirstOrDefault(a => a.IsLoggedIn);
 
-                bool success = await authService.SavePageAsync(
-                    _pageTitle,
-                    wikitext,
-                    dialog.Summary,
-                    dialog.IsMinorEdit
-                );
+                if (account != null)
+                {
+                    var authService = new AuthenticationService(
+                        account,
+                        _pageWikiContext,
+                        App.ApiWorkerFactory
+                    );
+                    saveSuccess = await authService.SavePageAsync(
+                        _pageTitle,
+                        wikitext,
+                        dialog.Summary,
+                        dialog.IsMinorEdit
+                    );
+                }
+                else
+                {
+                    var anonWorker = SessionManager.GetAnonymousWorkerForWiki(_pageWikiContext);
+                    await anonWorker.InitializeAsync(_pageWikiContext.BaseUrl);
+                    var tokenJson = await anonWorker.GetJsonFromApiAsync(
+                        $"{_pageWikiContext.ApiEndpoint}?action=query&meta=tokens&type=csrf&format=json"
+                    );
+                    var token = JObject
+                        .Parse(tokenJson)
+                        ?["query"]?["tokens"]?["csrftoken"]?.ToString();
+                    var postData = new Dictionary<string, string>
+                    {
+                        { "action", "edit" },
+                        { "format", "json" },
+                        { "title", _pageTitle },
+                        { "text", wikitext },
+                        { "summary", dialog.Summary },
+                        { "minor", dialog.IsMinorEdit ? "true" : "false" },
+                        { "token", token },
+                    };
+                    var resultJson = await anonWorker.PostAndGetJsonFromApiAsync(
+                        _pageWikiContext.ApiEndpoint,
+                        postData
+                    );
+                    var parsed = JObject.Parse(resultJson);
+                    saveSuccess = parsed?["edit"]?["result"]?.ToString() == "Success";
+                }
 
-                if (success)
+                if (saveSuccess)
                 {
                     _originalWikitext = wikitext;
                     Frame.GoBack();
@@ -240,7 +272,8 @@ namespace WikiViewer.Shared.Uwp.Pages
                 var errorDialog = new ContentDialog
                 {
                     Title = "Save Failed",
-                    Content = $"The page could not be saved. The server reported the following error:\n\n{ex.Message}",
+                    Content =
+                        $"The page could not be saved. The server reported the following error:\n\n{ex.Message}",
                     PrimaryButtonText = "OK",
                 };
                 await errorDialog.ShowAsync();
@@ -257,7 +290,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                     Title = "Discard Changes?",
                     Content = "You have unsaved changes. Are you sure you want to discard them?",
                     PrimaryButtonText = "Discard",
-                    SecondaryButtonText = "Cancel"
+                    SecondaryButtonText = "Cancel",
                 };
                 var result = await dialog.ShowAsync();
                 if (result != ContentDialogResult.Primary)
