@@ -1,11 +1,11 @@
-using HtmlAgilityPack;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
+using HtmlAgilityPack;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
 using WikiViewer.Shared.Uwp.Services;
@@ -25,6 +25,7 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected bool _isInitialized = false;
         protected readonly Stack<string> _articleHistory = new Stack<string>();
         public bool CanGoBackInPage => _articleHistory.Count > 1;
+        protected abstract AppBarButton RefreshAppBarButton { get; }
 
         protected abstract TextBlock ArticleTitleTextBlock { get; }
         protected abstract TextBlock LoadingTextBlock { get; }
@@ -281,7 +282,7 @@ namespace WikiViewer.Shared.Uwp.Pages
             try
             {
                 var worker = SessionManager.GetAnonymousWorkerForWiki(_pageWikiContext);
-                var (html, resolvedTitle) =
+                var (htmlContent, resolvedTitle) =
                     await ArticleProcessingService.FetchAndProcessArticleAsync(
                         _pageTitleToFetch,
                         fetchStopwatch,
@@ -297,15 +298,14 @@ namespace WikiViewer.Shared.Uwp.Pages
                     mainPage?.SetPageTitle(resolvedTitle);
                 }
 
-                var processedHtml = await ArticleProcessingService.ProcessHtmlAsync(
-                    html,
+                var processedHtml = await ArticleProcessingService.BuildArticleHtmlAsync(
+                    htmlContent,
                     _pageTitleToFetch,
-                    worker,
                     _pageWikiContext
                 );
 
                 await DisplayProcessedHtmlAsync(processedHtml);
-                EnhanceDisplayedHtmlWithCachedMediaAsync(html);
+                EnhanceDisplayedHtmlWithCachedMediaAsync(htmlContent);
                 await UpdateEditButtonForPageAsync();
 
                 var lastUpdated = await ArticleProcessingService.FetchLastUpdatedTimestampAsync(
@@ -322,20 +322,7 @@ namespace WikiViewer.Shared.Uwp.Pages
             }
             catch (NeedsUserVerificationException ex)
             {
-#if UWP_1809
                 ShowVerificationPanel(ex.Url);
-#else
-                ArticleTitleTextBlock.Text = "Unable to load page";
-                LoadingTextBlock.Text = "A security check is preventing access.";
-                var dialog = new ContentDialog
-                {
-                    Title = "Verification Required",
-                    Content =
-                        "This site is protected by a security check that is incompatible with this version of WebView.\n\nPlease go to Settings -> Manage Wikis, edit this wiki, and switch its 'Connection Backend' to 'Proxy' to access this content.",
-                    PrimaryButtonText = "OK",
-                };
-                await dialog.ShowAsync();
-#endif
             }
             catch (Exception ex)
             {
@@ -347,6 +334,19 @@ namespace WikiViewer.Shared.Uwp.Pages
                 HideLoadingOverlay();
                 UpdateFavoriteButton();
             }
+        }
+
+        protected async void RefreshButton_Click(object sender, RoutedEventArgs e)
+        {
+            string css = await ThemeManager.GetThemeCssAsync();
+            string escapedCss = JsonConvert.ToString(css);
+            string script =
+                $@"
+        var styleElement = document.getElementById('custom-theme-style');
+        if (styleElement) {{
+            styleElement.innerHTML = {escapedCss};
+        }}";
+            await ExecuteScriptInWebViewAsync(script);
         }
 
         public bool GoBackInPage()
@@ -464,11 +464,15 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         private async Task UpdateEditButtonForPageAsync()
         {
-            System.Diagnostics.Debug.WriteLine($"[EditCheck] Starting for '{_pageTitleToFetch}' on wiki '{_pageWikiContext?.Id}'");
+            System.Diagnostics.Debug.WriteLine(
+                $"[EditCheck] Starting for '{_pageTitleToFetch}' on wiki '{_pageWikiContext?.Id}'"
+            );
 
             if (_pageWikiContext == null || string.IsNullOrEmpty(_pageTitleToFetch))
             {
-                System.Diagnostics.Debug.WriteLine("[EditCheck] Missing wiki context or page title — aborting.");
+                System.Diagnostics.Debug.WriteLine(
+                    "[EditCheck] Missing wiki context or page title — aborting."
+                );
                 return;
             }
 
@@ -477,8 +481,8 @@ namespace WikiViewer.Shared.Uwp.Pages
                 var worker = SessionManager.GetAnonymousWorkerForWiki(_pageWikiContext);
 
                 var apiUrl =
-                    $"{_pageWikiContext.ApiEndpoint}?action=query&meta=userinfo&uiprop=rights|groups" +
-                    $"&prop=info&inprop=protection&titles={Uri.EscapeDataString(_pageTitleToFetch)}&format=json";
+                    $"{_pageWikiContext.ApiEndpoint}?action=query&meta=userinfo&uiprop=rights|groups"
+                    + $"&prop=info&inprop=protection&titles={Uri.EscapeDataString(_pageTitleToFetch)}&format=json";
 
                 System.Diagnostics.Debug.WriteLine($"[EditCheck] API URL: {apiUrl}");
 
@@ -488,18 +492,25 @@ namespace WikiViewer.Shared.Uwp.Pages
                 dynamic result = Newtonsoft.Json.JsonConvert.DeserializeObject(json);
 
                 var rightsToken = result?.query?.userinfo?.rights;
-                var rights = rightsToken != null
-                    ? ((Newtonsoft.Json.Linq.JArray)rightsToken).Select(r => (string)r).ToList()
-                    : new List<string>();
+                var rights =
+                    rightsToken != null
+                        ? ((Newtonsoft.Json.Linq.JArray)rightsToken).Select(r => (string)r).ToList()
+                        : new List<string>();
 
-                System.Diagnostics.Debug.WriteLine($"[EditCheck] Rights: {(rights.Any() ? string.Join(", ", rights) : "(none)")}");
+                System.Diagnostics.Debug.WriteLine(
+                    $"[EditCheck] Rights: {(rights.Any() ? string.Join(", ", rights) : "(none)")}"
+                );
                 bool canEdit = rights.Contains("edit");
                 System.Diagnostics.Debug.WriteLine($"[EditCheck] Has 'edit' right: {canEdit}");
 
                 var pagesObj = result?.query?.pages as JObject;
                 var page = pagesObj?.Properties().FirstOrDefault()?.Value as JObject;
 
-                if (page != null && page.TryGetValue("protection", out var protectionToken) && protectionToken is JArray protection)
+                if (
+                    page != null
+                    && page.TryGetValue("protection", out var protectionToken)
+                    && protectionToken is JArray protection
+                )
                 {
                     Debug.WriteLine($"[EditCheck] Raw protection JSON: {protection}");
                     Debug.WriteLine($"[EditCheck] Protection entries: {protection.Count}");
@@ -511,14 +522,19 @@ namespace WikiViewer.Shared.Uwp.Pages
                         Debug.WriteLine($"[EditCheck] Edit restriction level: {level}");
 
                         var groupsToken = result?.query?.userinfo?.groups;
-                        var groups = groupsToken != null
-                            ? ((JArray)groupsToken).Select(g => (string)g).ToList()
-                            : new List<string>();
+                        var groups =
+                            groupsToken != null
+                                ? ((JArray)groupsToken).Select(g => (string)g).ToList()
+                                : new List<string>();
 
-                        Debug.WriteLine($"[EditCheck] Groups: {(groups.Any() ? string.Join(", ", groups) : "(none)")}");
+                        Debug.WriteLine(
+                            $"[EditCheck] Groups: {(groups.Any() ? string.Join(", ", groups) : "(none)")}"
+                        );
                         if (!groups.Contains(level))
                         {
-                            Debug.WriteLine("[EditCheck] User does not meet restriction level — disabling edit.");
+                            Debug.WriteLine(
+                                "[EditCheck] User does not meet restriction level — disabling edit."
+                            );
                             canEdit = false;
                         }
                         else
@@ -540,9 +556,13 @@ namespace WikiViewer.Shared.Uwp.Pages
                     Windows.UI.Core.CoreDispatcherPriority.Normal,
                     () =>
                     {
-                        EditAppBarButton.Visibility = canEdit ? Visibility.Visible : Visibility.Collapsed;
+                        EditAppBarButton.Visibility = canEdit
+                            ? Visibility.Visible
+                            : Visibility.Collapsed;
                         EditAppBarButton.IsEnabled = canEdit;
-                        System.Diagnostics.Debug.WriteLine($"[EditCheck] Edit button Visibility set to {EditAppBarButton.Visibility}, IsEnabled set to {canEdit}");
+                        System.Diagnostics.Debug.WriteLine(
+                            $"[EditCheck] Edit button Visibility set to {EditAppBarButton.Visibility}, IsEnabled set to {canEdit}"
+                        );
                     }
                 );
 

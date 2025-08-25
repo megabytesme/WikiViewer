@@ -52,7 +52,7 @@ namespace WikiViewer.Core.Services
             return WrapInHtmlShell(finalBodyContent, isDarkMode, isShortMessage);
         }
 
-        private static string FixRelativeUrls(string html, WikiInstance wikiContext)
+        public static string FixRelativeUrls(string html, WikiInstance wikiContext)
         {
             if (string.IsNullOrEmpty(html))
                 return "";
@@ -194,12 +194,12 @@ namespace WikiViewer.Core.Services
 
                 string headContent =
                     $@"
-            <meta charset='UTF-8'>
-            <base href='{wikiContext.BaseUrl}'>
-            <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-            {(string.IsNullOrEmpty(cssUrl) ? "" : $"<link rel='stylesheet' href='{cssUrl}'>")}
-            {ArticleProcessingService.GetCssForTheme()}
-        ";
+    <meta charset='UTF-8'>
+    <base href='{wikiContext.BaseUrl}'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    {(string.IsNullOrEmpty(cssUrl) ? "" : $"<link rel='stylesheet' href='{cssUrl}'>")}
+    <style>{await ThemeManager.GetThemeCssAsync()}</style> 
+";
 
                 return $"<!DOCTYPE html><html><head>{headContent}</head><body><div class='mw-parser-output'>{previewHtml}</div></body></html>";
             }

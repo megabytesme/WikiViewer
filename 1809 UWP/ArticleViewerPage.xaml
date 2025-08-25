@@ -22,6 +22,7 @@
             <AppBarButton x:Name="EditButton" Icon="Edit" Label="Edit" Click="EditButton_Click" Visibility="Collapsed"/>
             <AppBarButton x:Name="FavoriteButton" Icon="Favorite" Label="Add to Favourites" Click="FavoriteButton_Click"/>
             <AppBarButton x:Name="ShareButton" Icon="Share" Label="Share" Click="ShareButton_Click"/>
+            <AppBarButton x:Name="RefreshButton" Icon="Refresh" Label="Refresh Theme" Click="RefreshButton_Click"/>
         </CommandBar>
         <Grid x:Name="LoadingOverlay" Opacity="0" IsHitTestVisible="False" Background="{StaticResource PageTitleBarAcrylicBrush}">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">

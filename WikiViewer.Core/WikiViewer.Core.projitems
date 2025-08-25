@@ -32,6 +32,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Services\HttpClientApiWorker.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)services\MediaCacheService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\SessionManager.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)services\ThemeManager.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\WikiManager.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\WikiPathDetectorService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)services\WikitextParsingService.cs" />

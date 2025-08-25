@@ -3,9 +3,10 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using WikiViewer.Core;
+using WikiViewer.Core.Managers;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
-using WikiViewer.Core.Managers;
+using Windows.Storage;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Documents;
@@ -341,6 +342,36 @@ namespace WikiViewer.Shared.Uwp.Pages
 #else
             return "2.0.1.0";
 #endif
+        }
+
+        protected async void EditThemeButton_Click(object sender, RoutedEventArgs e)
+        {
+            await ThemeManager.GetThemeCssAsync();
+            var file = await ApplicationData.Current.LocalFolder.GetFileAsync(
+                ThemeManager.ThemeCssFileName
+            );
+            if (file != null)
+            {
+                await Windows.System.Launcher.LaunchFileAsync(file);
+            }
+        }
+
+        protected async void ResetThemeButton_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new ContentDialog
+            {
+                Title = "Reset Theme?",
+                Content =
+                    "This will restore the default article appearance. Your custom CSS will be overwritten. Are you sure?",
+                PrimaryButtonText = "Reset Theme",
+                SecondaryButtonText = "Cancel",
+            };
+
+            var result = await dialog.ShowAsync();
+            if (result == ContentDialogResult.Primary)
+            {
+                await ThemeManager.ResetThemeToDefaultAsync();
+            }
         }
     }
 }

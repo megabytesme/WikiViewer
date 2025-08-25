@@ -50,6 +50,7 @@
                           Icon="ReShare"
                           Label="Share"
                           Click="ShareButton_Click"/>
+            <AppBarButton x:Name="RefreshButton" Icon="Refresh" Label="Refresh Theme" Click="RefreshButton_Click"/>
         </CommandBar>
 
         <Grid x:Name="LoadingOverlay"

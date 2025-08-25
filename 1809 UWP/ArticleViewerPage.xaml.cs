@@ -23,6 +23,7 @@ namespace _1809_UWP.Pages
         protected override Grid VerificationPanelGrid => VerificationPanel;
         protected override AppBarButton EditAppBarButton => EditButton;
         protected override AppBarButton FavoriteAppBarButton => FavoriteButton;
+        protected override AppBarButton RefreshAppBarButton => RefreshButton;
 
         protected override Type GetEditPageType() => typeof(EditPage);
 
