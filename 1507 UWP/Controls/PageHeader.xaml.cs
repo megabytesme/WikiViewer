@@ -57,17 +57,6 @@ namespace _1507_UWP.Controls
         {
             double available = e.NewSize.Width - (HamburgerButton.ActualWidth + NavSearchBox.ActualWidth + 16);
             PageTitleTextBlock.MaxWidth = available;
-
-            if (available < 220)
-            {
-                NavSearchBox.Visibility = Visibility.Collapsed;
-                SearchIconButton.Visibility = Visibility.Visible;
-            }
-            else
-            {
-                NavSearchBox.Visibility = Visibility.Visible;
-                SearchIconButton.Visibility = Visibility.Collapsed;
-            }
         }
     }
 }
