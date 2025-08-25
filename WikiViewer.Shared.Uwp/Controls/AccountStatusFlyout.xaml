@@ -28,7 +28,7 @@
                         <TextBlock Text="{x:Bind Converter={StaticResource AccountStatusConverter}, ConverterParameter='Username'}" Style="{ThemeResource CaptionTextBlockStyle}" Opacity="0.7"/>
                     </StackPanel>
 
-                    <Button Grid.Column="1" Content="{x:Bind Converter={StaticResource AccountStatusConverter}, ConverterParameter='ButtonText'}" Click="SignInOutButton_Click" VerticalAlignment="Center" Style="{ThemeResource AccentButtonStyle}"/>
+                    <Button Grid.Column="1" Content="{x:Bind Converter={StaticResource AccountStatusConverter}, ConverterParameter='ButtonText'}" Click="SignInOutButton_Click" VerticalAlignment="Center" Style="{ThemeResource TextBlockButtonStyle}"/>
                 </Grid>
             </DataTemplate>
         </ListView.ItemTemplate>
