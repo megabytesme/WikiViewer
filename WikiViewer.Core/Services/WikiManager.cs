@@ -45,7 +45,7 @@ namespace WikiViewer.Core.Services
                 {
                     new WikiInstance
                     {
-                        Name = "English Wikipedia",
+                        Name = "Wikipedia",
                         BaseUrl = "https://en.wikipedia.org/",
                     },
                 };
