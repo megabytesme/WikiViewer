@@ -2,6 +2,7 @@
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using WikiViewer.Core;
+using WikiViewer.Core.Services;
 using WikiViewer.Shared.Uwp.Pages;
 using WikiViewer.Shared.Uwp.Services;
 using Windows.Foundation;
@@ -164,32 +165,38 @@ namespace _1507_UWP.Pages
         }
 
         private async void ArticleDisplayWebView_NavigationStarting(
-    WebView sender,
-    WebViewNavigationStartingEventArgs args
-)
+            WebView sender,
+            WebViewNavigationStartingEventArgs args
+        )
         {
-            if (args.Uri != null && args.Uri.Scheme == "ms-local-stream")
+            args.Cancel = true;
+
+            if (args.Uri == null)
+                return;
+
+            if (args.Uri.Scheme == "ms-appdata" || args.Uri.Scheme == "ms-local-stream")
             {
+                args.Cancel = false;
                 return;
             }
 
-            if (args.Uri != null)
+            int fileIndex = args.Uri.AbsolutePath.IndexOf(
+                "/File:",
+                StringComparison.OrdinalIgnoreCase
+            );
+            int imageIndex = args.Uri.AbsolutePath.IndexOf(
+                "/Image:",
+                StringComparison.OrdinalIgnoreCase
+            );
+            int startIndex = Math.Max(fileIndex, imageIndex);
+
+            if (
+                startIndex != -1
+                && args.Uri.Host.Equals(_pageWikiContext.Host, StringComparison.OrdinalIgnoreCase)
+            )
             {
-                string path = args.Uri.AbsolutePath.ToLowerInvariant();
-                if (path.Contains("/wiki/file:") || path.Contains("/wiki/image:"))
-                {
-                    args.Cancel = true;
-
-                    string fileTitle = System.IO.Path.GetFileName(args.Uri.AbsolutePath);
-
-                    _ = ShowImageViewerAsync(Uri.UnescapeDataString(fileTitle));
-                    return;
-                }
-            }
-
-            args.Cancel = true;
-            if (args.Uri == null || _pageWikiContext == null)
-            {
+                string fileTitle = args.Uri.AbsolutePath.Substring(startIndex + 1);
+                _ = ShowImageViewerAsync(Uri.UnescapeDataString(fileTitle));
                 return;
             }
 
@@ -198,15 +205,35 @@ namespace _1507_UWP.Pages
                 return;
             }
 
-            if (args.Uri.Host.Equals(_pageWikiContext.Host, StringComparison.OrdinalIgnoreCase))
+            var targetWiki = WikiManager.GetWikiByHost(args.Uri.Host);
+            if (targetWiki != null)
             {
-                string articlePathPrefix = $"/{_pageWikiContext.ArticlePath}";
-                if (args.Uri.AbsolutePath.StartsWith(articlePathPrefix))
+                string articlePathPrefix = $"/{targetWiki.ArticlePath}";
+                if (
+                    args.Uri.AbsolutePath.StartsWith(
+                        articlePathPrefix,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                )
                 {
                     string newTitle = args.Uri.AbsolutePath.Substring(articlePathPrefix.Length);
                     if (!string.IsNullOrEmpty(newTitle))
                     {
-                        NavigateToInternalPage(Uri.UnescapeDataString(newTitle));
+                        if (targetWiki.Id == _pageWikiContext.Id)
+                        {
+                            NavigateToInternalPage(Uri.UnescapeDataString(newTitle));
+                        }
+                        else
+                        {
+                            Frame.Navigate(
+                                typeof(ArticleViewerPage),
+                                new ArticleNavigationParameter
+                                {
+                                    WikiId = targetWiki.Id,
+                                    PageTitle = newTitle,
+                                }
+                            );
+                        }
                         return;
                     }
                 }
@@ -277,7 +304,9 @@ namespace _1507_UWP.Pages
 
         protected override void UpdateRefreshButtonVisibility()
         {
-            RefreshAppBarButton.Visibility = AppSettings.ShowCssRefreshButton ? Visibility.Visible : Visibility.Collapsed;
+            RefreshAppBarButton.Visibility = AppSettings.ShowCssRefreshButton
+                ? Visibility.Visible
+                : Visibility.Collapsed;
         }
     }
 }

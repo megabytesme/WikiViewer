@@ -43,11 +43,7 @@ namespace WikiViewer.Core.Services
             {
                 _wikis = new List<WikiInstance>
                 {
-                    new WikiInstance
-                    {
-                        Name = "Wikipedia",
-                        BaseUrl = "https://en.wikipedia.org/",
-                    },
+                    new WikiInstance { Name = "Wikipedia", BaseUrl = "https://en.wikipedia.org/" },
                 };
                 await SaveAsync();
             }
@@ -66,6 +62,15 @@ namespace WikiViewer.Core.Services
         public static List<WikiInstance> GetWikis() => _wikis;
 
         public static WikiInstance GetWikiById(Guid id) => _wikis.FirstOrDefault(w => w.Id == id);
+
+        public static WikiInstance GetWikiByHost(string host)
+        {
+            if (string.IsNullOrEmpty(host))
+                return null;
+            return _wikis.FirstOrDefault(w =>
+                w.Host.Equals(host, StringComparison.OrdinalIgnoreCase)
+            );
+        }
 
         public static async Task AddWikiAsync(WikiInstance wiki)
         {
