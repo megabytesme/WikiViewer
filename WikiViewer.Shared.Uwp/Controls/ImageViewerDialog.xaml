@@ -1,0 +1,67 @@
+﻿<ContentDialog
+    x:Class="WikiViewer.Shared.Uwp.Controls.ImageViewerDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:models="using:WikiViewer.Core.Models" 
+    mc:Ignorable="d"
+    Title="{x:Bind Metadata.PageTitle, Mode=OneWay}"
+    PrimaryButtonText="Close">
+
+    <Grid MinWidth="400" MaxWidth="800" MaxHeight="600">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <ScrollViewer x:Name="ImageScrollViewer" Grid.Row="0"
+                      ZoomMode="Enabled" MinZoomFactor="1.0"
+                      HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+            <Image x:Name="RasterImageView" Stretch="Uniform" />
+        </ScrollViewer>
+
+        <WebView x:Name="SvgWebView" Grid.Row="0" Visibility="Collapsed" />
+
+        <ProgressRing x:Name="LoadingIndicator" Grid.Row="0"
+                      IsActive="True"
+                      Width="60" Height="60"
+                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+
+        <StackPanel Grid.Row="1" Margin="0,12,0,0">
+            <TextBlock Text="{x:Bind Metadata.Description, Mode=OneWay}" 
+                       TextWrapping="Wrap" 
+                       FontWeight="SemiBold"
+                       Visibility="{x:Bind Metadata.Description, Converter={StaticResource StringToVisibilityConverter}, Mode=OneWay}" />
+
+            <Grid Margin="0,8,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" Text="Author: " FontWeight="Bold" 
+                           Visibility="{x:Bind Metadata.Author, Converter={StaticResource StringToVisibilityConverter}, Mode=OneWay}"/>
+                <TextBlock Grid.Column="1" Text="{x:Bind Metadata.Author, Mode=OneWay}" TextWrapping="Wrap" />
+            </Grid>
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" Text="Date: " FontWeight="Bold" 
+                           Visibility="{x:Bind Metadata.Date, Converter={StaticResource StringToVisibilityConverter}, Mode=OneWay}"/>
+                <TextBlock Grid.Column="1" Text="{x:Bind Metadata.Date, Mode=OneWay}" TextWrapping="Wrap" />
+            </Grid>
+
+            <TextBlock Text="{x:Bind Metadata.LicensingInfo, Mode=OneWay}" 
+                       TextWrapping="Wrap" 
+                       FontSize="12" 
+                       Opacity="0.8"
+                       Margin="0,8,0,0"
+                       Visibility="{x:Bind Metadata.LicensingInfo, Converter={StaticResource StringToVisibilityConverter}, Mode=OneWay}"/>
+        </StackPanel>
+    </Grid>
+</ContentDialog>

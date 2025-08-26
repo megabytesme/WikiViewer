@@ -6,9 +6,9 @@ using System.Threading.Tasks;
 using HtmlAgilityPack;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using WikiViewer.Core;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
+using WikiViewer.Shared.Uwp.Controls;
 using WikiViewer.Shared.Uwp.Services;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.UI.Xaml;
@@ -296,14 +296,18 @@ namespace WikiViewer.Shared.Uwp.Pages
                 var doc = new HtmlDocument();
                 doc.LoadHtml(htmlContent);
 
-                var redirectNode = doc.DocumentNode.SelectSingleNode("//div[contains(@class, 'redirectMsg')]//a[@title]");
+                var redirectNode = doc.DocumentNode.SelectSingleNode(
+                    "//div[contains(@class, 'redirectMsg')]//a[@title]"
+                );
 
                 if (redirectNode != null)
                 {
                     string newTitle = redirectNode.GetAttributeValue("title", null);
                     if (!string.IsNullOrEmpty(newTitle))
                     {
-                        Debug.WriteLine($"HTML redirect detected. Navigating from '{_pageTitleToFetch}' to '{newTitle}'.");
+                        Debug.WriteLine(
+                            $"HTML redirect detected. Navigating from '{_pageTitleToFetch}' to '{newTitle}'."
+                        );
                         NavigateToInternalPage(newTitle);
                         return;
                     }
@@ -312,7 +316,8 @@ namespace WikiViewer.Shared.Uwp.Pages
                 if (_pageTitleToFetch.Equals("Special:Random", StringComparison.OrdinalIgnoreCase))
                 {
                     _pageTitleToFetch = resolvedTitle.Replace(' ', '_');
-                    if (_articleHistory.Any()) _articleHistory.Pop();
+                    if (_articleHistory.Any())
+                        _articleHistory.Pop();
                     _articleHistory.Push(_pageTitleToFetch);
                     ArticleTitleTextBlock.Text = resolvedTitle;
                     mainPage?.SetPageTitle(resolvedTitle);
@@ -612,6 +617,200 @@ namespace WikiViewer.Shared.Uwp.Pages
                         EditAppBarButton.Visibility = Visibility.Collapsed;
                         EditAppBarButton.IsEnabled = false;
                     }
+                );
+            }
+        }
+
+        protected async Task ShowImageViewerAsync(string filePageTitle)
+        {
+            var loadingDialog = new ContentDialog { Title = "Loading Image..." };
+            var loadingTask = loadingDialog.ShowAsync();
+            ImageMetadata metadata = null;
+
+            try
+            {
+                var worker = SessionManager.GetAnonymousWorkerForWiki(_pageWikiContext);
+
+                string fullFileTitle = filePageTitle;
+                if (
+                    !fullFileTitle.StartsWith("File:", StringComparison.OrdinalIgnoreCase)
+                    && !fullFileTitle.StartsWith("Image:", StringComparison.OrdinalIgnoreCase)
+                )
+                {
+                    fullFileTitle = "File:" + fullFileTitle;
+                }
+
+                string apiUrl =
+                    $"{_pageWikiContext.ApiEndpoint}?action=query&prop=imageinfo&iiprop=url|comment|user|timestamp&format=json&titles={Uri.EscapeDataString(fullFileTitle)}";
+                string json = await worker.GetJsonFromApiAsync(apiUrl);
+
+                if (string.IsNullOrEmpty(json))
+                {
+                    throw new Exception("API returned an empty response for image info.");
+                }
+
+                var response = JObject.Parse(json);
+                var pagesContainer = response?["query"]?["pages"] as JObject;
+                var page = pagesContainer?.Properties().FirstOrDefault()?.Value as JObject;
+                var imageInfo = page?["imageinfo"]?.FirstOrDefault();
+
+                if (imageInfo == null)
+                {
+                    var redirects = response?["query"]?["redirects"]?.FirstOrDefault();
+                    if (redirects != null)
+                    {
+                        var newTitle = redirects["to"]?.ToString();
+                        if (!string.IsNullOrEmpty(newTitle))
+                        {
+                            Debug.WriteLine(
+                                $"[ImageViewer] Redirect detected from '{filePageTitle}' to '{newTitle}'. Retrying..."
+                            );
+                            loadingDialog.Hide();
+                            await ShowImageViewerAsync(newTitle);
+                            return;
+                        }
+                    }
+                    throw new Exception(
+                        "Image metadata not found in the API response. The file may not exist or is not a standard image."
+                    );
+                }
+
+                metadata = new ImageMetadata
+                {
+                    PageTitle = page?["title"]?.ToString(),
+                    FullImageUrl = imageInfo["url"]?.ToString(),
+                    Description = imageInfo["comment"]?.ToString(),
+                    Author = imageInfo["user"]?.ToString(),
+                    Date = imageInfo["timestamp"]?.ToObject<DateTime>().ToString("g"),
+                    LicensingInfo = "Licensing information not available via API.",
+                };
+
+                if (
+                    !string.IsNullOrEmpty(metadata.Description)
+                    && metadata.Description.Contains("{{")
+                )
+                {
+                    try
+                    {
+                        string parseApiUrl =
+                            $"{_pageWikiContext.ApiEndpoint}?action=parse&text={Uri.EscapeDataString(metadata.Description)}&contentmodel=wikitext&prop=text&disablelimitreport=true&format=json";
+                        string parsedHtmlResult = await worker.GetRawHtmlFromUrlAsync(parseApiUrl);
+
+                        if (!string.IsNullOrEmpty(parsedHtmlResult))
+                        {
+                            var parsedResponse = JObject.Parse(parsedHtmlResult);
+                            string parsedHtml = parsedResponse?["parse"]?["text"]?["*"]?.ToString();
+
+                            if (!string.IsNullOrEmpty(parsedHtml))
+                            {
+                                var doc = new HtmlAgilityPack.HtmlDocument();
+                                doc.LoadHtml(parsedHtml);
+
+                                doc.DocumentNode.SelectNodes("//style|//script")
+                                    ?.ToList()
+                                    .ForEach(n => n.Remove());
+
+                                metadata.Description = System.Net.WebUtility.HtmlDecode(
+                                    doc.DocumentNode.InnerText.Trim()
+                                );
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine(
+                            $"[ImageViewer] Could not parse wikitext description: {ex.Message}"
+                        );
+                    }
+                }
+
+                string filePageUrl = _pageWikiContext.GetWikiPageUrl(fullFileTitle);
+                string html = await worker.GetRawHtmlFromUrlAsync(filePageUrl);
+                ParseImagePageHtml(html, metadata);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[ImageViewer] Failed to load image details: {ex.Message}");
+                loadingDialog.Hide();
+
+                var errorDialog = new ContentDialog
+                {
+                    Title = "Could Not Load Image",
+                    Content =
+                        $"There was a problem getting the image details. The file might be a video or another unsupported type.\n\nError: {ex.Message}",
+                    PrimaryButtonText = "Open in Browser",
+                    SecondaryButtonText = "Close",
+                };
+                var result = await errorDialog.ShowAsync();
+                if (result == ContentDialogResult.Primary)
+                {
+                    await Windows.System.Launcher.LaunchUriAsync(
+                        new Uri(_pageWikiContext.GetWikiPageUrl(filePageTitle))
+                    );
+                }
+                return;
+            }
+
+            loadingDialog.Hide();
+            if (metadata != null && !string.IsNullOrEmpty(metadata.FullImageUrl))
+            {
+                var imageDialog = new ImageViewerDialog(metadata);
+                await imageDialog.ShowAsync();
+            }
+            else
+            {
+                await Windows.System.Launcher.LaunchUriAsync(
+                    new Uri(_pageWikiContext.GetWikiPageUrl(filePageTitle))
+                );
+            }
+        }
+
+        private void ParseImagePageHtml(string html, ImageMetadata metadata)
+        {
+            if (string.IsNullOrEmpty(html) || metadata == null) return;
+
+            var doc = new HtmlDocument();
+            doc.LoadHtml(html);
+
+            doc.DocumentNode.SelectNodes("//style|//script")?.ToList().ForEach(n => n.Remove());
+
+            var fullImageLinkNode = doc.DocumentNode.SelectSingleNode("//div[@class='fullImageLink']//a")
+                                 ?? doc.DocumentNode.SelectSingleNode("//div[@class='fullMedia']//a");
+
+            if (fullImageLinkNode != null)
+            {
+                string href = fullImageLinkNode.GetAttributeValue("href", string.Empty);
+                if (!string.IsNullOrEmpty(href))
+                {
+                    try
+                    {
+                        var absoluteUri = new Uri(new Uri(_pageWikiContext.BaseUrl), href);
+                        metadata.FullImageUrl = absoluteUri.ToString();
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[ImageViewer] Failed to resolve relative image URL '{href}': {ex.Message}");
+                    }
+                }
+            }
+            var descriptionNode = doc.DocumentNode.SelectSingleNode("//td[@id='fileinfotpl_desc']/following-sibling::td[1]")
+                               ?? doc.DocumentNode.SelectSingleNode("//div[contains(@class, 'description') and @lang='en']")
+                               ?? doc.DocumentNode.SelectSingleNode("//div[@id='mw-imagepage-content']//p");
+            if (descriptionNode != null)
+            {
+                string descText = System.Net.WebUtility.HtmlDecode(descriptionNode.InnerText.Trim());
+                if (!string.IsNullOrWhiteSpace(descText) && descText != metadata.Description)
+                {
+                    metadata.Description = descText;
+                }
+            }
+
+            var licenseNode = doc.DocumentNode.SelectSingleNode("//div[contains(@class, 'licensetpl_wrapper')]//div[contains(@class, 'rlicense-desc')]")
+                           ?? doc.DocumentNode.SelectSingleNode("//div[contains(@class, 'im-license')]");
+            if (licenseNode != null)
+            {
+                metadata.LicensingInfo = System.Net.WebUtility.HtmlDecode(
+                    licenseNode.InnerText.Trim().Replace("\n", " ").Replace("\t", " ")
                 );
             }
         }

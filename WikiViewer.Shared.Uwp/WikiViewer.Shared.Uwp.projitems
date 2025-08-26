@@ -18,6 +18,10 @@
     <Compile Include="$(MSBuildThisFileDirectory)Controls\SymbolPickerDialog.xaml.cs">
       <DependentUpon>SymbolPickerDialog.xaml</DependentUpon>
     </Compile>
+    <Compile Include="$(MSBuildThisFileDirectory)Controls\ImageViewerDialog.xaml.cs">
+      <DependentUpon>ImageViewerDialog.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="$(MSBuildThisFileDirectory)converters\StringToVisibilityConverter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)helpers\NativeAnimatedImageLoader.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)services\UwpStorageProvider.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)viewmodels\SymbolViewModel.cs" />
@@ -67,6 +71,9 @@
     <Compile Include="$(MSBuildThisFileDirectory)Services\VisualTreeHelpers.cs" />
     <!-- ViewModels -->
     <Compile Include="$(MSBuildThisFileDirectory)ViewModels\SearchSuggestionViewModel.cs" />
+    <Page Include="$(MSBuildThisFileDirectory)Controls\ImageViewerDialog.xaml">
+      <SubType>Designer</SubType>
+    </Page>
   </ItemGroup>
   <ItemGroup>
     <Folder Include="$(MSBuildThisFileDirectory)Helpers\" />

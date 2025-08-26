@@ -164,13 +164,27 @@ namespace _1507_UWP.Pages
         }
 
         private async void ArticleDisplayWebView_NavigationStarting(
-            WebView sender,
-            WebViewNavigationStartingEventArgs args
-        )
+    WebView sender,
+    WebViewNavigationStartingEventArgs args
+)
         {
             if (args.Uri != null && args.Uri.Scheme == "ms-local-stream")
             {
                 return;
+            }
+
+            if (args.Uri != null)
+            {
+                string path = args.Uri.AbsolutePath.ToLowerInvariant();
+                if (path.Contains("/wiki/file:") || path.Contains("/wiki/image:"))
+                {
+                    args.Cancel = true;
+
+                    string fileTitle = System.IO.Path.GetFileName(args.Uri.AbsolutePath);
+
+                    _ = ShowImageViewerAsync(Uri.UnescapeDataString(fileTitle));
+                    return;
+                }
             }
 
             args.Cancel = true;

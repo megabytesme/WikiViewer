@@ -172,10 +172,18 @@ namespace _1809_UWP.Pages
         }
 
         private async void ArticleDisplayWebView_NavigationStarting(
-            CoreWebView2 sender,
-            CoreWebView2NavigationStartingEventArgs args
-        )
+    CoreWebView2 sender,
+    CoreWebView2NavigationStartingEventArgs args
+)
         {
+            args.Cancel = true;
+
+            if (string.IsNullOrEmpty(args.Uri) || _pageWikiContext == null)
+            {
+                return;
+            }
+            var uri = new Uri(args.Uri);
+
             if (
                 args.Uri.StartsWith(
                     $"https://{GetVirtualHostName()}",
@@ -183,33 +191,45 @@ namespace _1809_UWP.Pages
                 )
             )
             {
+                args.Cancel = false;
                 return;
             }
 
-            args.Cancel = true;
-            if (string.IsNullOrEmpty(args.Uri) || _pageWikiContext == null)
+            string path = uri.AbsolutePath;
+            int fileIndex = path.IndexOf("/File:", StringComparison.OrdinalIgnoreCase);
+            int imageIndex = path.IndexOf("/Image:", StringComparison.OrdinalIgnoreCase);
+
+            int startIndex = -1;
+            if (fileIndex != -1) startIndex = fileIndex;
+            if (imageIndex != -1 && (startIndex == -1 || imageIndex < startIndex)) startIndex = imageIndex;
+
+            if (uri.Host.Equals(_pageWikiContext.Host, StringComparison.OrdinalIgnoreCase) && startIndex != -1)
             {
+                string fileTitle = path.Substring(startIndex + 1);
+                _ = ShowImageViewerAsync(Uri.UnescapeDataString(fileTitle));
                 return;
             }
-
-            var uri = new Uri(args.Uri);
 
             if (HandleSpecialLink(uri))
             {
                 return;
             }
 
-            if (uri.Host.Equals(_pageWikiContext.Host, StringComparison.OrdinalIgnoreCase))
+            string articlePathPrefix = $"/{_pageWikiContext.ArticlePath}";
+
+            if (
+                uri.Host.Equals(_pageWikiContext.Host, StringComparison.OrdinalIgnoreCase)
+                && uri.AbsolutePath.StartsWith(
+                    $"/{_pageWikiContext.ArticlePath}",
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
             {
-                string articlePathPrefix = $"/{_pageWikiContext.ArticlePath}";
-                if (uri.AbsolutePath.StartsWith(articlePathPrefix))
+                string newTitle = uri.AbsolutePath.Substring(articlePathPrefix.Length);
+                if (!string.IsNullOrEmpty(newTitle))
                 {
-                    string newTitle = uri.AbsolutePath.Substring(articlePathPrefix.Length);
-                    if (!string.IsNullOrEmpty(newTitle))
-                    {
-                        NavigateToInternalPage(Uri.UnescapeDataString(newTitle));
-                        return;
-                    }
+                    NavigateToInternalPage(Uri.UnescapeDataString(newTitle));
+                    return;
                 }
             }
 
@@ -218,10 +238,9 @@ namespace _1809_UWP.Pages
 
         protected override void UpdateRefreshButtonVisibility()
         {
-            RefreshAppBarButton.Visibility =
-                AppSettings.ShowCssRefreshButton
-                    ? Windows.UI.Xaml.Visibility.Visible
-                    : Windows.UI.Xaml.Visibility.Collapsed;
+            RefreshAppBarButton.Visibility = AppSettings.ShowCssRefreshButton
+                ? Windows.UI.Xaml.Visibility.Visible
+                : Windows.UI.Xaml.Visibility.Collapsed;
         }
     }
 }

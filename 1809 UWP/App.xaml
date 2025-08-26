@@ -8,6 +8,7 @@
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
                 <ResourceDictionary>
+                    <shared:StringToVisibilityConverter x:Key="StringToVisibilityConverter" />
                     <shared:BooleanToVisibilityConverter x:Key="GlobalBoolToVisibility" />
                     <shared:StringUrlToImageSourceConverter x:Key="GlobalUrlToImageConverter" />
                     <shared:StringToBitmapImageConverter x:Key="StringToBitmapImageConverter" />
