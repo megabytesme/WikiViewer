@@ -105,7 +105,11 @@ namespace WikiViewer.Shared.Uwp.Pages
             ConnectionMethodComboBoxControl.Items.Add(
                 new ComboBoxItem
                 {
+#if UWP_1809
+                    Content = "WebView2 (Backup - Compatibility)",
+#else
                     Content = "WebView (Backup - Compatibility)",
+#endif
                     Tag = ConnectionMethod.WebView,
                 }
             );

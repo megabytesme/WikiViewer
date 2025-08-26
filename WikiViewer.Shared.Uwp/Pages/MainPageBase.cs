@@ -164,9 +164,9 @@ namespace WikiViewer.Shared.Uwp.Pages
             );
         }
 
-        private void OnWikisChanged(object sender, EventArgs e)
+        private async Task OnWikisChanged()
         {
-            _ = Dispatcher.RunAsync(
+            await Dispatcher.RunAsync(
                 Windows.UI.Core.CoreDispatcherPriority.Normal,
                 PopulateWikiNavItems
             );

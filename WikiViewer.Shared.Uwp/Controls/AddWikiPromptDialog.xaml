@@ -1,0 +1,22 @@
+﻿<ContentDialog
+    x:Class="WikiViewer.Shared.Uwp.Controls.AddWikiPromptDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="External Link"
+    PrimaryButtonText="Add to App"
+    SecondaryButtonText="Open in Browser"
+    PrimaryButtonClick="ContentDialog_PrimaryButtonClick"
+    SecondaryButtonClick="ContentDialog_SecondaryButtonClick">
+
+    <StackPanel MinWidth="300">
+        <StackPanel x:Name="LoadingPanel" Orientation="Horizontal" Margin="0,12">
+            <ProgressRing IsActive="True" Margin="0,0,12,0"/>
+            <TextBlock x:Name="LoadingText" Text="Analyzing link..." VerticalAlignment="Center"/>
+        </StackPanel>
+
+        <StackPanel x:Name="ResultPanel" Visibility="Collapsed">
+            <TextBlock x:Name="ResultMessage" TextWrapping="Wrap" Margin="0,0,0,12"/>
+            <TextBox x:Name="WikiNameTextBox" Header="Wiki Name" Visibility="Collapsed"/>
+        </StackPanel>
+    </StackPanel>
+</ContentDialog>

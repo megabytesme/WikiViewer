@@ -27,6 +27,8 @@ namespace _1809_UWP.Pages
         protected override AppBarButton FavoriteAppBarButton => FavoriteButton;
         protected override AppBarButton RefreshAppBarButton => RefreshButton;
 
+        protected override Type GetArticleViewerPageType() => typeof(ArticleViewerPage);
+
         protected override Type GetEditPageType() => typeof(EditPage);
 
         protected override Type GetLoginPageType() => typeof(LoginPage);
@@ -236,7 +238,7 @@ namespace _1809_UWP.Pages
                         else
                         {
                             Frame.Navigate(
-                                typeof(ArticleViewerPage),
+                                GetArticleViewerPageType(),
                                 new ArticleNavigationParameter
                                 {
                                     WikiId = targetWiki.Id,
@@ -248,8 +250,10 @@ namespace _1809_UWP.Pages
                     }
                 }
             }
-
-            await Windows.System.Launcher.LaunchUriAsync(uri);
+            else
+            {
+                await ShowWikiDetectionPromptAsync(uri);
+            }
         }
 
         protected override void UpdateRefreshButtonVisibility()
