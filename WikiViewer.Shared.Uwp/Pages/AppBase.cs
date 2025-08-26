@@ -76,6 +76,9 @@ namespace WikiViewer.Shared.Uwp
             MediaCacheService.DispatcherInvoker = (func) =>
                 Window.Current.Dispatcher.RunTaskAsync(func);
 
+            ImageMetadataCacheService.StorageProvider = storageProvider;
+            await ImageMetadataCacheService.InitializeAsync();
+
             SessionManager.ApiWorkerFactory = ApiWorkerFactory;
             SessionManager.CredentialService = credentialService;
             SessionManager.PlatformReady = UIReady;

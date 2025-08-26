@@ -102,6 +102,7 @@ namespace _1507_UWP.Services
         {
             await EnsureInitializedAsync();
             Debug.WriteLine($"[WebViewApiWorker] GetJsonFromApiAsync called for: {url}");
+
             return await GetContentFromUrlCore(
                 url,
                 (fullHtml) =>
@@ -273,45 +274,42 @@ namespace _1507_UWP.Services
                         );
                     }
 
-                    var stopwatch = Stopwatch.StartNew();
-                    while (stopwatch.Elapsed.TotalSeconds < 15)
-                    {
-                        await Task.Delay(250);
-                        string fullHtml = await WebView.InvokeScriptAsync(
-                            "eval",
-                            new[] { "document.documentElement.outerHTML" }
-                        );
-                        Debug.WriteLine(
-                            $"[WebViewApiWorker] -> Scraping attempt for {url}. HTML length: {fullHtml?.Length ?? 0}"
-                        );
-
-                        if (CloudflareDetector.IsCloudflareChallenge(fullHtml))
-                        {
-                            Debug.WriteLine(
-                                $"[WebViewApiWorker] -> FAILED: Cloudflare challenge detected in content for {url}."
-                            );
-                            throw new NeedsUserVerificationException(
-                                "Cloudflare challenge detected.",
-                                url
-                            );
-                        }
-
-                        if (string.IsNullOrEmpty(fullHtml))
-                            continue;
-
-                        string extractedContent = validationLogic(fullHtml);
-                        if (extractedContent != null)
-                        {
-                            Debug.WriteLine(
-                                $"[WebViewApiWorker] -> SUCCESS: Content validated for {url}."
-                            );
-                            return extractedContent;
-                        }
-                    }
-                    Debug.WriteLine(
-                        $"[WebViewApiWorker] -> FAILED: Content validation timed out for {url}."
+                    string fullHtml = await WebView.InvokeScriptAsync(
+                        "eval",
+                        new[] { "document.documentElement.outerHTML" }
                     );
-                    throw new TimeoutException($"Content validation timed out for GET URL: {url}");
+
+                    if (CloudflareDetector.IsCloudflareChallenge(fullHtml))
+                    {
+                        Debug.WriteLine(
+                            $"[WebViewApiWorker] -> FAILED: Cloudflare challenge detected in content for {url}."
+                        );
+                        throw new NeedsUserVerificationException(
+                            "Cloudflare challenge detected.",
+                            url
+                        );
+                    }
+
+                    if (string.IsNullOrEmpty(fullHtml))
+                    {
+                        throw new Exception(
+                            $"Failed to retrieve any HTML content for GET URL: {url}"
+                        );
+                    }
+
+                    string extractedContent = validationLogic(fullHtml);
+                    if (extractedContent != null)
+                    {
+                        Debug.WriteLine(
+                            $"[WebViewApiWorker] -> SUCCESS: Content validated for {url}."
+                        );
+                        return extractedContent;
+                    }
+
+                    Debug.WriteLine(
+                        $"[WebViewApiWorker] -> FAILED: Content validation failed for {url}."
+                    );
+                    throw new Exception($"Content validation failed for GET URL: {url}");
                 }
             );
         }

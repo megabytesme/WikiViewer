@@ -31,6 +31,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Services\FaviconService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\FavouritesService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\HttpClientApiWorker.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)services\ImageMetadataCacheService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)services\MediaCacheService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\SessionManager.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)services\ThemeManager.cs" />

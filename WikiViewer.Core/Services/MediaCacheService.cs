@@ -108,7 +108,15 @@ namespace WikiViewer.Core.Services
             if (string.IsNullOrEmpty(remoteUrl) || wiki == null)
                 return null;
 
-            string mapKey = originalThumbnailUrl ?? remoteUrl;
+            string mapKey = remoteUrl;
+
+            if (
+                !string.IsNullOrEmpty(originalThumbnailUrl)
+                && _urlToLocalPathMap.ContainsKey(originalThumbnailUrl)
+            )
+            {
+                mapKey = originalThumbnailUrl;
+            }
 
             if (_urlToLocalPathMap.TryGetValue(mapKey, out var localPath))
             {
@@ -118,18 +126,25 @@ namespace WikiViewer.Core.Services
                     )
                 )
                 {
+                    if (mapKey != remoteUrl)
+                    {
+                        _urlToLocalPathMap[remoteUrl] = localPath;
+                        RequestSave();
+                    }
                     return $"ms-appdata:///local{localPath}";
                 }
                 else
                 {
                     _urlToLocalPathMap.TryRemove(mapKey, out _);
+                    if (mapKey != remoteUrl)
+                        _urlToLocalPathMap.TryRemove(remoteUrl, out _);
                     RequestSave();
                 }
             }
 
             string finalPath = await _inFlightDownloads.GetOrAdd(
                 remoteUrl,
-                (url) => DownloadAndCacheAsync(url, wiki, mapKey)
+                (url) => DownloadAndCacheAsync(url, wiki)
             );
 
             _inFlightDownloads.TryRemove(remoteUrl, out _);
@@ -137,11 +152,7 @@ namespace WikiViewer.Core.Services
             return finalPath;
         }
 
-        private static async Task<string> DownloadAndCacheAsync(
-            string remoteUrl,
-            WikiInstance wiki,
-            string mapKey
-        )
+        private static async Task<string> DownloadAndCacheAsync(string remoteUrl, WikiInstance wiki)
         {
             await _downloadSemaphore.WaitAsync();
             try
@@ -157,17 +168,20 @@ namespace WikiViewer.Core.Services
                             .Security.Cryptography.SHA1.Create()
                             .ComputeHash(System.Text.Encoding.UTF8.GetBytes(remoteUrl));
 
-                        string fileExtension = System.IO.Path.GetExtension(new Uri(remoteUrl).AbsolutePath);
+                        string fileExtension = System.IO.Path.GetExtension(
+                            new Uri(remoteUrl).AbsolutePath
+                        );
+                        if (string.IsNullOrEmpty(fileExtension))
+                            fileExtension = ".jpg";
 
                         var fileName =
-                            string.Concat(hash.Select(b => b.ToString("x2")))
-                            + fileExtension;
+                            string.Concat(hash.Select(b => b.ToString("x2"))) + fileExtension;
 
                         var relativePath = $"/cache/{fileName}";
 
                         await StorageProvider.WriteBytesAsync($"cache\\{fileName}", imageBytes);
 
-                        _urlToLocalPathMap[mapKey] = relativePath;
+                        _urlToLocalPathMap[remoteUrl] = relativePath;
                         RequestSave();
 
                         return $"ms-appdata:///local{relativePath}";

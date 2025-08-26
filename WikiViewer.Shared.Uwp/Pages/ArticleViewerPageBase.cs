@@ -20,7 +20,7 @@ namespace WikiViewer.Shared.Uwp.Pages
     public abstract class ArticleViewerPageBase : Page
     {
         protected bool _isVerificationOnlyFlow = false;
-        protected WikiInstance _pageWikiContext;
+        public WikiInstance _pageWikiContext;
         protected string _pageTitleToFetch = "";
         protected string _verificationUrl = null;
         protected bool _isInitialized = false;
@@ -64,38 +64,51 @@ namespace WikiViewer.Shared.Uwp.Pages
             doc.LoadHtml(html);
             var baseUri = new Uri(_pageWikiContext.BaseUrl);
 
-            var mediaNodes = doc.DocumentNode.SelectNodes("//img[@src]");
-            if (mediaNodes == null)
+            var imageLinkNodes = doc.DocumentNode.SelectNodes("//a[contains(@href, '/File:') or contains(@href, '/Image:')]/img[@src]");
+            if (imageLinkNodes == null)
                 return;
 
-            foreach (var node in mediaNodes)
+            foreach (var imageNode in imageLinkNodes)
             {
-                string originalUrl = node.GetAttributeValue("src", null);
-                if (
-                    string.IsNullOrEmpty(originalUrl)
-                    || originalUrl.StartsWith("data:")
-                    || originalUrl.StartsWith("ms-appdata")
-                )
+                var linkNode = imageNode.ParentNode;
+                string filePageHref = linkNode.GetAttributeValue("href", "");
+                string thumbnailUrl = imageNode.GetAttributeValue("src", "");
+
+                if (string.IsNullOrEmpty(filePageHref) || string.IsNullOrEmpty(thumbnailUrl))
                     continue;
 
-                var absoluteUrl = new Uri(baseUri, originalUrl).AbsoluteUri;
+                int fileIndex = filePageHref.LastIndexOf("File:", StringComparison.OrdinalIgnoreCase);
+                int imageIndex = filePageHref.LastIndexOf("Image:", StringComparison.OrdinalIgnoreCase);
+                int titleIndex = Math.Max(fileIndex, imageIndex);
+                if (titleIndex == -1) continue;
+                string fileTitle = filePageHref.Substring(titleIndex);
 
                 _ = Task.Run(async () =>
                 {
-                    string localUri = await MediaCacheService.GetLocalUriAsync(
-                        absoluteUrl,
-                        _pageWikiContext
-                    );
-                    if (!string.IsNullOrEmpty(localUri))
+                    try
                     {
-                        string updateScript = GetImageUpdateScript(absoluteUrl, localUri);
-                        await Dispatcher.RunAsync(
-                            Windows.UI.Core.CoreDispatcherPriority.Normal,
-                            async () =>
-                            {
-                                await ExecuteScriptInWebViewAsync(updateScript);
-                            }
-                        );
+                        var metadata = ImageMetadataCacheService.GetMetadata(_pageWikiContext.Id, fileTitle)
+                                       ?? await FetchImageMetadataFromApiAsync(fileTitle);
+
+                        if (metadata == null) return;
+
+                        ImageMetadataCacheService.StoreMetadata(_pageWikiContext.Id, fileTitle, metadata);
+
+                        string absoluteThumbnailUrl = new Uri(baseUri, thumbnailUrl).AbsoluteUri;
+                        string localUri = await MediaCacheService.GetLocalUriAsync(metadata.FullImageUrl, _pageWikiContext, absoluteThumbnailUrl);
+
+                        if (!string.IsNullOrEmpty(localUri))
+                        {
+                            string originalSrcForScript = imageNode.GetAttributeValue("src", "");
+                            string updateScript = GetImageUpdateScript(originalSrcForScript, localUri);
+                            await Dispatcher.RunAsync(
+                                Windows.UI.Core.CoreDispatcherPriority.Normal,
+                                async () => await ExecuteScriptInWebViewAsync(updateScript));
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[EnhanceHtml] Failed to process image '{fileTitle}': {ex.Message}");
                     }
                 });
             }
@@ -629,104 +642,36 @@ namespace WikiViewer.Shared.Uwp.Pages
 
             try
             {
-                var worker = SessionManager.GetAnonymousWorkerForWiki(_pageWikiContext);
+                metadata = ImageMetadataCacheService.GetMetadata(_pageWikiContext.Id, filePageTitle);
 
-                string fullFileTitle = filePageTitle;
-                if (
-                    !fullFileTitle.StartsWith("File:", StringComparison.OrdinalIgnoreCase)
-                    && !fullFileTitle.StartsWith("Image:", StringComparison.OrdinalIgnoreCase)
-                )
+                if (metadata == null)
                 {
-                    fullFileTitle = "File:" + fullFileTitle;
-                }
+                    Debug.WriteLine($"[ImageViewer] Metadata for '{filePageTitle}' not cached. Fetching from API.");
+                    metadata = await FetchImageMetadataFromApiAsync(filePageTitle);
 
-                string apiUrl =
-                    $"{_pageWikiContext.ApiEndpoint}?action=query&prop=imageinfo&iiprop=url|comment|user|timestamp&format=json&titles={Uri.EscapeDataString(fullFileTitle)}";
-                string json = await worker.GetJsonFromApiAsync(apiUrl);
-
-                if (string.IsNullOrEmpty(json))
-                {
-                    throw new Exception("API returned an empty response for image info.");
-                }
-
-                var response = JObject.Parse(json);
-                var pagesContainer = response?["query"]?["pages"] as JObject;
-                var page = pagesContainer?.Properties().FirstOrDefault()?.Value as JObject;
-                var imageInfo = page?["imageinfo"]?.FirstOrDefault();
-
-                if (imageInfo == null)
-                {
-                    var redirects = response?["query"]?["redirects"]?.FirstOrDefault();
-                    if (redirects != null)
+                    if (metadata != null)
                     {
-                        var newTitle = redirects["to"]?.ToString();
-                        if (!string.IsNullOrEmpty(newTitle))
-                        {
-                            Debug.WriteLine(
-                                $"[ImageViewer] Redirect detected from '{filePageTitle}' to '{newTitle}'. Retrying..."
-                            );
-                            loadingDialog.Hide();
-                            await ShowImageViewerAsync(newTitle);
-                            return;
-                        }
-                    }
-                    throw new Exception(
-                        "Image metadata not found in the API response. The file may not exist or is not a standard image."
-                    );
-                }
-
-                metadata = new ImageMetadata
-                {
-                    PageTitle = page?["title"]?.ToString(),
-                    FullImageUrl = imageInfo["url"]?.ToString(),
-                    Description = imageInfo["comment"]?.ToString(),
-                    Author = imageInfo["user"]?.ToString(),
-                    Date = imageInfo["timestamp"]?.ToObject<DateTime>().ToString("g"),
-                    LicensingInfo = "Licensing information not available via API.",
-                };
-
-                if (
-                    !string.IsNullOrEmpty(metadata.Description)
-                    && metadata.Description.Contains("{{")
-                )
-                {
-                    try
-                    {
-                        string parseApiUrl =
-                            $"{_pageWikiContext.ApiEndpoint}?action=parse&text={Uri.EscapeDataString(metadata.Description)}&contentmodel=wikitext&prop=text&disablelimitreport=true&format=json";
-                        string parsedHtmlResult = await worker.GetRawHtmlFromUrlAsync(parseApiUrl);
-
-                        if (!string.IsNullOrEmpty(parsedHtmlResult))
-                        {
-                            var parsedResponse = JObject.Parse(parsedHtmlResult);
-                            string parsedHtml = parsedResponse?["parse"]?["text"]?["*"]?.ToString();
-
-                            if (!string.IsNullOrEmpty(parsedHtml))
-                            {
-                                var doc = new HtmlAgilityPack.HtmlDocument();
-                                doc.LoadHtml(parsedHtml);
-
-                                doc.DocumentNode.SelectNodes("//style|//script")
-                                    ?.ToList()
-                                    .ForEach(n => n.Remove());
-
-                                metadata.Description = System.Net.WebUtility.HtmlDecode(
-                                    doc.DocumentNode.InnerText.Trim()
-                                );
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine(
-                            $"[ImageViewer] Could not parse wikitext description: {ex.Message}"
-                        );
+                        ImageMetadataCacheService.StoreMetadata(_pageWikiContext.Id, filePageTitle, metadata);
                     }
                 }
+                else
+                {
+                    Debug.WriteLine($"[ImageViewer] Loaded metadata for '{filePageTitle}' from cache.");
+                }
 
-                string filePageUrl = _pageWikiContext.GetWikiPageUrl(fullFileTitle);
-                string html = await worker.GetRawHtmlFromUrlAsync(filePageUrl);
-                ParseImagePageHtml(html, metadata);
+                if (metadata != null)
+                {
+                    loadingDialog.Hide();
+
+                    var imageDialog = new ImageViewerDialog(metadata, _pageWikiContext);
+
+                    await imageDialog.ShowAsync();
+                }
+                else
+                {
+                    loadingDialog.Hide();
+                    throw new Exception("Failed to retrieve image metadata from both cache and API.");
+                }
             }
             catch (Exception ex)
             {
@@ -736,33 +681,95 @@ namespace WikiViewer.Shared.Uwp.Pages
                 var errorDialog = new ContentDialog
                 {
                     Title = "Could Not Load Image",
-                    Content =
-                        $"There was a problem getting the image details. The file might be a video or another unsupported type.\n\nError: {ex.Message}",
+                    Content = $"There was a problem getting the image details. The file might be a video or another unsupported type.\n\nError: {ex.Message}",
                     PrimaryButtonText = "Open in Browser",
-                    SecondaryButtonText = "Close",
+                    SecondaryButtonText = "Close"
                 };
                 var result = await errorDialog.ShowAsync();
                 if (result == ContentDialogResult.Primary)
                 {
-                    await Windows.System.Launcher.LaunchUriAsync(
-                        new Uri(_pageWikiContext.GetWikiPageUrl(filePageTitle))
-                    );
+                    await Windows.System.Launcher.LaunchUriAsync(new Uri(_pageWikiContext.GetWikiPageUrl(filePageTitle)));
                 }
-                return;
+            }
+        }
+
+        private async Task<ImageMetadata> FetchImageMetadataFromApiAsync(string filePageTitle)
+        {
+            var worker = SessionManager.GetAnonymousWorkerForWiki(_pageWikiContext);
+
+            string fullFileTitle = filePageTitle;
+            if (!fullFileTitle.StartsWith("File:", StringComparison.OrdinalIgnoreCase) && !fullFileTitle.StartsWith("Image:", StringComparison.OrdinalIgnoreCase))
+            {
+                fullFileTitle = "File:" + fullFileTitle;
             }
 
-            loadingDialog.Hide();
-            if (metadata != null && !string.IsNullOrEmpty(metadata.FullImageUrl))
+            string apiUrl = $"{_pageWikiContext.ApiEndpoint}?action=query&prop=imageinfo&iiprop=url|comment|user|timestamp&format=json&titles={Uri.EscapeDataString(fullFileTitle)}";
+            string json = await worker.GetJsonFromApiAsync(apiUrl);
+
+            if (string.IsNullOrEmpty(json)) return null;
+
+            var response = JObject.Parse(json);
+            var pagesContainer = response?["query"]?["pages"] as JObject;
+            var page = pagesContainer?.Properties().FirstOrDefault()?.Value as JObject;
+            var imageInfo = page?["imageinfo"]?.FirstOrDefault();
+
+            if (imageInfo == null)
             {
-                var imageDialog = new ImageViewerDialog(metadata);
-                await imageDialog.ShowAsync();
+                var redirects = response?["query"]?["redirects"]?.FirstOrDefault();
+                if (redirects != null)
+                {
+                    var newTitle = redirects["to"]?.ToString();
+                    if (!string.IsNullOrEmpty(newTitle))
+                    {
+                        Debug.WriteLine($"[ImageViewer] Redirect detected from '{filePageTitle}' to '{newTitle}'. Retrying fetch...");
+                        return await FetchImageMetadataFromApiAsync(newTitle);
+                    }
+                }
+                return null;
             }
-            else
+
+            var metadata = new ImageMetadata
             {
-                await Windows.System.Launcher.LaunchUriAsync(
-                    new Uri(_pageWikiContext.GetWikiPageUrl(filePageTitle))
-                );
+                PageTitle = page?["title"]?.ToString(),
+                FullImageUrl = imageInfo["url"]?.ToString(),
+                Description = imageInfo["comment"]?.ToString(),
+                Author = imageInfo["user"]?.ToString(),
+                Date = imageInfo["timestamp"]?.ToObject<DateTime>().ToString("g"),
+                LicensingInfo = "Licensing information not available via API."
+            };
+
+            if (!string.IsNullOrEmpty(metadata.Description) && metadata.Description.Contains("{{"))
+            {
+                try
+                {
+                    string parseApiUrl = $"{_pageWikiContext.ApiEndpoint}?action=parse&text={Uri.EscapeDataString(metadata.Description)}&contentmodel=wikitext&prop=text&disablelimitreport=true&format=json";
+
+                    string parsedJson = await worker.GetJsonFromApiAsync(parseApiUrl);
+
+                    if (!string.IsNullOrEmpty(parsedJson))
+                    {
+                        var parsedResponse = JObject.Parse(parsedJson);
+                        string parsedHtml = parsedResponse?["parse"]?["text"]?["*"]?.ToString();
+                        if (!string.IsNullOrEmpty(parsedHtml))
+                        {
+                            var doc = new HtmlAgilityPack.HtmlDocument();
+                            doc.LoadHtml(parsedHtml);
+                            doc.DocumentNode.SelectNodes("//style|//script")?.ToList().ForEach(n => n.Remove());
+                            metadata.Description = System.Net.WebUtility.HtmlDecode(doc.DocumentNode.InnerText.Trim());
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[ImageViewer] Could not parse wikitext description: {ex.Message}");
+                }
             }
+
+            string filePageUrl = _pageWikiContext.GetWikiPageUrl(fullFileTitle);
+            string html = await worker.GetRawHtmlFromUrlAsync(filePageUrl);
+            ParseImagePageHtml(html, metadata);
+
+            return metadata;
         }
 
         private void ParseImagePageHtml(string html, ImageMetadata metadata)
