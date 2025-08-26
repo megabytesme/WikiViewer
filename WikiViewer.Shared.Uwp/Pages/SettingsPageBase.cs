@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using WikiViewer.Core;
+using WikiViewer.Core.Enums;
 using WikiViewer.Core.Managers;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
@@ -18,6 +19,7 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected readonly ObservableCollection<WikiInstance> Wikis =
             new ObservableCollection<WikiInstance>();
 
+        protected abstract ComboBox DefaultConnectionMethodComboBoxControl { get; }
         protected abstract ToggleSwitch CachingToggleControl { get; }
         protected abstract ComboBox ConcurrencyComboBoxControl { get; }
         protected abstract TextBlock CacheSizeTextControl { get; }
@@ -35,6 +37,7 @@ namespace WikiViewer.Shared.Uwp.Pages
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
             PopulateConcurrencyComboBox();
+            PopulateDefaultConnectionMethodComboBox();
 
             var savedLevel = AppSettings.DownloadConcurrencyLevel;
 
@@ -113,6 +116,24 @@ namespace WikiViewer.Shared.Uwp.Pages
             );
 
             ConcurrencyComboBoxControl.SelectedValuePath = "Tag";
+        }
+
+        private void PopulateDefaultConnectionMethodComboBox()
+        {
+            DefaultConnectionMethodComboBoxControl.Items.Clear();
+            DefaultConnectionMethodComboBoxControl.Items.Add(new ComboBoxItem { Content = "WebView (Recommended)", Tag = ConnectionMethod.WebView });
+            DefaultConnectionMethodComboBoxControl.Items.Add(new ComboBoxItem { Content = "Proxy (Required for some sites)", Tag = ConnectionMethod.HttpClientProxy });
+
+            DefaultConnectionMethodComboBoxControl.SelectedValue = AppSettings.DefaultConnectionMethod;
+            DefaultConnectionMethodComboBoxControl.SelectedValuePath = "Tag";
+        }
+
+        protected void DefaultConnectionMethodComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (DefaultConnectionMethodComboBoxControl.SelectedValue is ConnectionMethod method)
+            {
+                AppSettings.DefaultConnectionMethod = method;
+            }
         }
 
         private void UpdateConcurrencyDescription(ConcurrencyLevel level)

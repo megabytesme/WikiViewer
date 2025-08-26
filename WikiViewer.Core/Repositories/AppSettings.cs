@@ -1,4 +1,5 @@
 using System;
+using WikiViewer.Core.Enums;
 using WikiViewer.Core.Interfaces;
 using Windows.UI.Xaml;
 
@@ -24,6 +25,7 @@ namespace WikiViewer.Core
         private const string ProxyDisclaimerKey = "HasAcceptedProxyDisclaimer";
         private const string EditorThemeKey = "EditorTheme";
         private const string ShowCssRefreshButtonKey = "ShowCssRefreshButton";
+        private const string DefaultConnectionMethodKey = "DefaultConnectionMethodForNewWikis";
 
         private const string DefaultMainPageName = "Main Page";
 
@@ -99,6 +101,17 @@ namespace WikiViewer.Core
                         return Environment.ProcessorCount;
                 }
             }
+        }
+
+        public static ConnectionMethod DefaultConnectionMethod
+        {
+            get =>
+                (ConnectionMethod)
+                    SettingsProvider.GetValue(
+                        DefaultConnectionMethodKey,
+                        (int)ConnectionMethod.HttpClientProxy
+                    );
+            set => SettingsProvider.SetValue(DefaultConnectionMethodKey, (int)value);
         }
 
         public static string MainPageName => DefaultMainPageName;

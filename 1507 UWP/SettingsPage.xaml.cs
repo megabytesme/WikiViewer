@@ -18,6 +18,7 @@ namespace _1507_UWP.Pages
         protected override ListView WikiListViewControl => this.WikiListView;
         protected override TextBlock ConcurrencyDescriptionTextControl => this.ConcurrencyDescriptionText;
         protected override ToggleSwitch ShowCssRefreshButtonToggleControl => ShowCssRefreshToggle;
+        protected override ComboBox DefaultConnectionMethodComboBoxControl => this.DefaultConnectionMethodComboBox;
 
         protected override Type GetWikiDetailPageType() => typeof(WikiDetailPage);
     }

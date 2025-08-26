@@ -40,6 +40,10 @@
 
                 <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
                     <StackPanel Spacing="12">
+                        <ComboBox x:Name="DefaultConnectionMethodComboBox"
+                                  Header="Default connection method for new wikis"
+                                  SelectionChanged="DefaultConnectionMethodComboBox_SelectionChanged"
+                                  Margin="0,12,0,0"/>
                         <TextBlock Text="Connection" Style="{ThemeResource SubtitleTextBlockStyle}"/>
                         <ComboBox x:Name="ConcurrencyComboBox"
                                   Header="Concurrent downloads per page"
