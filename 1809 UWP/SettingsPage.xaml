@@ -28,7 +28,9 @@
                             <ListView.ItemTemplate>
                                 <DataTemplate x:DataType="models:WikiInstance">
                                     <StackPanel Orientation="Horizontal" Spacing="12" Padding="8,4">
-                                        <SymbolIcon Symbol="Globe"/>
+                                        <BitmapIcon UriSource="{x:Bind IconUrl, Mode=OneWay}"
+                                                    Width="24" Height="24"
+                                                    ShowAsMonochrome="False"/>
                                         <TextBlock Text="{x:Bind Name}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </DataTemplate>
