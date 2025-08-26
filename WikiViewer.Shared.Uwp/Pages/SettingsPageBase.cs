@@ -136,23 +136,40 @@ namespace WikiViewer.Shared.Uwp.Pages
             DefaultConnectionMethodComboBoxControl.Items.Add(
                 new ComboBoxItem
                 {
-                    Content = "WebView (Recommended)",
+                    Content = "HttpClient (Recommended - Fastest)",
+                    Tag = ConnectionMethod.HttpClient,
+                }
+            );
+            DefaultConnectionMethodComboBoxControl.Items.Add(
+                new ComboBoxItem
+                {
+#if UWP_1809
+                    Content = "WebView2 (Backup - Compatibility)",
+#else
+                    Content = "WebView (Backup - Compatibility)",
+#endif
                     Tag = ConnectionMethod.WebView,
                 }
             );
             DefaultConnectionMethodComboBoxControl.Items.Add(
                 new ComboBoxItem
                 {
-                    Content = "Proxy (Required for some sites)",
+                    Content = "Proxy (Last Resort)",
                     Tag = ConnectionMethod.HttpClientProxy,
                 }
             );
             DefaultConnectionMethodComboBoxControl.SelectedValuePath = "Tag";
         }
 
-        protected void DefaultConnectionMethodComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        protected void DefaultConnectionMethodComboBox_SelectionChanged(
+            object sender,
+            SelectionChangedEventArgs e
+        )
         {
-            if (DefaultConnectionMethodComboBoxControl.SelectedItem is ComboBoxItem selectedItem && selectedItem.Tag is ConnectionMethod method)
+            if (
+                DefaultConnectionMethodComboBoxControl.SelectedItem is ComboBoxItem selectedItem
+                && selectedItem.Tag is ConnectionMethod method
+            )
             {
                 AppSettings.DefaultConnectionMethod = method;
             }

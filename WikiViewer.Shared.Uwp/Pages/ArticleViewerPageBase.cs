@@ -27,6 +27,7 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected readonly Stack<string> _articleHistory = new Stack<string>();
         public bool CanGoBackInPage => _articleHistory.Count > 1;
         protected abstract AppBarButton RefreshAppBarButton { get; }
+        protected abstract Type GetArticleViewerPageType();
 
         protected abstract TextBlock ArticleTitleTextBlock { get; }
         protected abstract TextBlock LoadingTextBlock { get; }
@@ -819,6 +820,31 @@ namespace WikiViewer.Shared.Uwp.Pages
                 metadata.LicensingInfo = System.Net.WebUtility.HtmlDecode(
                     licenseNode.InnerText.Trim().Replace("\n", " ").Replace("\t", " ")
                 );
+            }
+        }
+
+        protected async Task ShowWikiDetectionPromptAsync(Uri uri)
+        {
+            var dialog = new Controls.AddWikiPromptDialog(uri);
+            var result = await dialog.ShowAsync();
+
+            if (result == ContentDialogResult.Primary && dialog.NewWikiInstance != null)
+            {
+                await WikiManager.AddWikiAsync(dialog.NewWikiInstance);
+
+                string articlePathPrefix = $"/{dialog.NewWikiInstance.ArticlePath}";
+                if (uri.AbsolutePath.StartsWith(articlePathPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    string newTitle = uri.AbsolutePath.Substring(articlePathPrefix.Length);
+
+                    Frame.Navigate(
+                        GetArticleViewerPageType(),
+                        new ArticleNavigationParameter { WikiId = dialog.NewWikiInstance.Id, PageTitle = newTitle });
+                }
+            }
+            else
+            {
+                await Windows.System.Launcher.LaunchUriAsync(uri);
             }
         }
     }

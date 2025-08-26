@@ -10,12 +10,16 @@ namespace _1809_UWP.Services
     {
         public IApiWorker CreateApiWorker(WikiInstance wiki)
         {
-            if (wiki.PreferredConnectionMethod == ConnectionMethod.HttpClientProxy)
+            switch (wiki.PreferredConnectionMethod)
             {
-                return new ProxyHttpClientApiWorker();
+                case ConnectionMethod.HttpClient:
+                    return new HttpClientApiWorker();
+                case ConnectionMethod.HttpClientProxy:
+                    return new ProxyHttpClientApiWorker();
+                case ConnectionMethod.WebView:
+                default:
+                    return new PooledWebView2ProxyWorker(wiki);
             }
-
-            return new PooledWebView2ProxyWorker(wiki);
         }
 
         public Task<IApiWorker> CreateApiWorkerAsync(WikiInstance wiki)

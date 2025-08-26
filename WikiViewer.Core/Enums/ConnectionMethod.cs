@@ -4,5 +4,6 @@ namespace WikiViewer.Core.Enums
     {
         WebView,
         HttpClientProxy,
+        HttpClient,
     }
 }

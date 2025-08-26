@@ -31,7 +31,7 @@
                     </StackPanel>
                 </Button>
                 <TextBlock x:Name="DetectionStatusTextBlock" Visibility="Collapsed" TextWrapping="Wrap" Style="{ThemeResource CaptionTextBlockStyle}" Margin="0,0,0,12"/>
-                <ToggleSwitch x:Name="ConnectionMethodToggleSwitch" Header="Connection Backend" OnContent="Proxy" OffContent="WebView" Toggled="ConnectionMethodToggle_Toggled"/>
+                <ComboBox x:Name="ConnectionMethodComboBox" Header="Connection Backend" Margin="0,0,0,12"/>
             </StackPanel>
         </ScrollViewer>
 

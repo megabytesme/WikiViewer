@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Threading.Tasks;
 using WikiViewer.Core;
 using WikiViewer.Core.Enums;
@@ -17,23 +18,49 @@ namespace WikiViewer.Shared.Uwp.Pages
     {
         private WikiInstance _currentWiki;
         private bool _isNewWiki = false;
-        private bool _isConnectionToggleEvent = false;
 
         protected abstract TextBlock PageTitleTextBlockControl { get; }
         protected abstract TextBox WikiNameTextBoxControl { get; }
         protected abstract TextBox WikiUrlTextBoxControl { get; }
         protected abstract TextBox ScriptPathTextBoxControl { get; }
         protected abstract TextBox ArticlePathTextBoxControl { get; }
-        protected abstract ToggleSwitch ConnectionMethodToggleSwitchControl { get; }
+        protected abstract ComboBox ConnectionMethodComboBoxControl { get; }
         protected abstract TextBlock DetectionStatusTextBlockControl { get; }
         protected abstract Grid LoadingOverlayControl { get; }
         protected abstract TextBlock LoadingTextControl { get; }
 
         protected abstract void ShowVerificationPanel(string url);
+        
+        public WikiDetailPageBase()
+        {
+            this.Loaded += OnLoaded;
+        }
+
+        private void OnLoaded(object sender, RoutedEventArgs e)
+        {
+            if (_currentWiki != null)
+            {
+                var mainPage = this.FindParent<MainPageBase>();
+                if (mainPage != null)
+                {
+                    mainPage.SetPageTitle(_isNewWiki ? "Add New Wiki" : $"Editing '{_currentWiki.Name}'");
+                }
+
+                var methodMatch = ConnectionMethodComboBoxControl
+                    .Items.OfType<ComboBoxItem>()
+                    .FirstOrDefault(i => Equals(i.Tag, _currentWiki.PreferredConnectionMethod));
+
+                if (methodMatch != null)
+                {
+                    ConnectionMethodComboBoxControl.SelectedItem = methodMatch;
+                }
+            }
+        }
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
+
             if (e.Parameter is Guid wikiId)
             {
                 _currentWiki = WikiManager.GetWikiById(wikiId);
@@ -48,11 +75,10 @@ namespace WikiViewer.Shared.Uwp.Pages
                 _currentWiki = new WikiInstance
                 {
                     Name = "New Wiki",
-                    BaseUrl = "https://www.mediawiki.org/",
+                    BaseUrl = "https://www.example.com/",
+                    PreferredConnectionMethod = AppSettings.DefaultConnectionMethod,
                 };
                 PopulateDetails();
-                PageTitleTextBlockControl.Text = "Add New Wiki";
-                this.FindParent<MainPageBase>()?.SetPageTitle("Add New Wiki");
             }
 
             if (_currentWiki == null)
@@ -63,17 +89,34 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         private void PopulateDetails()
         {
-            PageTitleTextBlockControl.Text = _isNewWiki
-                ? "Add New Wiki"
-                : $"Editing '{_currentWiki.Name}'";
-            this.FindParent<MainPageBase>()
-                ?.SetPageTitle(_isNewWiki ? "Add New Wiki" : $"Editing '{_currentWiki.Name}'");
             WikiNameTextBoxControl.Text = _currentWiki.Name;
             WikiUrlTextBoxControl.Text = _currentWiki.BaseUrl;
             ScriptPathTextBoxControl.Text = _currentWiki.ScriptPath;
             ArticlePathTextBoxControl.Text = _currentWiki.ArticlePath;
-            ConnectionMethodToggleSwitchControl.IsOn =
-                _currentWiki.PreferredConnectionMethod == ConnectionMethod.HttpClientProxy;
+
+            ConnectionMethodComboBoxControl.Items.Clear();
+            ConnectionMethodComboBoxControl.Items.Add(
+                new ComboBoxItem
+                {
+                    Content = "HttpClient (Recommended - Fastest)",
+                    Tag = ConnectionMethod.HttpClient,
+                }
+            );
+            ConnectionMethodComboBoxControl.Items.Add(
+                new ComboBoxItem
+                {
+                    Content = "WebView (Backup - Compatibility)",
+                    Tag = ConnectionMethod.WebView,
+                }
+            );
+            ConnectionMethodComboBoxControl.Items.Add(
+                new ComboBoxItem
+                {
+                    Content = "Proxy (Last Resort)",
+                    Tag = ConnectionMethod.HttpClientProxy,
+                }
+            );
+            ConnectionMethodComboBoxControl.SelectedValuePath = "Tag";
         }
 
         protected async void SaveButton_Click(object sender, RoutedEventArgs e)
@@ -85,9 +128,8 @@ namespace WikiViewer.Shared.Uwp.Pages
             _currentWiki.BaseUrl = WikiUrlTextBoxControl.Text;
             _currentWiki.ScriptPath = ScriptPathTextBoxControl.Text;
             _currentWiki.ArticlePath = ArticlePathTextBoxControl.Text;
-            _currentWiki.PreferredConnectionMethod = ConnectionMethodToggleSwitchControl.IsOn
-                ? ConnectionMethod.HttpClientProxy
-                : ConnectionMethod.WebView;
+            _currentWiki.PreferredConnectionMethod = (ConnectionMethod)
+                ConnectionMethodComboBoxControl.SelectedValue;
 
             if (_isNewWiki)
             {
@@ -156,22 +198,21 @@ namespace WikiViewer.Shared.Uwp.Pages
             LoadingTextControl.Text = "Detecting paths...";
             DetectionStatusTextBlockControl.Visibility = Visibility.Collapsed;
 
-            var tempWiki = new WikiInstance
+            var tempWikiForDetection = new WikiInstance
             {
                 BaseUrl = urlToDetect,
-                PreferredConnectionMethod = ConnectionMethodToggleSwitchControl.IsOn
-                    ? ConnectionMethod.HttpClientProxy
-                    : ConnectionMethod.WebView,
+                PreferredConnectionMethod = (ConnectionMethod)
+                    ConnectionMethodComboBoxControl.SelectedValue,
             };
 
-            using (var tempWorker = App.ApiWorkerFactory.CreateApiWorker(tempWiki))
+            using (var detectorWorker = App.ApiWorkerFactory.CreateApiWorker(tempWikiForDetection))
             {
                 try
                 {
-                    await tempWorker.InitializeAsync(urlToDetect);
+                    await detectorWorker.InitializeAsync(urlToDetect);
                     var detectedPaths = await WikiPathDetectorService.DetectPathsAsync(
                         urlToDetect,
-                        tempWorker
+                        detectorWorker
                     );
 
                     if (detectedPaths.WasDetectedSuccessfully)
@@ -214,51 +255,6 @@ namespace WikiViewer.Shared.Uwp.Pages
                 {
                     DetectionStatusTextBlockControl.Visibility = Visibility.Visible;
                     LoadingOverlayControl.Visibility = Visibility.Collapsed;
-                }
-            }
-        }
-
-        protected async void ConnectionMethodToggle_Toggled(object sender, RoutedEventArgs e)
-        {
-            if (_isConnectionToggleEvent)
-                return;
-
-            if (ConnectionMethodToggleSwitchControl.IsOn && !AppSettings.HasAcceptedProxyDisclaimer)
-            {
-                var dialog = new ContentDialog
-                {
-                    Title = "Important Notice: Proxy Service",
-                    Content = new ScrollViewer
-                    {
-                        VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                        Content = new TextBlock
-                        {
-                            Text =
-                                "You are enabling an optional, experimental proxy service. Please read the following carefully:\n\n"
-                                + "1. Data Transmission: To bypass web restrictions (like Cloudflare), your network requests from this app will be routed through an intermediary server hosted by the developer in the United Kingdom.\n\n"
-                                + "2. No Logging Policy: This server does not intentionally log or store the content of the pages you visit. Its purpose is only to transmit the request and return the result.\n\n"
-                                + "3. Security and Data Handling: The connection to the proxy server is secured using HTTPS (SSL/TLS). However, to function, the server must process your requests. This means unencrypted data is momentarily accessible on the server before being forwarded to the destination wiki. For this reason, it is strongly advised that you do not use this service for sensitive accounts or private information.\n\n"
-                                + "4. Acceptable Use: You agree to use this service only for lawful purposes. You will not use it to access or distribute illegal content. The developer reserves the right to block access to the service in cases of misuse.\n\n"
-                                + "5. No Warranty: This service is provided 'as is', without any guarantees of availability, speed, or reliability. It may not work for all websites.\n\n"
-                                + "By clicking 'Agree and Enable', you acknowledge that you have read and understood these points and agree to use this service at your own risk.",
-                            TextWrapping = TextWrapping.Wrap
-                        }
-                    },
-                    PrimaryButtonText = "Agree and Enable",
-                    SecondaryButtonText = "Cancel"
-                };
-
-                var result = await dialog.ShowAsync();
-
-                if (result == ContentDialogResult.Primary)
-                {
-                    AppSettings.HasAcceptedProxyDisclaimer = true;
-                }
-                else
-                {
-                    _isConnectionToggleEvent = true;
-                    ConnectionMethodToggleSwitchControl.IsOn = false;
-                    _isConnectionToggleEvent = false;
                 }
             }
         }

@@ -18,7 +18,7 @@ namespace _1507_UWP
         protected override TextBox WikiUrlTextBoxControl => this.WikiUrlTextBox;
         protected override TextBox ScriptPathTextBoxControl => this.ScriptPathTextBox;
         protected override TextBox ArticlePathTextBoxControl => this.ArticlePathTextBox;
-        protected override ToggleSwitch ConnectionMethodToggleSwitchControl => this.ConnectionMethodToggleSwitch;
+        protected override ComboBox ConnectionMethodComboBoxControl => this.ConnectionMethodComboBox;
         protected override TextBlock DetectionStatusTextBlockControl => this.DetectionStatusTextBlock;
         protected override Grid LoadingOverlayControl => this.LoadingOverlay;
         protected override TextBlock LoadingTextControl => this.LoadingText;
