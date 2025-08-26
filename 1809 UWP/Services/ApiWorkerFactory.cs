@@ -12,7 +12,7 @@ namespace _1809_UWP.Services
         {
             if (wiki.PreferredConnectionMethod == ConnectionMethod.HttpClientProxy)
             {
-                return new HttpClientApiWorker();
+                return new ProxyHttpClientApiWorker();
             }
 
             return new PooledWebView2ProxyWorker(wiki);

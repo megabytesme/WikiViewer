@@ -13,7 +13,7 @@ namespace _1507_UWP.Services
             IApiWorker worker;
             if (wiki.PreferredConnectionMethod == ConnectionMethod.HttpClientProxy)
             {
-                worker = new HttpClientApiWorker();
+                worker = new ProxyHttpClientApiWorker();
             }
             else
             {
