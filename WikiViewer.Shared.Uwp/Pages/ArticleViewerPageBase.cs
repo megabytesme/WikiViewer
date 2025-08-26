@@ -292,10 +292,27 @@ namespace WikiViewer.Shared.Uwp.Pages
                         worker,
                         _pageWikiContext
                     );
+
+                var doc = new HtmlDocument();
+                doc.LoadHtml(htmlContent);
+
+                var redirectNode = doc.DocumentNode.SelectSingleNode("//div[contains(@class, 'redirectMsg')]//a[@title]");
+
+                if (redirectNode != null)
+                {
+                    string newTitle = redirectNode.GetAttributeValue("title", null);
+                    if (!string.IsNullOrEmpty(newTitle))
+                    {
+                        Debug.WriteLine($"HTML redirect detected. Navigating from '{_pageTitleToFetch}' to '{newTitle}'.");
+                        NavigateToInternalPage(newTitle);
+                        return;
+                    }
+                }
+
                 if (_pageTitleToFetch.Equals("Special:Random", StringComparison.OrdinalIgnoreCase))
                 {
                     _pageTitleToFetch = resolvedTitle.Replace(' ', '_');
-                    _articleHistory.Pop();
+                    if (_articleHistory.Any()) _articleHistory.Pop();
                     _articleHistory.Push(_pageTitleToFetch);
                     ArticleTitleTextBlock.Text = resolvedTitle;
                     mainPage?.SetPageTitle(resolvedTitle);
