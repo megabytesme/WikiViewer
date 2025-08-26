@@ -51,6 +51,18 @@ namespace WikiViewer.Shared.Uwp.Pages
                 UpdateConcurrencyDescription(savedLevel);
             }
 
+            var savedMethod = AppSettings.DefaultConnectionMethod;
+            var methodMatch = DefaultConnectionMethodComboBoxControl
+                .Items.OfType<ComboBoxItem>()
+                .FirstOrDefault(i => Equals(i.Tag, savedMethod));
+            if (methodMatch != null)
+            {
+                DefaultConnectionMethodComboBoxControl.SelectedItem = methodMatch;
+            }
+
+            DefaultConnectionMethodComboBoxControl.SelectionChanged +=
+                DefaultConnectionMethodComboBox_SelectionChanged;
+
             CachingToggleControl.IsOn = AppSettings.IsCachingEnabled;
             _ = UpdateCacheSizeAsync();
             LoadWikis();
@@ -121,16 +133,26 @@ namespace WikiViewer.Shared.Uwp.Pages
         private void PopulateDefaultConnectionMethodComboBox()
         {
             DefaultConnectionMethodComboBoxControl.Items.Clear();
-            DefaultConnectionMethodComboBoxControl.Items.Add(new ComboBoxItem { Content = "WebView (Recommended)", Tag = ConnectionMethod.WebView });
-            DefaultConnectionMethodComboBoxControl.Items.Add(new ComboBoxItem { Content = "Proxy (Required for some sites)", Tag = ConnectionMethod.HttpClientProxy });
-
-            DefaultConnectionMethodComboBoxControl.SelectedValue = AppSettings.DefaultConnectionMethod;
+            DefaultConnectionMethodComboBoxControl.Items.Add(
+                new ComboBoxItem
+                {
+                    Content = "WebView (Recommended)",
+                    Tag = ConnectionMethod.WebView,
+                }
+            );
+            DefaultConnectionMethodComboBoxControl.Items.Add(
+                new ComboBoxItem
+                {
+                    Content = "Proxy (Required for some sites)",
+                    Tag = ConnectionMethod.HttpClientProxy,
+                }
+            );
             DefaultConnectionMethodComboBoxControl.SelectedValuePath = "Tag";
         }
 
         protected void DefaultConnectionMethodComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (DefaultConnectionMethodComboBoxControl.SelectedValue is ConnectionMethod method)
+            if (DefaultConnectionMethodComboBoxControl.SelectedItem is ComboBoxItem selectedItem && selectedItem.Tag is ConnectionMethod method)
             {
                 AppSettings.DefaultConnectionMethod = method;
             }
@@ -168,7 +190,7 @@ namespace WikiViewer.Shared.Uwp.Pages
             ConcurrencyDescriptionTextControl.Text = description;
         }
 
-        private void OnWikisChanged(object sender, EventArgs e)
+        private async Task OnWikisChanged()
         {
             _ = Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, LoadWikis);
         }
