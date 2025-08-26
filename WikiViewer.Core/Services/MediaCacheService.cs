@@ -156,9 +156,13 @@ namespace WikiViewer.Core.Services
                         var hash = System
                             .Security.Cryptography.SHA1.Create()
                             .ComputeHash(System.Text.Encoding.UTF8.GetBytes(remoteUrl));
+
+                        string fileExtension = System.IO.Path.GetExtension(new Uri(remoteUrl).AbsolutePath);
+
                         var fileName =
                             string.Concat(hash.Select(b => b.ToString("x2")))
-                            + System.IO.Path.GetExtension(remoteUrl);
+                            + fileExtension;
+
                         var relativePath = $"/cache/{fileName}";
 
                         await StorageProvider.WriteBytesAsync($"cache\\{fileName}", imageBytes);
