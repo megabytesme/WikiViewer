@@ -78,20 +78,27 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         private readonly List<WikitextPair> _wikitextPairs = new List<WikitextPair>
         {
+            // Existing Table Rules
+            new WikitextPair("table", @"^\{\|", @"^\|\}", "{|", "|}"),
+            new WikitextPair("table_caption", @"^\|\+", "$", "|+", ""),
+            new WikitextPair("table_row", @"^\|-", "$", "|-", ""),
+            new WikitextPair("table_header", @"^!", "$", "!", ""),
+            new WikitextPair("table_cell", @"^\|(?!})", "$", "|", ""),
+            // Headings
             new WikitextPair("======", "======"),
             new WikitextPair("=====", "====="),
             new WikitextPair("====", "===="),
             new WikitextPair("===", "==="),
             new WikitextPair("==", "=="),
+            // Standard Formatting
+            new WikitextPair("'''''", "'''''"),
             new WikitextPair("'''", "'''"),
             new WikitextPair("''", "''"),
+            // HTML-like tags
             new WikitextPair("ref", @"<ref\b[^>]*>", @"</ref>", "<ref>", "</ref>", isRaw: true),
             new WikitextPair("<nowiki>", "</nowiki>", isRaw: true),
             new WikitextPair("<code>", "</code>", isRaw: true),
             new WikitextPair("<pre>", "</pre>", isRaw: true),
-            new WikitextPair("{{", "}}"),
-            new WikitextPair("[[", "]]"),
-            new WikitextPair("<!--", "-->"),
             new WikitextPair("<ins>", "</ins>"),
             new WikitextPair("<del>", "</del>"),
             new WikitextPair("<sup>", "</sup>"),
@@ -100,9 +107,64 @@ namespace WikiViewer.Shared.Uwp.Pages
             new WikitextPair("<blockquote>", "</blockquote>"),
             new WikitextPair("<u>", "</u>"),
             new WikitextPair("<s>", "</s>"),
+            new WikitextPair("<big>", "</big>"),
+            // Template and Link Brackets
+            new WikitextPair("{{", "}}"),
+            new WikitextPair("[[", "]]"),
+            // Comments
+            new WikitextPair("<!--", "-->"),
+            // Single Brackets
             new WikitextPair("{", "}"),
             new WikitextPair("[", "]"),
             new WikitextPair("(", ")"),
+            // Specialized Content Tags
+            new WikitextPair(
+                "syntaxhighlight",
+                @"<syntaxhighlight\b[^>]*>",
+                @"</syntaxhighlight>",
+                "<syntaxhighlight>",
+                "</syntaxhighlight>",
+                isRaw: true
+            ),
+            new WikitextPair(
+                "source",
+                @"<source\b[^>]*>",
+                @"</source>",
+                "<source>",
+                "</source>",
+                isRaw: true
+            ),
+            new WikitextPair(
+                "poem",
+                @"<poem\b[^>]*>",
+                @"</poem>",
+                "<poem>",
+                "</poem>",
+                isRaw: true
+            ),
+            new WikitextPair(
+                "score",
+                @"<score\b[^>]*>",
+                @"</score>",
+                "<score>",
+                "</score>",
+                isRaw: true
+            ),
+            new WikitextPair(
+                "hiero",
+                @"<hiero\b[^>]*>",
+                @"</hiero>",
+                "<hiero>",
+                "</hiero>",
+                isRaw: true
+            ),
+            // Transclusion Control Tags
+            new WikitextPair("<noinclude>", "</noinclude>"),
+            new WikitextPair("<includeonly>", "</includeonly>"),
+            new WikitextPair("<onlyinclude>", "</onlyinclude>"),
+            // Other Content Blocks
+            new WikitextPair("<gallery>", "</gallery>", isRaw: true),
+            new WikitextPair("<math>", "</math>", isRaw: true),
         };
 
         private class TokenMatch
@@ -534,7 +596,9 @@ namespace WikiViewer.Shared.Uwp.Pages
             var matches = new List<TokenMatch>();
             var stack = new Stack<TokenMatch>();
 
-            foreach (System.Text.RegularExpressions.Match match in _masterScannerRegex.Matches(text))
+            foreach (
+                System.Text.RegularExpressions.Match match in _masterScannerRegex.Matches(text)
+            )
             {
                 string successfulGroupName = null;
                 foreach (string groupName in _groupNameToInfoMap.Keys)
@@ -546,7 +610,8 @@ namespace WikiViewer.Shared.Uwp.Pages
                     }
                 }
 
-                if (successfulGroupName == null) continue;
+                if (successfulGroupName == null)
+                    continue;
 
                 var groupInfo = _groupNameToInfoMap[successfulGroupName];
                 var pair = groupInfo.Pair;
@@ -573,7 +638,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                         IsOpening = true,
                         IsMatched = true,
                         MatchPosition = match.Index,
-                        Pair = pair
+                        Pair = pair,
                     };
                     matches.Add(token);
                 }
@@ -609,14 +674,16 @@ namespace WikiViewer.Shared.Uwp.Pages
                     }
                     else
                     {
-                        matches.Add(new TokenMatch
-                        {
-                            Position = match.Index,
-                            Length = match.Length,
-                            IsOpening = false,
-                            Pair = pair,
-                            IsMatched = false
-                        });
+                        matches.Add(
+                            new TokenMatch
+                            {
+                                Position = match.Index,
+                                Length = match.Length,
+                                IsOpening = false,
+                                Pair = pair,
+                                IsMatched = false,
+                            }
+                        );
                     }
                 }
             }
@@ -627,7 +694,9 @@ namespace WikiViewer.Shared.Uwp.Pages
             }
 
             stopwatch.Stop();
-            Debug.WriteLine($"[Highlighting] Single-threaded scan completed in {stopwatch.ElapsedMilliseconds}ms.");
+            Debug.WriteLine(
+                $"[Highlighting] Single-threaded scan completed in {stopwatch.ElapsedMilliseconds}ms."
+            );
 
             _lastScannedText = text;
             _lastScanResult = matches;
@@ -637,7 +706,8 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         private void InitializeMasterScanner()
         {
-            if (_masterScannerRegex != null) return;
+            if (_masterScannerRegex != null)
+                return;
 
             var patternBuilder = new System.Text.StringBuilder();
             _groupNameToInfoMap = new Dictionary<string, GroupInfo>();
@@ -647,20 +717,29 @@ namespace WikiViewer.Shared.Uwp.Pages
             {
                 string openGroupName = $"p{groupCounter++}";
                 patternBuilder.Append($"(?<{openGroupName}>{pair.OpenPattern})|");
-                _groupNameToInfoMap[openGroupName] = new GroupInfo { Pair = pair, IsOpeningPattern = true };
+                _groupNameToInfoMap[openGroupName] = new GroupInfo
+                {
+                    Pair = pair,
+                    IsOpeningPattern = true,
+                };
 
                 if (pair.OpenPattern.ToString() != pair.ClosePattern.ToString())
                 {
                     string closeGroupName = $"p{groupCounter++}";
                     patternBuilder.Append($"(?<{closeGroupName}>{pair.ClosePattern})|");
-                    _groupNameToInfoMap[closeGroupName] = new GroupInfo { Pair = pair, IsOpeningPattern = false };
+                    _groupNameToInfoMap[closeGroupName] = new GroupInfo
+                    {
+                        Pair = pair,
+                        IsOpeningPattern = false,
+                    };
                 }
             }
             patternBuilder.Length--;
 
             _masterScannerRegex = new System.Text.RegularExpressions.Regex(
                 patternBuilder.ToString(),
-                System.Text.RegularExpressions.RegexOptions.Compiled);
+                System.Text.RegularExpressions.RegexOptions.Compiled
+            );
         }
 
         private void ClearBracketHighlight()
