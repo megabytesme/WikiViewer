@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using WikiViewer.Core.Interfaces;
@@ -185,6 +186,7 @@ namespace WikiViewer.Shared.Uwp.Pages
         private DispatcherTimer _highlightDebounceTimer;
         private string _lastHighlightText = null;
         private int _lastHighlightCaretPosition = -1;
+        private CancellationTokenSource _highlightCts;
 
         protected abstract RichEditBox WikitextEditorTextBox { get; }
         protected abstract TextBlock PageTitleTextBlock { get; }
@@ -442,7 +444,7 @@ namespace WikiViewer.Shared.Uwp.Pages
             }
         }
 
-        private void HighlightDebounceTimer_Tick(object sender, object e)
+        private async void HighlightDebounceTimer_Tick(object sender, object e)
         {
             _highlightDebounceTimer.Stop();
             if (_isUpdatingText)
@@ -459,13 +461,83 @@ namespace WikiViewer.Shared.Uwp.Pages
                 return;
             }
 
+            _highlightCts?.Cancel();
+            _highlightCts = new CancellationTokenSource();
+            var cancellationToken = _highlightCts.Token;
+
             try
             {
+                var allTokens = await Task.Run(
+                    () => ScanDocumentForAllTokens(currentText),
+                    cancellationToken
+                );
+
+                cancellationToken.ThrowIfCancellationRequested();
+
                 _isUpdatingText = true;
                 WikitextEditorTextBox.Document.BeginUndoGroup();
-                UpdateBracketHighlighting();
+
+                ClearBracketHighlight();
+                var defaultBackgroundColor = Colors.Transparent;
+
+                foreach (var range in _lastUnmatchedRanges)
+                {
+                    if (range.StartPosition < currentText.Length)
+                    {
+                        range.CharacterFormat.BackgroundColor = defaultBackgroundColor;
+                    }
+                }
+                _lastUnmatchedRanges.Clear();
+
+                if (!string.IsNullOrEmpty(currentText))
+                {
+                    foreach (var t in allTokens.Where(t => !t.IsMatched))
+                    {
+                        var range = PaintToken(t.Position, t.Length, Colors.Red);
+                        if (range != null)
+                            _lastUnmatchedRanges.Add(range);
+                    }
+
+                    var tokenUnderCaret = allTokens.FirstOrDefault(t =>
+                        (
+                            currentCaretPosition > t.Position
+                            && currentCaretPosition <= t.Position + t.Length
+                        ) || (currentCaretPosition == t.Position)
+                    );
+
+                    if (tokenUnderCaret != null && tokenUnderCaret.IsMatched)
+                    {
+                        var accentColor = (Color)
+                            Application.Current.Resources["SystemAccentColorLight2"];
+                        _lastLeftBracket = PaintToken(
+                            tokenUnderCaret.Position,
+                            tokenUnderCaret.Length,
+                            accentColor
+                        );
+                        var matchingToken = allTokens.FirstOrDefault(t =>
+                            t.Position == tokenUnderCaret.MatchPosition
+                        );
+                        if (matchingToken != null)
+                        {
+                            _lastRightBracket = PaintToken(
+                                matchingToken.Position,
+                                matchingToken.Length,
+                                accentColor
+                            );
+                        }
+                    }
+                }
+
                 _lastHighlightText = currentText;
                 _lastHighlightCaretPosition = currentCaretPosition;
+            }
+            catch (OperationCanceledException)
+            {
+                Debug.WriteLine("[Highlighting] Scan was cancelled by newer edit.");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[Highlighting] Error during background processing: {ex.Message}");
             }
             finally
             {
