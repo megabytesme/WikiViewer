@@ -4,16 +4,20 @@ namespace WikiViewer.Core.Services
     {
         private static readonly string[] cloudflareMarkers =
         {
-            "challenge-running",
-            "Just a second...",
-            "Just a moment...",
+            "window._cf_chl_opt",
+            "/cdn-cgi/challenge-platform/",
+            "__cf_chl_tk",
+            "cf-challenge-running",
+            "cf-im-under-attack",
+            "challenge-error-text",
+            "Enable JavaScript and cookies to continue",
             "Verifying you are human",
-            "Please stand by, while we are checking your browser...",
             "Checking your browser before accessing",
             "This process is automatic",
-            "g-recaptcha",
-            "cf-challenge-running",
-            "cf-im-under-attack"
+            "Just a second...",
+            "Just a moment...",
+            "Please stand by, while we are checking your browser...",
+            "challenge-running",
         };
 
         public static bool IsCloudflareChallenge(string html)
