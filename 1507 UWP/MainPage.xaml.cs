@@ -72,15 +72,17 @@ namespace _1507_UWP.Pages
             string title,
             string message,
             bool showActionButton,
-            bool isClosable)
+            bool isClosable
+        )
         {
-            if (_currentInfoDialog != null) return;
+            if (_currentInfoDialog != null)
+                return;
 
             var dialog = new ContentDialog
             {
                 Title = title,
                 Content = message,
-                PrimaryButtonText = "OK"
+                PrimaryButtonText = "OK",
             };
 
             if (showActionButton)
@@ -114,7 +116,7 @@ namespace _1507_UWP.Pages
             {
                 Title = title,
                 Content = message,
-                PrimaryButtonText = "OK"
+                PrimaryButtonText = "OK",
             };
             await dialog.ShowAsync();
         }
