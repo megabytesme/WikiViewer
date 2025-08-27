@@ -24,7 +24,7 @@ namespace _1809_UWP.Services
     {
         public WebView2 WebView { get; private set; }
         public bool IsInitialized { get; private set; }
-        public WikiInstance Wiki { get; set; }
+        public WikiInstance WikiContext { get; set; }
         private Task _initializationTask;
 
         public Task InitializeAsync(string baseUrl = null)
@@ -87,7 +87,7 @@ namespace _1809_UWP.Services
         {
             if (!IsInitialized)
             {
-                await InitializeAsync(this.Wiki?.BaseUrl);
+                await InitializeAsync(this.WikiContext?.BaseUrl);
             }
         }
 
@@ -267,10 +267,10 @@ namespace _1809_UWP.Services
                             navTcs.TrySetResult(e.IsSuccess);
                         };
                         tempWorker.CoreWebView2.NavigationCompleted += navHandler;
-                        tempWorker.CoreWebView2.Navigate(this.Wiki.BaseUrl);
+                        tempWorker.CoreWebView2.Navigate(this.WikiContext.BaseUrl);
                         if (!await navTcs.Task)
                             throw new Exception(
-                                $"Navigation to base URL '{this.Wiki.BaseUrl}' failed, preventing download context setup."
+                                $"Navigation to base URL '{this.WikiContext.BaseUrl}' failed, preventing download context setup."
                             );
 
                         string script =
@@ -333,9 +333,9 @@ namespace _1809_UWP.Services
 
         private async Task CopyCookiesInternalAsync(CoreWebView2 source, CoreWebView2 destination)
         {
-            if (this.Wiki == null)
+            if (this.WikiContext == null)
                 return;
-            var sourceCookies = await source.CookieManager.GetCookiesAsync(this.Wiki.BaseUrl);
+            var sourceCookies = await source.CookieManager.GetCookiesAsync(this.WikiContext.BaseUrl);
             if (sourceCookies == null)
                 return;
             foreach (var cookie in sourceCookies)

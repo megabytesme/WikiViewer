@@ -20,10 +20,10 @@ namespace _1809_UWP.Services
             {
                 if (_workerPool.TryTake(out var worker))
                 {
-                    worker.Wiki = wiki;
+                    worker.WikiContext = wiki;
                     return worker;
                 }
-                var newWorker = new WebView2ApiWorker { Wiki = wiki };
+                var newWorker = new WebView2ApiWorker { WikiContext = wiki };
                 return newWorker;
             });
         }
@@ -34,7 +34,7 @@ namespace _1809_UWP.Services
                 CoreDispatcherPriority.Normal,
                 () =>
                 {
-                    worker.Wiki = null;
+                    worker.WikiContext = null;
                     _workerPool.Add(worker);
                 }
             );

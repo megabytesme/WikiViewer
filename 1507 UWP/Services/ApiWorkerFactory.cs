@@ -25,6 +25,10 @@ namespace _1507_UWP.Services
                 }
             }
 
+            Debug.WriteLine(
+                $"[ApiWorkerFactory] Creating worker for '{wiki.Host}'. Preferred: {wiki.PreferredConnectionMethod}, Resolved: {wiki.ResolvedConnectionMethod}, FINAL METHOD USED: {methodToUse}"
+            );
+
             switch (methodToUse)
             {
                 case ConnectionMethod.HttpClient:
@@ -33,24 +37,36 @@ namespace _1507_UWP.Services
                     return new ProxyHttpClientApiWorker();
                 case ConnectionMethod.WebView:
                 default:
-                    return new WebViewApiWorker { Wiki = wiki };
+                    return new WebViewApiWorker { WikiContext = wiki };
             }
         }
 
         public async Task<IApiWorker> CreateApiWorkerAsync(WikiInstance wiki)
         {
-            if (wiki.PreferredConnectionMethod == ConnectionMethod.Auto && !wiki.ResolvedConnectionMethod.HasValue)
+            if (
+                wiki.PreferredConnectionMethod == ConnectionMethod.Auto
+                && !wiki.ResolvedConnectionMethod.HasValue
+            )
             {
-                Debug.WriteLine($"[ApiWorkerFactory] Auto-detecting best connection method for {wiki.Host}...");
-                var testResult = await ConnectionTesterService.FindWorkingMethodAndPathsAsync(wiki.BaseUrl, this);
+                Debug.WriteLine(
+                    $"[ApiWorkerFactory] Auto-detecting best connection method for {wiki.Host}..."
+                );
+                var testResult = await ConnectionTesterService.FindWorkingMethodAndPathsAsync(
+                    wiki.BaseUrl,
+                    this
+                );
                 if (testResult.IsSuccess)
                 {
-                    Debug.WriteLine($"[ApiWorkerFactory] Auto-detection successful: {testResult.Method}");
+                    Debug.WriteLine(
+                        $"[ApiWorkerFactory] Auto-detection successful: {testResult.Method}"
+                    );
                     wiki.ResolvedConnectionMethod = testResult.Method;
                 }
                 else
                 {
-                    Debug.WriteLine($"[ApiWorkerFactory] Auto-detection failed. Falling back to WebView.");
+                    Debug.WriteLine(
+                        $"[ApiWorkerFactory] Auto-detection failed. Falling back to WebView."
+                    );
                     wiki.ResolvedConnectionMethod = ConnectionMethod.WebView;
                 }
             }

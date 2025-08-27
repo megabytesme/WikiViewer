@@ -43,21 +43,25 @@ namespace WikiViewer.Shared.Uwp.Controls
             var baseUrl = $"{_targetUri.Scheme}://{_targetUri.Host}";
             LoadingText.Text = "Finding best connection method...";
 
-            var testResult = await ConnectionTesterService.FindWorkingMethodAndPathsAsync(baseUrl, App.ApiWorkerFactory);
+            var testResult = await ConnectionTesterService.FindWorkingMethodAndPathsAsync(
+                baseUrl,
+                App.ApiWorkerFactory
+            );
 
             if (testResult.IsSuccess)
             {
                 NewWikiInstance = new WikiInstance
                 {
                     BaseUrl = baseUrl,
-                    ScriptPath = testResult.DetectedPaths.ScriptPath,
-                    ArticlePath = testResult.DetectedPaths.ArticlePath,
-                    PreferredConnectionMethod = ConnectionMethod.Auto
+                    ScriptPath = testResult.Paths.ScriptPath,
+                    ArticlePath = testResult.Paths.ArticlePath,
+                    PreferredConnectionMethod = ConnectionMethod.Auto,
                 };
 
                 LoadingPanel.Visibility = Visibility.Collapsed;
                 ResultPanel.Visibility = Visibility.Visible;
-                ResultMessage.Text = $"Successfully connected to '{_targetUri.Host}' using the '{testResult.Method}' method. Add to app?";
+                ResultMessage.Text =
+                    $"Successfully connected to '{_targetUri.Host}' using the '{testResult.Method}' method. Add to app?";
                 WikiNameTextBox.Text = _targetUri.Host;
                 WikiNameTextBox.Visibility = Visibility.Visible;
                 this.IsPrimaryButtonEnabled = true;

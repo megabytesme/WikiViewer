@@ -8,11 +8,14 @@ namespace _1809_UWP.Services
 {
     public class PooledWebView2ProxyWorker : IApiWorker
     {
+        public WikiInstance WikiContext { get; set; }
+
         private readonly WikiInstance _wiki;
 
         public PooledWebView2ProxyWorker(WikiInstance wiki)
         {
             _wiki = wiki;
+            WikiContext = wiki;
         }
 
         public Task InitializeAsync(string baseUrl = null) => Task.CompletedTask;

@@ -143,6 +143,17 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         protected async void SaveButton_Click(object sender, RoutedEventArgs e)
         {
+            string baseUrl = WikiUrlTextBoxControl.Text.Trim();
+            if (
+                string.IsNullOrEmpty(baseUrl)
+                || !Uri.IsWellFormedUriString(baseUrl, UriKind.Absolute)
+            )
+            {
+                DetectionStatusTextBlockControl.Text =
+                    "Please enter a valid, full URL (e.g., https://en.wikipedia.org/).";
+                DetectionStatusTextBlockControl.Visibility = Visibility.Visible;
+                return;
+            }
             if (_currentWiki == null)
                 return;
 
@@ -231,8 +242,8 @@ namespace WikiViewer.Shared.Uwp.Pages
 
                 if (testResult.IsSuccess)
                 {
-                    ScriptPathTextBoxControl.Text = testResult.DetectedPaths.ScriptPath;
-                    ArticlePathTextBoxControl.Text = testResult.DetectedPaths.ArticlePath;
+                    ScriptPathTextBoxControl.Text = testResult.Paths.ScriptPath;
+                    ArticlePathTextBoxControl.Text = testResult.Paths.ArticlePath;
                     DetectionStatusTextBlockControl.Text =
                         $"Success! Found a working connection using '{testResult.Method}'.";
                     DetectionStatusTextBlockControl.Foreground = new SolidColorBrush(

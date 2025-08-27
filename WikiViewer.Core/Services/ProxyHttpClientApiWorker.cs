@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.IO.Compression;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 using HtmlAgilityPack;
 using Newtonsoft.Json;
 using WikiViewer.Core.Interfaces;
+using WikiViewer.Core.Models;
 
 namespace WikiViewer.Core.Services
 {
@@ -15,17 +18,27 @@ namespace WikiViewer.Core.Services
         private const string GatekeeperEndpoint = "https://wikiflareresolverr.ddns.net";
 
         public bool IsInitialized { get; private set; }
+        public WikiInstance WikiContext { get; set; }
 
-        public Task InitializeAsync(string baseUrl = null)
+        public Task InitializeAsync(string baseUrl)
         {
             IsInitialized = true;
             return Task.CompletedTask;
         }
 
+        private void CheckInitialized()
+        {
+            if (!IsInitialized)
+                throw new InvalidOperationException(
+                    "Worker must be initialized before use. Call InitializeAsync first."
+                );
+        }
+
         private string ExtractJsonFromHtml(string responseText)
         {
+            // (No changes needed here, logic is sound)
             if (string.IsNullOrWhiteSpace(responseText))
-                return responseText;
+                return null;
             string trimmedText = responseText.Trim();
             if (trimmedText.StartsWith("{") || trimmedText.StartsWith("["))
                 return trimmedText;
@@ -41,16 +54,9 @@ namespace WikiViewer.Core.Services
                     if (potentialJson.StartsWith("{") || potentialJson.StartsWith("["))
                         return potentialJson;
                 }
-                var bodyNode = doc.DocumentNode.SelectSingleNode("//body");
-                if (bodyNode != null)
-                {
-                    string potentialJson = bodyNode.InnerText.Trim();
-                    if (potentialJson.StartsWith("{") || potentialJson.StartsWith("["))
-                        return potentialJson;
-                }
             }
             catch { }
-            return responseText;
+            return null;
         }
 
         private async Task<byte[]> MakeGatekeeperRequest(object payload)
@@ -73,34 +79,19 @@ namespace WikiViewer.Core.Services
             if (!response.IsSuccessStatusCode)
             {
                 string errorContent = await response.Content.ReadAsStringAsync();
-                try
-                {
-                    var errorObj = JsonConvert.DeserializeObject<dynamic>(errorContent);
-                    string errorMessage = errorObj.error ?? "Unknown proxy error";
-                    string errorDetails = errorObj.details ?? "";
-                    throw new Exception(
-                        $"Proxy returned an error: {response.StatusCode} - {errorMessage} {errorDetails}"
-                    );
-                }
-                catch
-                {
-                    throw new Exception(
-                        $"Proxy returned a non-success status code: {response.StatusCode} - {errorContent}"
-                    );
-                }
+                throw new Exception(
+                    $"Proxy returned a non-success status code: {response.StatusCode} - {errorContent}"
+                );
             }
 
             byte[] bytes = await response.Content.ReadAsByteArrayAsync();
             if (bytes.Length > 2 && bytes[0] == 0x1F && bytes[1] == 0x8B)
             {
-                using (var compressedStream = new System.IO.MemoryStream(bytes))
+                using (var compressedStream = new MemoryStream(bytes))
                 using (
-                    var gzipStream = new System.IO.Compression.GZipStream(
-                        compressedStream,
-                        System.IO.Compression.CompressionMode.Decompress
-                    )
+                    var gzipStream = new GZipStream(compressedStream, CompressionMode.Decompress)
                 )
-                using (var resultStream = new System.IO.MemoryStream())
+                using (var resultStream = new MemoryStream())
                 {
                     await gzipStream.CopyToAsync(resultStream);
                     bytes = resultStream.ToArray();
@@ -111,18 +102,21 @@ namespace WikiViewer.Core.Services
 
         public async Task<byte[]> GetRawBytesFromUrlAsync(string url)
         {
+            CheckInitialized();
             var payload = new { url = url };
             return await MakeGatekeeperRequest(payload);
         }
 
         public async Task<string> GetRawHtmlFromUrlAsync(string url)
         {
+            CheckInitialized();
             var bytes = await GetRawBytesFromUrlAsync(url);
             return Encoding.UTF8.GetString(bytes);
         }
 
         public async Task<string> GetJsonFromApiAsync(string url)
         {
+            CheckInitialized();
             string responseText = await GetRawHtmlFromUrlAsync(url);
             return ExtractJsonFromHtml(responseText);
         }
@@ -132,6 +126,7 @@ namespace WikiViewer.Core.Services
             Dictionary<string, string> postData
         )
         {
+            CheckInitialized();
             var payload = new { url, postData };
             var bytes = await MakeGatekeeperRequest(payload);
             string responseText = Encoding.UTF8.GetString(bytes);

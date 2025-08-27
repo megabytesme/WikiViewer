@@ -1,14 +1,15 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using WikiViewer.Core.Models;
 
 namespace WikiViewer.Core.Interfaces
 {
     public interface IApiWorker : IDisposable
     {
         bool IsInitialized { get; }
-
-        Task InitializeAsync(string baseUrl = null);
+        WikiInstance WikiContext { get; set; }
+        Task InitializeAsync(string baseUrl);
         Task<string> GetJsonFromApiAsync(string url);
         Task<string> PostAndGetJsonFromApiAsync(string url, Dictionary<string, string> postData);
         Task<string> GetRawHtmlFromUrlAsync(string url);

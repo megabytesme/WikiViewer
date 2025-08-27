@@ -28,7 +28,6 @@ namespace WikiViewer.Shared.Uwp.Pages
         public bool CanGoBackInPage => _articleHistory.Count > 1;
         protected abstract AppBarButton RefreshAppBarButton { get; }
         protected abstract Type GetArticleViewerPageType();
-
         protected abstract TextBlock ArticleTitleTextBlock { get; }
         protected abstract TextBlock LoadingTextBlock { get; }
         protected abstract TextBlock LastUpdatedTextBlock { get; }
@@ -56,7 +55,7 @@ namespace WikiViewer.Shared.Uwp.Pages
             this.Unloaded += Page_Unloaded;
         }
 
-        private async void EnhanceDisplayedHtmlWithCachedMediaAsync(string html)
+        private void EnhanceDisplayedHtmlWithCachedMediaAsync(string html)
         {
             if (string.IsNullOrEmpty(html) || _pageWikiContext == null)
                 return;
@@ -106,7 +105,6 @@ namespace WikiViewer.Shared.Uwp.Pages
             {
                 string absoluteUrl = kvp.Key;
                 string originalSrcValue = kvp.Value;
-
                 _ = Task.Run(async () =>
                 {
                     try
@@ -115,11 +113,9 @@ namespace WikiViewer.Shared.Uwp.Pages
                             absoluteUrl,
                             _pageWikiContext
                         );
-
                         if (!string.IsNullOrEmpty(localUri))
                         {
                             string updateScript = GetImageUpdateScript(originalSrcValue, localUri);
-
                             await Dispatcher.RunAsync(
                                 Windows.UI.Core.CoreDispatcherPriority.Normal,
                                 async () =>
@@ -331,72 +327,80 @@ namespace WikiViewer.Shared.Uwp.Pages
 
             try
             {
-                var worker = await App.ApiWorkerFactory.CreateApiWorkerAsync(_pageWikiContext);
-                var (htmlContent, resolvedTitle) =
-                    await ArticleProcessingService.FetchAndProcessArticleAsync(
+                using (
+                    var worker = await App.ApiWorkerFactory.CreateApiWorkerAsync(_pageWikiContext)
+                )
+                {
+                    await worker.InitializeAsync(_pageWikiContext.BaseUrl);
+
+                    var (htmlContent, resolvedTitle) =
+                        await ArticleProcessingService.FetchAndProcessArticleAsync(
+                            _pageTitleToFetch,
+                            fetchStopwatch,
+                            worker,
+                            _pageWikiContext
+                        );
+
+                    var doc = new HtmlDocument();
+                    doc.LoadHtml(htmlContent);
+
+                    var redirectNode = doc.DocumentNode.SelectSingleNode(
+                        "//div[contains(@class, 'redirectMsg')]//a[@title]"
+                    );
+                    if (redirectNode != null)
+                    {
+                        string newTitle = redirectNode.GetAttributeValue("title", null);
+                        if (!string.IsNullOrEmpty(newTitle))
+                        {
+                            Debug.WriteLine(
+                                $"HTML redirect detected. Navigating from '{_pageTitleToFetch}' to '{newTitle}'."
+                            );
+                            NavigateToInternalPage(newTitle);
+                            return;
+                        }
+                    }
+
+                    if (
+                        _pageTitleToFetch.Equals(
+                            "Special:Random",
+                            StringComparison.OrdinalIgnoreCase
+                        )
+                    )
+                    {
+                        _pageTitleToFetch = resolvedTitle.Replace(' ', '_');
+                        if (_articleHistory.Any())
+                            _articleHistory.Pop();
+                        _articleHistory.Push(_pageTitleToFetch);
+                        ArticleTitleTextBlock.Text = resolvedTitle;
+                        mainPage?.SetPageTitle(resolvedTitle);
+                    }
+
+                    var processedHtml = await ArticleProcessingService.BuildArticleHtmlAsync(
+                        htmlContent,
                         _pageTitleToFetch,
-                        fetchStopwatch,
+                        _pageWikiContext
+                    );
+                    await DisplayProcessedHtmlAsync(processedHtml);
+                    EnhanceDisplayedHtmlWithCachedMediaAsync(htmlContent);
+                    await UpdateEditButtonForPageAsync();
+
+                    var lastUpdated = await ArticleProcessingService.FetchLastUpdatedTimestampAsync(
+                        _pageTitleToFetch,
                         worker,
                         _pageWikiContext
                     );
-
-                var doc = new HtmlDocument();
-                doc.LoadHtml(htmlContent);
-
-                var redirectNode = doc.DocumentNode.SelectSingleNode(
-                    "//div[contains(@class, 'redirectMsg')]//a[@title]"
-                );
-
-                if (redirectNode != null)
-                {
-                    string newTitle = redirectNode.GetAttributeValue("title", null);
-                    if (!string.IsNullOrEmpty(newTitle))
+                    if (lastUpdated.HasValue)
                     {
-                        Debug.WriteLine(
-                            $"HTML redirect detected. Navigating from '{_pageTitleToFetch}' to '{newTitle}'."
-                        );
-                        NavigateToInternalPage(newTitle);
-                        return;
+                        LastUpdatedTextBlock.Text =
+                            $"Last updated: {lastUpdated.Value.ToLocalTime():g}";
+                        LastUpdatedTextBlock.Visibility = Visibility.Visible;
                     }
-                }
-
-                if (_pageTitleToFetch.Equals("Special:Random", StringComparison.OrdinalIgnoreCase))
-                {
-                    _pageTitleToFetch = resolvedTitle.Replace(' ', '_');
-                    if (_articleHistory.Any())
-                        _articleHistory.Pop();
-                    _articleHistory.Push(_pageTitleToFetch);
-                    ArticleTitleTextBlock.Text = resolvedTitle;
-                    mainPage?.SetPageTitle(resolvedTitle);
-                }
-
-                var processedHtml = await ArticleProcessingService.BuildArticleHtmlAsync(
-                    htmlContent,
-                    _pageTitleToFetch,
-                    _pageWikiContext
-                );
-
-                await DisplayProcessedHtmlAsync(processedHtml);
-                EnhanceDisplayedHtmlWithCachedMediaAsync(htmlContent);
-                await UpdateEditButtonForPageAsync();
-
-                var lastUpdated = await ArticleProcessingService.FetchLastUpdatedTimestampAsync(
-                    _pageTitleToFetch,
-                    worker,
-                    _pageWikiContext
-                );
-                if (lastUpdated.HasValue)
-                {
-                    LastUpdatedTextBlock.Text =
-                        $"Last updated: {lastUpdated.Value.ToLocalTime():g}";
-                    LastUpdatedTextBlock.Visibility = Visibility.Visible;
                 }
             }
             catch (NeedsUserVerificationException ex)
             {
 #if UWP_1809
                 ShowVerificationPanel(ex.Url);
-
 #else
                 ArticleTitleTextBlock.Text = "Unable to load page";
                 LoadingTextBlock.Text = "A security check is preventing access.";
@@ -427,11 +431,7 @@ namespace WikiViewer.Shared.Uwp.Pages
             string css = await ThemeManager.GetThemeCssAsync();
             string escapedCss = JsonConvert.ToString(css);
             string script =
-                $@"
-        var styleElement = document.getElementById('custom-theme-style');
-        if (styleElement) {{
-            styleElement.innerHTML = {escapedCss};
-        }}";
+                $@"var styleElement = document.getElementById('custom-theme-style'); if (styleElement) {{ styleElement.innerHTML = {escapedCss}; }}";
             await ExecuteScriptInWebViewAsync(script);
         }
 
@@ -466,7 +466,6 @@ namespace WikiViewer.Shared.Uwp.Pages
         {
             if (_pageWikiContext == null || string.IsNullOrEmpty(_pageTitleToFetch))
                 return;
-
             var account = AccountManager
                 .GetAccountsForWiki(_pageWikiContext.Id)
                 .FirstOrDefault(a => a.IsLoggedIn);
@@ -474,7 +473,6 @@ namespace WikiViewer.Shared.Uwp.Pages
                 (account != null)
                     ? new AuthenticationService(account, _pageWikiContext, App.ApiWorkerFactory)
                     : null;
-
             if (FavouritesService.IsFavourite(_pageTitleToFetch, _pageWikiContext.Id))
             {
                 await FavouritesService.RemoveFavoriteAsync(
@@ -550,109 +548,99 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         private async Task UpdateEditButtonForPageAsync()
         {
-            System.Diagnostics.Debug.WriteLine(
+            Debug.WriteLine(
                 $"[EditCheck] Starting for '{_pageTitleToFetch}' on wiki '{_pageWikiContext?.Id}'"
             );
-
             if (_pageWikiContext == null || string.IsNullOrEmpty(_pageTitleToFetch))
             {
-                System.Diagnostics.Debug.WriteLine(
-                    "[EditCheck] Missing wiki context or page title — aborting."
-                );
+                Debug.WriteLine("[EditCheck] Missing wiki context or page title — aborting.");
                 return;
             }
 
             try
             {
-                var worker = SessionManager.GetAnonymousWorkerForWiki(_pageWikiContext);
-
-                var apiUrl =
-                    $"{_pageWikiContext.ApiEndpoint}?action=query&meta=userinfo&uiprop=rights|groups"
-                    + $"&prop=info&inprop=protection&titles={Uri.EscapeDataString(_pageTitleToFetch)}&format=json";
-
-                System.Diagnostics.Debug.WriteLine($"[EditCheck] API URL: {apiUrl}");
-
-                var json = await worker.GetJsonFromApiAsync(apiUrl);
-                System.Diagnostics.Debug.WriteLine($"[EditCheck] JSON length: {json?.Length ?? 0}");
-
-                dynamic result = Newtonsoft.Json.JsonConvert.DeserializeObject(json);
-
-                var rightsToken = result?.query?.userinfo?.rights;
-                var rights =
-                    rightsToken != null
-                        ? ((Newtonsoft.Json.Linq.JArray)rightsToken).Select(r => (string)r).ToList()
-                        : new List<string>();
-
-                System.Diagnostics.Debug.WriteLine(
-                    $"[EditCheck] Rights: {(rights.Any() ? string.Join(", ", rights) : "(none)")}"
-                );
-                bool canEdit = rights.Contains("edit");
-                System.Diagnostics.Debug.WriteLine($"[EditCheck] Has 'edit' right: {canEdit}");
-
-                var pagesObj = result?.query?.pages as JObject;
-                var page = pagesObj?.Properties().FirstOrDefault()?.Value as JObject;
-
-                if (
-                    page != null
-                    && page.TryGetValue("protection", out var protectionToken)
-                    && protectionToken is JArray protection
-                )
+                using (var worker = SessionManager.GetAnonymousWorkerForWiki(_pageWikiContext))
                 {
-                    Debug.WriteLine($"[EditCheck] Raw protection JSON: {protection}");
-                    Debug.WriteLine($"[EditCheck] Protection entries: {protection.Count}");
+                    await worker.InitializeAsync(_pageWikiContext.BaseUrl);
+                    var apiUrl =
+                        $"{_pageWikiContext.ApiEndpoint}?action=query&meta=userinfo&uiprop=rights|groups&prop=info&inprop=protection&titles={Uri.EscapeDataString(_pageTitleToFetch)}&format=json";
+                    Debug.WriteLine($"[EditCheck] API URL: {apiUrl}");
+                    var json = await worker.GetJsonFromApiAsync(apiUrl);
+                    Debug.WriteLine($"[EditCheck] JSON length: {json?.Length ?? 0}");
 
-                    var editProt = protection.FirstOrDefault(p => (string)p["type"] == "edit");
-                    if (editProt != null)
+                    dynamic result = JsonConvert.DeserializeObject(json);
+                    var rightsToken = result?.query?.userinfo?.rights;
+                    var rights =
+                        rightsToken != null
+                            ? ((JArray)rightsToken).Select(r => (string)r).ToList()
+                            : new List<string>();
+                    Debug.WriteLine(
+                        $"[EditCheck] Rights: {(rights.Any() ? string.Join(", ", rights) : "(none)")}"
+                    );
+                    bool canEdit = rights.Contains("edit");
+                    Debug.WriteLine($"[EditCheck] Has 'edit' right: {canEdit}");
+
+                    var pagesObj = result?.query?.pages as JObject;
+                    var page = pagesObj?.Properties().FirstOrDefault()?.Value as JObject;
+
+                    if (
+                        page != null
+                        && page.TryGetValue("protection", out var protectionToken)
+                        && protectionToken is JArray protection
+                    )
                     {
-                        var level = (string)editProt["level"];
-                        Debug.WriteLine($"[EditCheck] Edit restriction level: {level}");
-
-                        var groupsToken = result?.query?.userinfo?.groups;
-                        var groups =
-                            groupsToken != null
-                                ? ((JArray)groupsToken).Select(g => (string)g).ToList()
-                                : new List<string>();
-
-                        Debug.WriteLine(
-                            $"[EditCheck] Groups: {(groups.Any() ? string.Join(", ", groups) : "(none)")}"
-                        );
-                        if (!groups.Contains(level))
+                        Debug.WriteLine($"[EditCheck] Raw protection JSON: {protection}");
+                        Debug.WriteLine($"[EditCheck] Protection entries: {protection.Count}");
+                        var editProt = protection.FirstOrDefault(p => (string)p["type"] == "edit");
+                        if (editProt != null)
                         {
+                            var level = (string)editProt["level"];
+                            Debug.WriteLine($"[EditCheck] Edit restriction level: {level}");
+                            var groupsToken = result?.query?.userinfo?.groups;
+                            var groups =
+                                groupsToken != null
+                                    ? ((JArray)groupsToken).Select(g => (string)g).ToList()
+                                    : new List<string>();
                             Debug.WriteLine(
-                                "[EditCheck] User does not meet restriction level — disabling edit."
+                                $"[EditCheck] Groups: {(groups.Any() ? string.Join(", ", groups) : "(none)")}"
                             );
-                            canEdit = false;
+                            if (!groups.Contains(level))
+                            {
+                                Debug.WriteLine(
+                                    "[EditCheck] User does not meet restriction level — disabling edit."
+                                );
+                                canEdit = false;
+                            }
+                            else
+                            {
+                                Debug.WriteLine("[EditCheck] User meets restriction level.");
+                            }
                         }
                         else
                         {
-                            Debug.WriteLine("[EditCheck] User meets restriction level.");
+                            Debug.WriteLine("[EditCheck] No edit-specific protection found.");
                         }
                     }
                     else
                     {
-                        Debug.WriteLine("[EditCheck] No edit-specific protection found.");
+                        Debug.WriteLine("[EditCheck] No protection array present in API response.");
                     }
-                }
-                else
-                {
-                    Debug.WriteLine("[EditCheck] No protection array present in API response.");
-                }
 
-                await Dispatcher.RunAsync(
-                    Windows.UI.Core.CoreDispatcherPriority.Normal,
-                    () =>
-                    {
-                        EditAppBarButton.Visibility = canEdit
-                            ? Visibility.Visible
-                            : Visibility.Collapsed;
-                        EditAppBarButton.IsEnabled = canEdit;
-                        System.Diagnostics.Debug.WriteLine(
-                            $"[EditCheck] Edit button Visibility set to {EditAppBarButton.Visibility}, IsEnabled set to {canEdit}"
-                        );
-                    }
-                );
-
-                System.Diagnostics.Debug.WriteLine("[EditCheck] Completed successfully.");
+                    await Dispatcher.RunAsync(
+                        Windows.UI.Core.CoreDispatcherPriority.Normal,
+                        () =>
+                        {
+                            EditAppBarButton.Visibility = canEdit
+                                ? Visibility.Visible
+                                : Visibility.Collapsed;
+                            EditAppBarButton.IsEnabled = canEdit;
+                            Debug.WriteLine(
+                                $"[EditCheck] Edit button Visibility set to {EditAppBarButton.Visibility}, IsEnabled set to {canEdit}"
+                            );
+                        }
+                    );
+                    Debug.WriteLine("[EditCheck] Completed successfully.");
+                }
             }
             catch (Exception ex)
             {
@@ -680,14 +668,12 @@ namespace WikiViewer.Shared.Uwp.Pages
                     _pageWikiContext.Id,
                     filePageTitle
                 );
-
                 if (metadata == null)
                 {
                     Debug.WriteLine(
                         $"[ImageViewer] Metadata for '{filePageTitle}' not cached. Fetching from API."
                     );
                     metadata = await FetchImageMetadataFromApiAsync(filePageTitle);
-
                     if (metadata != null)
                     {
                         ImageMetadataCacheService.StoreMetadata(
@@ -707,9 +693,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                 if (metadata != null)
                 {
                     loadingDialog.Hide();
-
                     var imageDialog = new ImageViewerDialog(metadata, _pageWikiContext);
-
                     await imageDialog.ShowAsync();
                 }
                 else
@@ -724,7 +708,6 @@ namespace WikiViewer.Shared.Uwp.Pages
             {
                 Debug.WriteLine($"[ImageViewer] Failed to load image details: {ex.Message}");
                 loadingDialog.Hide();
-
                 var errorDialog = new ContentDialog
                 {
                     Title = "Could Not Load Image",
@@ -745,111 +728,109 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         private async Task<ImageMetadata> FetchImageMetadataFromApiAsync(string filePageTitle)
         {
-            var worker = SessionManager.GetAnonymousWorkerForWiki(_pageWikiContext);
-
-            string fullFileTitle = filePageTitle;
-            if (
-                !fullFileTitle.StartsWith("File:", StringComparison.OrdinalIgnoreCase)
-                && !fullFileTitle.StartsWith("Image:", StringComparison.OrdinalIgnoreCase)
-            )
+            using (var worker = SessionManager.GetAnonymousWorkerForWiki(_pageWikiContext))
             {
-                fullFileTitle = "File:" + fullFileTitle;
-            }
-
-            string apiUrl =
-                $"{_pageWikiContext.ApiEndpoint}?action=query&prop=imageinfo&iiprop=url|comment|user|timestamp&format=json&titles={Uri.EscapeDataString(fullFileTitle)}";
-            string json = await worker.GetJsonFromApiAsync(apiUrl);
-
-            if (string.IsNullOrEmpty(json))
-                return null;
-
-            var response = JObject.Parse(json);
-            var pagesContainer = response?["query"]?["pages"] as JObject;
-            var page = pagesContainer?.Properties().FirstOrDefault()?.Value as JObject;
-            var imageInfo = page?["imageinfo"]?.FirstOrDefault();
-
-            if (imageInfo == null)
-            {
-                var redirects = response?["query"]?["redirects"]?.FirstOrDefault();
-                if (redirects != null)
+                await worker.InitializeAsync(_pageWikiContext.BaseUrl);
+                string fullFileTitle = filePageTitle;
+                if (
+                    !fullFileTitle.StartsWith("File:", StringComparison.OrdinalIgnoreCase)
+                    && !fullFileTitle.StartsWith("Image:", StringComparison.OrdinalIgnoreCase)
+                )
                 {
-                    var newTitle = redirects["to"]?.ToString();
-                    if (!string.IsNullOrEmpty(newTitle))
-                    {
-                        Debug.WriteLine(
-                            $"[ImageViewer] Redirect detected from '{filePageTitle}' to '{newTitle}'. Retrying fetch..."
-                        );
-                        return await FetchImageMetadataFromApiAsync(newTitle);
-                    }
+                    fullFileTitle = "File:" + fullFileTitle;
                 }
-                return null;
-            }
 
-            var metadata = new ImageMetadata
-            {
-                PageTitle = page?["title"]?.ToString(),
-                FullImageUrl = imageInfo["url"]?.ToString(),
-                Description = imageInfo["comment"]?.ToString(),
-                Author = imageInfo["user"]?.ToString(),
-                Date = imageInfo["timestamp"]?.ToObject<DateTime>().ToString("g"),
-                LicensingInfo = "Licensing information not available via API.",
-            };
+                string apiUrl =
+                    $"{_pageWikiContext.ApiEndpoint}?action=query&prop=imageinfo&iiprop=url|comment|user|timestamp&format=json&titles={Uri.EscapeDataString(fullFileTitle)}";
+                string json = await worker.GetJsonFromApiAsync(apiUrl);
+                if (string.IsNullOrEmpty(json))
+                    return null;
 
-            if (!string.IsNullOrEmpty(metadata.Description) && metadata.Description.Contains("{{"))
-            {
-                try
+                var response = JObject.Parse(json);
+                var pagesContainer = response?["query"]?["pages"] as JObject;
+                var page = pagesContainer?.Properties().FirstOrDefault()?.Value as JObject;
+                var imageInfo = page?["imageinfo"]?.FirstOrDefault();
+
+                if (imageInfo == null)
                 {
-                    string parseApiUrl =
-                        $"{_pageWikiContext.ApiEndpoint}?action=parse&text={Uri.EscapeDataString(metadata.Description)}&contentmodel=wikitext&prop=text&disablelimitreport=true&format=json";
-
-                    string parsedJson = await worker.GetJsonFromApiAsync(parseApiUrl);
-
-                    if (!string.IsNullOrEmpty(parsedJson))
+                    var redirects = response?["query"]?["redirects"]?.FirstOrDefault();
+                    if (redirects != null)
                     {
-                        var parsedResponse = JObject.Parse(parsedJson);
-                        string parsedHtml = parsedResponse?["parse"]?["text"]?["*"]?.ToString();
-                        if (!string.IsNullOrEmpty(parsedHtml))
+                        var newTitle = redirects["to"]?.ToString();
+                        if (!string.IsNullOrEmpty(newTitle))
                         {
-                            var doc = new HtmlAgilityPack.HtmlDocument();
-                            doc.LoadHtml(parsedHtml);
-                            doc.DocumentNode.SelectNodes("//style|//script")
-                                ?.ToList()
-                                .ForEach(n => n.Remove());
-                            metadata.Description = System.Net.WebUtility.HtmlDecode(
-                                doc.DocumentNode.InnerText.Trim()
+                            Debug.WriteLine(
+                                $"[ImageViewer] Redirect detected from '{filePageTitle}' to '{newTitle}'. Retrying fetch..."
                             );
+                            return await FetchImageMetadataFromApiAsync(newTitle);
                         }
                     }
+                    return null;
                 }
-                catch (Exception ex)
+
+                var metadata = new ImageMetadata
                 {
-                    Debug.WriteLine(
-                        $"[ImageViewer] Could not parse wikitext description: {ex.Message}"
-                    );
+                    PageTitle = page?["title"]?.ToString(),
+                    FullImageUrl = imageInfo["url"]?.ToString(),
+                    Description = imageInfo["comment"]?.ToString(),
+                    Author = imageInfo["user"]?.ToString(),
+                    Date = imageInfo["timestamp"]?.ToObject<DateTime>().ToString("g"),
+                    LicensingInfo = "Licensing information not available via API.",
+                };
+
+                if (
+                    !string.IsNullOrEmpty(metadata.Description)
+                    && metadata.Description.Contains("{{")
+                )
+                {
+                    try
+                    {
+                        string parseApiUrl =
+                            $"{_pageWikiContext.ApiEndpoint}?action=parse&text={Uri.EscapeDataString(metadata.Description)}&contentmodel=wikitext&prop=text&disablelimitreport=true&format=json";
+                        string parsedJson = await worker.GetJsonFromApiAsync(parseApiUrl);
+                        if (!string.IsNullOrEmpty(parsedJson))
+                        {
+                            var parsedResponse = JObject.Parse(parsedJson);
+                            string parsedHtml = parsedResponse?["parse"]?["text"]?["*"]?.ToString();
+                            if (!string.IsNullOrEmpty(parsedHtml))
+                            {
+                                var doc = new HtmlDocument();
+                                doc.LoadHtml(parsedHtml);
+                                doc.DocumentNode.SelectNodes("//style|//script")
+                                    ?.ToList()
+                                    .ForEach(n => n.Remove());
+                                metadata.Description = System.Net.WebUtility.HtmlDecode(
+                                    doc.DocumentNode.InnerText.Trim()
+                                );
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine(
+                            $"[ImageViewer] Could not parse wikitext description: {ex.Message}"
+                        );
+                    }
                 }
+
+                string filePageUrl = _pageWikiContext.GetWikiPageUrl(fullFileTitle);
+                string html = await worker.GetRawHtmlFromUrlAsync(filePageUrl);
+                ParseImagePageHtml(html, metadata);
+                return metadata;
             }
-
-            string filePageUrl = _pageWikiContext.GetWikiPageUrl(fullFileTitle);
-            string html = await worker.GetRawHtmlFromUrlAsync(filePageUrl);
-            ParseImagePageHtml(html, metadata);
-
-            return metadata;
         }
 
         private void ParseImagePageHtml(string html, ImageMetadata metadata)
         {
             if (string.IsNullOrEmpty(html) || metadata == null)
                 return;
-
             var doc = new HtmlDocument();
             doc.LoadHtml(html);
-
             doc.DocumentNode.SelectNodes("//style|//script")?.ToList().ForEach(n => n.Remove());
 
             var fullImageLinkNode =
                 doc.DocumentNode.SelectSingleNode("//div[@class='fullImageLink']//a")
                 ?? doc.DocumentNode.SelectSingleNode("//div[@class='fullMedia']//a");
-
             if (fullImageLinkNode != null)
             {
                 string href = fullImageLinkNode.GetAttributeValue("href", string.Empty);
@@ -903,11 +884,9 @@ namespace WikiViewer.Shared.Uwp.Pages
         {
             var dialog = new Controls.AddWikiPromptDialog(uri);
             var result = await dialog.ShowAsync();
-
             if (result == ContentDialogResult.Primary && dialog.NewWikiInstance != null)
             {
                 await WikiManager.AddWikiAsync(dialog.NewWikiInstance);
-
                 string articlePathPrefix = $"/{dialog.NewWikiInstance.ArticlePath}";
                 if (
                     uri.AbsolutePath.StartsWith(

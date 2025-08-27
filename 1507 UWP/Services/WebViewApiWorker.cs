@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
@@ -21,28 +22,43 @@ namespace _1507_UWP.Services
     {
         public WebView WebView { get; private set; }
         public bool IsInitialized { get; private set; }
-        public WikiInstance Wiki { get; set; }
-        private Task _initializationTask;
+        public WikiInstance WikiContext { get; set; }
 
-        public Task InitializeAsync(string baseUrl = null)
+        private Task _initializationTask;
+        private readonly SemaphoreSlim _initSemaphore = new SemaphoreSlim(1, 1);
+
+        public async Task InitializeAsync(string baseUrl)
         {
             if (IsInitialized)
+                return;
+
+            await _initSemaphore.WaitAsync();
+            try
             {
-                return Task.CompletedTask;
+                if (IsInitialized)
+                    return;
+                if (_initializationTask == null)
+                {
+                    _initializationTask = InitializeInternalAsync(baseUrl);
+                }
+            }
+            finally
+            {
+                _initSemaphore.Release();
             }
 
-            if (_initializationTask != null)
-            {
-                return _initializationTask;
-            }
-
-            _initializationTask = InitializeInternalAsync(baseUrl);
-            return _initializationTask;
+            await _initializationTask;
         }
 
         private async Task InitializeInternalAsync(string baseUrl)
         {
-            Debug.WriteLine("[WebViewApiWorker] InitializeInternalAsync called.");
+            if (string.IsNullOrEmpty(baseUrl))
+                throw new ArgumentNullException(
+                    nameof(baseUrl),
+                    "Base URL cannot be null for WebView initialization."
+                );
+
+            Debug.WriteLine($"[WebViewApiWorker] Starting initialization for {baseUrl}");
             var tcs = new TaskCompletionSource<bool>();
             await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(
                 CoreDispatcherPriority.Normal,
@@ -51,11 +67,10 @@ namespace _1507_UWP.Services
                     try
                     {
                         if (WikiViewer.Shared.Uwp.App.UIHost == null)
-                        {
                             throw new InvalidOperationException(
                                 "App.UIHost is not available for WebView worker."
                             );
-                        }
+
                         WebView = new WebView();
                         WikiViewer.Shared.Uwp.App.UIHost.Children.Add(WebView);
                         Debug.WriteLine("[WebViewApiWorker] WebView control created.");
@@ -69,10 +84,7 @@ namespace _1507_UWP.Services
                                 tcs.SetResult(e.IsSuccess);
                         };
                         WebView.NavigationCompleted += navHandler;
-                        if (baseUrl == null)
-                            throw new InvalidOperationException(
-                                "Cannot initialize WebView worker without a base URL."
-                            );
+
                         var urlToNavigate = new Uri(baseUrl);
                         WebView.Navigate(urlToNavigate);
                     }
@@ -86,21 +98,30 @@ namespace _1507_UWP.Services
                     }
                 }
             );
-            await tcs.Task;
-            IsInitialized = true;
+
+            bool success = await tcs.Task;
+            if (success)
+            {
+                IsInitialized = true;
+                Debug.WriteLine("[WebViewApiWorker] Initialization successful.");
+            }
+            else
+            {
+                throw new Exception("WebView navigation failed during initialization.");
+            }
         }
 
-        private async Task EnsureInitializedAsync()
+        private void CheckInitialized()
         {
             if (!IsInitialized)
-            {
-                await InitializeAsync(Wiki?.BaseUrl);
-            }
+                throw new InvalidOperationException(
+                    "Worker must be initialized before use. Call InitializeAsync first."
+                );
         }
 
         public async Task<string> GetJsonFromApiAsync(string url)
         {
-            await EnsureInitializedAsync();
+            CheckInitialized();
             Debug.WriteLine($"[WebViewApiWorker] GetJsonFromApiAsync called for: {url}");
 
             return await GetContentFromUrlCore(
@@ -130,7 +151,7 @@ namespace _1507_UWP.Services
             Dictionary<string, string> postData
         )
         {
-            await EnsureInitializedAsync();
+            CheckInitialized();
 
             return await DispatcherTaskExtensions.RunTaskAsync(
                 CoreApplication.MainView.CoreWindow.Dispatcher,
@@ -215,7 +236,7 @@ namespace _1507_UWP.Services
 
         public async Task<string> GetRawHtmlFromUrlAsync(string url)
         {
-            await EnsureInitializedAsync();
+            CheckInitialized();
             Debug.WriteLine($"[WebViewApiWorker] GetRawHtmlFromUrlAsync called for: {url}");
             return await GetContentFromUrlCore(
                 url,
@@ -446,9 +467,9 @@ namespace _1507_UWP.Services
             var filter = new HttpBaseProtocolFilter();
             var cookieManager = filter.CookieManager;
 
-            if (this.Wiki == null)
+            if (this.WikiContext == null)
                 return Task.CompletedTask;
-            var sourceCookies = cookieManager.GetCookies(new Uri(this.Wiki.BaseUrl));
+            var sourceCookies = cookieManager.GetCookies(new Uri(this.WikiContext.BaseUrl));
             if (sourceCookies == null || !sourceCookies.Any())
                 return Task.CompletedTask;
 
