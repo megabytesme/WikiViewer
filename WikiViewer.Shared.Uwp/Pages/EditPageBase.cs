@@ -177,6 +177,7 @@ namespace WikiViewer.Shared.Uwp.Pages
             public WikitextPair Pair { get; set; }
         }
 
+        private const string WIKITEXT_PUNCTUATION = "[]{}'|#*=!<>:-";
         private ITextRange _lastLeftBracket,
             _lastRightBracket;
         private readonly List<ITextRange> _lastUnmatchedRanges = new List<ITextRange>();
@@ -299,12 +300,46 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         private void CoreWindow_CharacterReceived(CoreWindow sender, CharacterReceivedEventArgs e)
         {
-            if (FocusManager.GetFocusedElement() != WikitextEditorTextBox)
+            if (FocusManager.GetFocusedElement() != WikitextEditorTextBox || _isUpdatingText)
                 return;
 
+            var document = WikitextEditorTextBox.Document;
+            var selection = document.Selection;
             char typedChar = (char)e.KeyCode;
 
-            Debug.WriteLine($"User typed: '{typedChar}'");
+            if (selection.Length > 0 || selection.StartPosition < 1)
+            {
+                HandleAutoCompletion();
+                _highlightDebounceTimer.Start();
+                return;
+            }
+
+            if (WIKITEXT_PUNCTUATION.Contains(typedChar)) { }
+            else
+            {
+                var typedCharRange = document.GetRange(
+                    selection.StartPosition - 1,
+                    selection.StartPosition
+                );
+
+                if (typedCharRange.CharacterFormat.BackgroundColor != Colors.Transparent)
+                {
+                    try
+                    {
+                        _isUpdatingText = true;
+                        document.BeginUndoGroup();
+
+                        var cleanFormat = typedCharRange.CharacterFormat.GetClone();
+                        cleanFormat.BackgroundColor = Colors.Transparent;
+                        typedCharRange.CharacterFormat = cleanFormat;
+                    }
+                    finally
+                    {
+                        document.EndUndoGroup();
+                        _isUpdatingText = false;
+                    }
+                }
+            }
 
             HandleAutoCompletion();
             _highlightDebounceTimer.Start();
