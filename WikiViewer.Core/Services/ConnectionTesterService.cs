@@ -1,96 +1,89 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using WikiViewer.Core.Enums;
 using WikiViewer.Core.Interfaces;
-using WikiViewer.Core.Models;
 
 namespace WikiViewer.Core.Services
 {
     public class ConnectionTestResult
     {
-        public ConnectionMethod Method { get; set; }
         public bool IsSuccess { get; set; }
-        public WikiPaths DetectedPaths { get; set; }
+        public ConnectionMethod Method { get; set; }
+        public WikiPaths Paths { get; set; }
     }
 
     public static class ConnectionTesterService
     {
-        private static readonly List<ConnectionMethod> TestOrder = new List<ConnectionMethod>
-        {
-            ConnectionMethod.HttpClient,
-            ConnectionMethod.WebView,
-            ConnectionMethod.HttpClientProxy,
-        };
-
         public static async Task<ConnectionTestResult> FindWorkingMethodAndPathsAsync(
             string baseUrl,
             IApiWorkerFactory factory
         )
         {
-            var cts = new CancellationTokenSource();
-            var tasks = new List<Task<ConnectionTestResult>>();
-
-            foreach (var method in TestOrder)
+            var methodsToTest = new[]
             {
-                tasks.Add(
-                    Task.Run(
-                        async () =>
-                        {
-                            if (cts.IsCancellationRequested)
-                                return new ConnectionTestResult { IsSuccess = false };
+                ConnectionMethod.HttpClient,
+                ConnectionMethod.WebView,
+                ConnectionMethod.HttpClientProxy,
+            };
 
-                            Debug.WriteLine($"[ConnectionTester] Starting test for: {method}");
-                            var tempWiki = new WikiInstance
-                            {
-                                BaseUrl = baseUrl,
-                                PreferredConnectionMethod = method,
-                            };
-                            using (var worker = factory.CreateApiWorker(tempWiki))
-                            {
-                                try
-                                {
-                                    await worker.InitializeAsync(baseUrl);
-                                    var paths = await WikiPathDetectorService.DetectPathsAsync(
-                                        baseUrl,
-                                        worker
-                                    );
-                                    if (paths.WasDetectedSuccessfully)
-                                    {
-                                        Debug.WriteLine($"[ConnectionTester] SUCCESS for: {method}");
-                                        cts.Cancel();
-                                        return new ConnectionTestResult
-                                        {
-                                            Method = method,
-                                            IsSuccess = true,
-                                            DetectedPaths = paths,
-                                        };
-                                    }
-                                }
-                                catch (Exception ex)
-                                {
-                                    Debug.WriteLine(
-                                        $"[ConnectionTester] FAILED for {method}: {ex.Message}"
-                                    );
-                                }
-                            }
-                            return new ConnectionTestResult { Method = method, IsSuccess = false };
-                        },
-                        cts.Token
+            foreach (var method in methodsToTest)
+            {
+                Debug.WriteLine($"[ConnectionTester] Starting test for: {method}");
+                using (
+                    var worker = factory.CreateApiWorker(
+                        new Models.WikiInstance { PreferredConnectionMethod = method }
                     )
-                );
-            }
+                )
+                {
+                    try
+                    {
+                        await worker.InitializeAsync(baseUrl);
+                        var paths = await WikiPathDetectorService.DetectPathsAsync(baseUrl, worker);
+                        if (!paths.WasDetectedSuccessfully)
+                        {
+                            Debug.WriteLine(
+                                $"[ConnectionTester] FAILED (Path Detection): {method}"
+                            );
+                            continue;
+                        }
 
-            var results = await Task.WhenAll(tasks);
+                        var tempWikiForApiTest = new Models.WikiInstance
+                        {
+                            BaseUrl = baseUrl,
+                            ScriptPath = paths.ScriptPath,
+                        };
+                        string testApiUrl =
+                            $"{tempWikiForApiTest.ApiEndpoint}?action=query&meta=siteinfo&format=json";
 
-            foreach (var method in TestOrder)
-            {
-                var successResult = results.FirstOrDefault(r => r.IsSuccess && r.Method == method);
-                if (successResult != null)
-                    return successResult;
+                        Debug.WriteLine(
+                            $"[ConnectionTester] Performing API validation call for {method} to {testApiUrl}"
+                        );
+                        string jsonResult = await worker.GetJsonFromApiAsync(testApiUrl);
+
+                        if (string.IsNullOrEmpty(jsonResult))
+                        {
+                            Debug.WriteLine(
+                                $"[ConnectionTester] FAILED (API Call returned no JSON): {method}"
+                            );
+                            continue;
+                        }
+
+                        Debug.WriteLine($"[ConnectionTester] SUCCESS for: {method}");
+                        return new ConnectionTestResult
+                        {
+                            IsSuccess = true,
+                            Method = method,
+                            Paths = paths,
+                        };
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine(
+                            $"[ConnectionTester] FAILED (Exception) for {method}: {ex.Message}"
+                        );
+                    }
+                }
             }
 
             return new ConnectionTestResult { IsSuccess = false };
