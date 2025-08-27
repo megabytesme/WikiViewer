@@ -109,6 +109,8 @@ namespace _1809_UWP.Pages
             }
         }
 
+        protected override void HideConnectionInfoBar() => ConnectionInfoBar.IsOpen = false;
+
         protected override async Task ShowDialogAsync(string title, string message)
         {
             await ShowConnectionInfoBarAsync(title, message, false, true);
