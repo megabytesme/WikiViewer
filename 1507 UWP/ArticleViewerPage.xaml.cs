@@ -152,16 +152,16 @@ namespace _1507_UWP.Pages
         protected override string GetImageUpdateScript(string originalUrl, string localPath)
         {
             string fileName = System.IO.Path.GetFileName(localPath);
+            string finalLocalUrl = fileName;
             string escapedOriginalUrl = JsonConvert.ToString(originalUrl);
-            string escapedFileName = JsonConvert.ToString(fileName);
+            string escapedLocalUrl = JsonConvert.ToString(finalLocalUrl);
 
             return $@"
         (function() {{
-            var imgs = document.getElementsByTagName('img');
+            var selector = 'img[src=' + {escapedOriginalUrl} + ']';
+            var imgs = document.querySelectorAll(selector);
             for (var i = 0; i < imgs.length; i++) {{
-                if (imgs[i].src && imgs[i].src.indexOf({escapedOriginalUrl}) !== -1) {{
-                    imgs[i].src = {escapedFileName};
-                }}
+                imgs[i].src = {escapedLocalUrl};
             }}
         }})();";
         }

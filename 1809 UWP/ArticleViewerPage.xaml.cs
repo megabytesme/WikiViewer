@@ -146,10 +146,18 @@ namespace _1809_UWP.Pages
 
         protected override string GetImageUpdateScript(string originalUrl, string localPath)
         {
-            string virtualHostUrl = $"https://{GetVirtualHostName()}{localPath.Replace('\\', '/')}";
+            string finalLocalUrl = $"https://{GetVirtualHostName()}{localPath.Replace('\\', '/')}";
             string escapedOriginalUrl = JsonConvert.ToString(originalUrl);
-            string escapedVirtualUrl = JsonConvert.ToString(virtualHostUrl);
-            return $"var imgs = document.querySelectorAll('img[src=' + {escapedOriginalUrl} + ']'); for (var i = 0; i < imgs.length; i++) {{ imgs[i].src = {escapedVirtualUrl}; }}";
+            string escapedLocalUrl = JsonConvert.ToString(finalLocalUrl);
+
+            return $@"
+        (function() {{
+            var selector = 'img[src=' + {escapedOriginalUrl} + ']';
+            var imgs = document.querySelectorAll(selector);
+            for (var i = 0; i < imgs.length; i++) {{
+                imgs[i].src = {escapedLocalUrl};
+            }}
+        }})();";
         }
 
         protected override void InitializePlatformControls()

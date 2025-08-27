@@ -150,23 +150,49 @@ namespace WikiViewer.Core.Services
             );
 
             var finalDoc = new HtmlDocument();
+            var contentDoc = new HtmlDocument();
+            contentDoc.LoadHtml(contentWithAbsoluteUrls);
+
+            var lazyImages = contentDoc.DocumentNode.SelectNodes(
+                "//img[contains(@class, 'lazyload') and @data-src]"
+            );
+            if (lazyImages != null)
+            {
+                foreach (var imgNode in lazyImages)
+                {
+                    var realSrc = imgNode.GetAttributeValue("data-src", null);
+                    if (!string.IsNullOrEmpty(realSrc))
+                    {
+                        imgNode.SetAttributeValue("src", realSrc);
+
+                        imgNode.Attributes.Remove("data-src");
+                        string currentClass = imgNode.GetAttributeValue("class", "");
+                        imgNode.SetAttributeValue(
+                            "class",
+                            currentClass.Replace("lazyload", "").Trim()
+                        );
+                    }
+                }
+            }
+            string processedContent = contentDoc.DocumentNode.OuterHtml;
+
             var htmlNode = finalDoc.CreateElement("html");
             finalDoc.DocumentNode.AppendChild(htmlNode);
 
             var headNode = finalDoc.CreateElement("head");
             headNode.InnerHtml =
                 $@"
-<meta charset='UTF-8'>
-<title>{WebUtility.HtmlEncode(pageTitle)}</title>
-<meta name='viewport' content='width=device-width, initial-scale=1.0'>
-<base href='{wiki.BaseUrl}'>
-<style id='custom-theme-style'>{decodedCss}</style>";
+            <meta charset='UTF-8'>
+            <title>{WebUtility.HtmlEncode(pageTitle)}</title>
+            <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+            <base href='{wiki.BaseUrl}'>
+            <style id='custom-theme-style'>{decodedCss}</style>";
             htmlNode.AppendChild(headNode);
 
             var bodyNode = finalDoc.CreateElement("body");
             var wrapperDiv = finalDoc.CreateElement("div");
             wrapperDiv.SetAttributeValue("class", "mw-parser-output");
-            wrapperDiv.InnerHtml = contentWithAbsoluteUrls;
+            wrapperDiv.InnerHtml = processedContent;
             bodyNode.AppendChild(wrapperDiv);
 
             htmlNode.AppendChild(bodyNode);
