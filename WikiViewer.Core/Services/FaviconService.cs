@@ -1,7 +1,5 @@
 using System;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
 using HtmlAgilityPack;
 using WikiViewer.Core.Interfaces;
@@ -12,21 +10,38 @@ namespace WikiViewer.Core.Services
 {
     public static class FaviconService
     {
-        public static async Task<string> FetchAndCacheFaviconUrlAsync(WikiInstance wiki, IApiWorker worker)
+        public static async Task<string> FetchAndCacheFaviconUrlAsync(
+            WikiInstance wiki,
+            IApiWorker worker,
+            bool forceRefresh = false
+        )
         {
-            if (wiki == null || worker == null) return null;
+            if (wiki == null || worker == null)
+                return null;
 
-            if (!string.IsNullOrEmpty(wiki.IconUrl) && wiki.IconUrl.StartsWith("ms-appdata:///"))
+            var faviconsFolder = await ApplicationData.Current.LocalFolder.CreateFolderAsync(
+                "favicons",
+                CreationCollisionOption.OpenIfExists
+            );
+            var targetFileName = wiki.Id.ToString();
+
+            if (!forceRefresh)
             {
-                return wiki.IconUrl;
+                if (
+                    !string.IsNullOrEmpty(wiki.IconUrl) && wiki.IconUrl.StartsWith("ms-appdata:///")
+                )
+                {
+                    var existingFile = await faviconsFolder.TryGetItemAsync(targetFileName);
+                    if (existingFile != null)
+                    {
+                        return wiki.IconUrl;
+                    }
+                }
             }
 
-            var faviconsFolder = await ApplicationData.Current.LocalFolder.CreateFolderAsync("favicons", CreationCollisionOption.OpenIfExists);
-            var targetFile = await faviconsFolder.TryGetItemAsync(wiki.Id.ToString());
-            if (targetFile != null)
-            {
-                return $"ms-appdata:///local/favicons/{wiki.Id.ToString()}";
-            }
+            Debug.WriteLine(
+                $"[FaviconService] Fetching favicon for {wiki.Name} (Force Refresh: {forceRefresh})"
+            );
 
             string iconUrl = null;
             byte[] iconBytes = null;
@@ -42,7 +57,9 @@ namespace WikiViewer.Core.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[FaviconService] /favicon.ico not found for {wiki.Name}: {ex.Message}");
+                Debug.WriteLine(
+                    $"[FaviconService] /favicon.ico not found for {wiki.Name}: {ex.Message}"
+                );
             }
 
             if (iconBytes == null)
@@ -53,7 +70,9 @@ namespace WikiViewer.Core.Services
                     var doc = new HtmlDocument();
                     doc.LoadHtml(html);
 
-                    var linkNode = doc.DocumentNode.SelectSingleNode("//link[@rel='icon' or @rel='shortcut icon']");
+                    var linkNode = doc.DocumentNode.SelectSingleNode(
+                        "//link[@rel='icon' or @rel='shortcut icon']"
+                    );
                     if (linkNode != null)
                     {
                         string href = linkNode.GetAttributeValue("href", null);
@@ -67,7 +86,9 @@ namespace WikiViewer.Core.Services
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"[FaviconService] Could not parse main page for icon for {wiki.Name}: {ex.Message}");
+                    Debug.WriteLine(
+                        $"[FaviconService] Could not parse main page for icon for {wiki.Name}: {ex.Message}"
+                    );
                 }
             }
 
@@ -75,15 +96,26 @@ namespace WikiViewer.Core.Services
             {
                 try
                 {
-                    var file = await faviconsFolder.CreateFileAsync(wiki.Id.ToString(), CreationCollisionOption.ReplaceExisting);
+                    var file = await faviconsFolder.CreateFileAsync(
+                        targetFileName,
+                        CreationCollisionOption.ReplaceExisting
+                    );
                     await FileIO.WriteBytesAsync(file, iconBytes);
-                    wiki.IconUrl = $"ms-appdata:///local/favicons/{wiki.Id.ToString()}";
-                    await WikiManager.SaveAsync();
+
+                    string newIconUrl = $"ms-appdata:///local/favicons/{targetFileName}";
+
+                    if (wiki.IconUrl != newIconUrl)
+                    {
+                        wiki.IconUrl = newIconUrl;
+                        await WikiManager.SaveAsync();
+                    }
                     return wiki.IconUrl;
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"[FaviconService] Failed to save icon to disk for {wiki.Name}: {ex.Message}");
+                    Debug.WriteLine(
+                        $"[FaviconService] Failed to save icon to disk for {wiki.Name}: {ex.Message}"
+                    );
                 }
             }
 

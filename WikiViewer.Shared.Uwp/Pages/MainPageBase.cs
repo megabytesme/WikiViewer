@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Linq;
@@ -198,6 +199,8 @@ namespace WikiViewer.Shared.Uwp.Pages
             _ = SessionManager.PerformAutoLoginAsync();
 
             PopulateWikiNavItems();
+            _ = RefreshAllFaviconsAsync();
+
             SearchBox.PlaceholderText = "Search all wikis...";
 
             if (ContentFrame.Content == null)
@@ -216,6 +219,34 @@ namespace WikiViewer.Shared.Uwp.Pages
                 }
             }
             await PerformPreflightCheckAsync();
+        }
+
+        private async Task RefreshAllFaviconsAsync()
+        {
+            Debug.WriteLine("[MainPage] Starting background favicon refresh...");
+            var allWikis = WikiManager.GetWikis();
+            var refreshTasks = new List<Task>();
+
+            foreach (var wiki in allWikis)
+            {
+                refreshTasks.Add(
+                    Task.Run(async () =>
+                    {
+                        using (var worker = App.ApiWorkerFactory.CreateApiWorker(wiki))
+                        {
+                            await worker.InitializeAsync();
+                            await FaviconService.FetchAndCacheFaviconUrlAsync(
+                                wiki,
+                                worker,
+                                forceRefresh: true
+                            );
+                        }
+                    })
+                );
+            }
+
+            await Task.WhenAll(refreshTasks);
+            Debug.WriteLine("[MainPage] Background favicon refresh complete.");
         }
 
         private async Task PerformPreflightCheckAsync()
