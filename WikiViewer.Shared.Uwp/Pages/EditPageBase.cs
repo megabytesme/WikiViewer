@@ -510,140 +510,157 @@ namespace WikiViewer.Shared.Uwp.Pages
             }
         }
 
+        private class GroupInfo
+        {
+            public WikitextPair Pair { get; set; }
+            public bool IsOpeningPattern { get; set; }
+        }
+
+        private static System.Text.RegularExpressions.Regex _masterScannerRegex;
+        private static Dictionary<string, GroupInfo> _groupNameToInfoMap;
+        private string _lastScannedText;
+        private List<TokenMatch> _lastScanResult;
+
         private List<TokenMatch> ScanDocumentForAllTokens(string text)
         {
-            var stopwatch = Stopwatch.StartNew();
-            int numChunks = Environment.ProcessorCount;
-            int chunkSize = (int)Math.Ceiling((double)text.Length / numChunks);
-            var chunks = new List<Tuple<string, int>>();
-            for (int i = 0; i < text.Length; i += chunkSize)
+            if (text == _lastScannedText)
             {
-                chunks.Add(
-                    Tuple.Create(text.Substring(i, Math.Min(chunkSize, text.Length - i)), i)
-                );
+                return _lastScanResult;
             }
-            var allTokens = chunks
-                .AsParallel()
-                .Select(chunk =>
+
+            var stopwatch = Stopwatch.StartNew();
+            InitializeMasterScanner();
+
+            var matches = new List<TokenMatch>();
+            var stack = new Stack<TokenMatch>();
+
+            foreach (System.Text.RegularExpressions.Match match in _masterScannerRegex.Matches(text))
+            {
+                string successfulGroupName = null;
+                foreach (string groupName in _groupNameToInfoMap.Keys)
                 {
-                    var chunkText = chunk.Item1;
-                    var offset = chunk.Item2;
-                    var localMatches = new List<TokenMatch>();
-                    var stack = new Stack<TokenMatch>();
-                    int index = 0;
-                    while (index < chunkText.Length)
+                    if (match.Groups[groupName].Success)
                     {
-                        bool matchedThisTurn = false;
-                        if (stack.Any() && stack.Peek().Pair.IsRawContent)
-                        {
-                            var currentPair = stack.Peek().Pair;
-                            var closeMatch = currentPair.ClosePattern.Match(chunkText, index);
-                            if (closeMatch.Success && closeMatch.Index == index)
-                            {
-                                var opener = stack.Pop();
-                                var token = new TokenMatch
-                                {
-                                    Position = index + offset,
-                                    Length = closeMatch.Length,
-                                    IsOpening = false,
-                                    Pair = currentPair,
-                                    IsMatched = true,
-                                    MatchPosition = opener.Position,
-                                };
-                                opener.IsMatched = true;
-                                opener.MatchPosition = index + offset;
-                                localMatches.Add(token);
-                                index += closeMatch.Length;
-                                matchedThisTurn = true;
-                            }
-                        }
-                        else
-                        {
-                            foreach (var pair in _wikitextPairs)
-                            {
-                                var openMatch = pair.OpenPattern.Match(chunkText, index);
-                                if (openMatch.Success && openMatch.Index == index)
-                                {
-                                    bool isOpening = !(
-                                        stack.Any()
-                                        && stack.Peek().Pair.Name == pair.Name
-                                        && pair.OpenPattern.ToString()
-                                            == pair.ClosePattern.ToString()
-                                    );
-                                    if (isOpening)
-                                    {
-                                        var token = new TokenMatch
-                                        {
-                                            Position = index + offset,
-                                            Length = openMatch.Length,
-                                            IsOpening = true,
-                                            Pair = pair,
-                                        };
-                                        stack.Push(token);
-                                        localMatches.Add(token);
-                                    }
-                                    else
-                                    {
-                                        var opener = stack.Pop();
-                                        var token = new TokenMatch
-                                        {
-                                            Position = index + offset,
-                                            Length = openMatch.Length,
-                                            IsOpening = false,
-                                            Pair = pair,
-                                            IsMatched = true,
-                                            MatchPosition = opener.Position,
-                                        };
-                                        opener.IsMatched = true;
-                                        opener.MatchPosition = index + offset;
-                                        localMatches.Add(token);
-                                    }
-                                    index += openMatch.Length;
-                                    matchedThisTurn = true;
-                                    break;
-                                }
-                                var closeMatch = pair.ClosePattern.Match(chunkText, index);
-                                if (
-                                    stack.Any()
-                                    && stack.Peek().Pair.Name == pair.Name
-                                    && closeMatch.Success
-                                    && closeMatch.Index == index
-                                )
-                                {
-                                    var opener = stack.Pop();
-                                    var token = new TokenMatch
-                                    {
-                                        Position = index + offset,
-                                        Length = closeMatch.Length,
-                                        IsOpening = false,
-                                        Pair = pair,
-                                        IsMatched = true,
-                                        MatchPosition = opener.Position,
-                                    };
-                                    opener.IsMatched = true;
-                                    opener.MatchPosition = index + offset;
-                                    localMatches.Add(token);
-                                    index += closeMatch.Length;
-                                    matchedThisTurn = true;
-                                    break;
-                                }
-                            }
-                        }
-                        if (!matchedThisTurn)
-                        {
-                            index++;
-                        }
+                        successfulGroupName = groupName;
+                        break;
                     }
-                    return localMatches;
-                })
-                .SelectMany(list => list)
-                .OrderBy(t => t.Position)
-                .ToList();
+                }
+
+                if (successfulGroupName == null) continue;
+
+                var groupInfo = _groupNameToInfoMap[successfulGroupName];
+                var pair = groupInfo.Pair;
+                bool isOpeningToken = groupInfo.IsOpeningPattern;
+
+                if (pair.OpenPattern.ToString() == pair.ClosePattern.ToString())
+                {
+                    if (stack.Any() && stack.Peek().Pair.Name == pair.Name)
+                    {
+                        isOpeningToken = false;
+                    }
+                    else
+                    {
+                        isOpeningToken = true;
+                    }
+                }
+
+                if (isOpeningToken && match.Value.TrimEnd().EndsWith("/>"))
+                {
+                    var token = new TokenMatch
+                    {
+                        Position = match.Index,
+                        Length = match.Length,
+                        IsOpening = true,
+                        IsMatched = true,
+                        MatchPosition = match.Index,
+                        Pair = pair
+                    };
+                    matches.Add(token);
+                }
+                else if (isOpeningToken)
+                {
+                    var token = new TokenMatch
+                    {
+                        Position = match.Index,
+                        Length = match.Length,
+                        IsOpening = true,
+                        Pair = pair,
+                    };
+                    stack.Push(token);
+                    matches.Add(token);
+                }
+                else
+                {
+                    if (stack.Any() && stack.Peek().Pair.Name == pair.Name)
+                    {
+                        var opener = stack.Pop();
+                        var token = new TokenMatch
+                        {
+                            Position = match.Index,
+                            Length = match.Length,
+                            IsOpening = false,
+                            Pair = pair,
+                            IsMatched = true,
+                            MatchPosition = opener.Position,
+                        };
+                        opener.IsMatched = true;
+                        opener.MatchPosition = match.Index;
+                        matches.Add(token);
+                    }
+                    else
+                    {
+                        matches.Add(new TokenMatch
+                        {
+                            Position = match.Index,
+                            Length = match.Length,
+                            IsOpening = false,
+                            Pair = pair,
+                            IsMatched = false
+                        });
+                    }
+                }
+            }
+
+            foreach (var unclosed in stack)
+            {
+                unclosed.IsMatched = false;
+            }
+
             stopwatch.Stop();
-            Debug.WriteLine(
-                $"[Highlighting] Multi-threaded scan completed in {stopwatch.ElapsedMilliseconds}ms on {numChunks} cores."
-            );
-            return allTokens;
+            Debug.WriteLine($"[Highlighting] Single-threaded scan completed in {stopwatch.ElapsedMilliseconds}ms.");
+
+            _lastScannedText = text;
+            _lastScanResult = matches;
+
+            return matches;
+        }
+
+        private void InitializeMasterScanner()
+        {
+            if (_masterScannerRegex != null) return;
+
+            var patternBuilder = new System.Text.StringBuilder();
+            _groupNameToInfoMap = new Dictionary<string, GroupInfo>();
+            int groupCounter = 0;
+
+            foreach (var pair in _wikitextPairs)
+            {
+                string openGroupName = $"p{groupCounter++}";
+                patternBuilder.Append($"(?<{openGroupName}>{pair.OpenPattern})|");
+                _groupNameToInfoMap[openGroupName] = new GroupInfo { Pair = pair, IsOpeningPattern = true };
+
+                if (pair.OpenPattern.ToString() != pair.ClosePattern.ToString())
+                {
+                    string closeGroupName = $"p{groupCounter++}";
+                    patternBuilder.Append($"(?<{closeGroupName}>{pair.ClosePattern})|");
+                    _groupNameToInfoMap[closeGroupName] = new GroupInfo { Pair = pair, IsOpeningPattern = false };
+                }
+            }
+            patternBuilder.Length--;
+
+            _masterScannerRegex = new System.Text.RegularExpressions.Regex(
+                patternBuilder.ToString(),
+                System.Text.RegularExpressions.RegexOptions.Compiled);
         }
 
         private void ClearBracketHighlight()
