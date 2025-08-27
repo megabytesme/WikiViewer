@@ -130,7 +130,7 @@
 
         <!-- Verification Panel -->
         <Grid x:Name="VerificationPanel"
-              Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
+              Background="{ThemeResource PageTitleBarAcrylicBrush}"
               Visibility="Collapsed">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
