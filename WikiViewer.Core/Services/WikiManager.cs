@@ -1,10 +1,10 @@
-using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
 using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
 
@@ -81,8 +81,9 @@ namespace WikiViewer.Core.Services
         {
             if (string.IsNullOrEmpty(host))
                 return null;
+
             return _wikis.FirstOrDefault(w =>
-                w.Host.Equals(host, StringComparison.OrdinalIgnoreCase)
+                w.Host != null && w.Host.Equals(host, StringComparison.OrdinalIgnoreCase)
             );
         }
 
