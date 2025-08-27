@@ -298,7 +298,7 @@ namespace WikiViewer.Shared.Uwp.Pages
 
             try
             {
-                var worker = SessionManager.GetAnonymousWorkerForWiki(_pageWikiContext);
+                var worker = await App.ApiWorkerFactory.CreateApiWorkerAsync(_pageWikiContext);
                 var (htmlContent, resolvedTitle) =
                     await ArticleProcessingService.FetchAndProcessArticleAsync(
                         _pageTitleToFetch,

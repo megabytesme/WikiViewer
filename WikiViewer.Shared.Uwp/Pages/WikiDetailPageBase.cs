@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Linq;
-using System.Threading.Tasks;
 using WikiViewer.Core;
 using WikiViewer.Core.Enums;
 using WikiViewer.Core.Models;
@@ -30,7 +29,7 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected abstract TextBlock LoadingTextControl { get; }
 
         protected abstract void ShowVerificationPanel(string url);
-        
+
         public WikiDetailPageBase()
         {
             this.Loaded += OnLoaded;
@@ -38,22 +37,26 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
-            if (_currentWiki != null)
+            if (_currentWiki == null)
+                return;
+
+            PopulateDetails();
+
+            var mainPage = this.FindParent<MainPageBase>();
+            if (mainPage != null)
             {
-                var mainPage = this.FindParent<MainPageBase>();
-                if (mainPage != null)
-                {
-                    mainPage.SetPageTitle(_isNewWiki ? "Add New Wiki" : $"Editing '{_currentWiki.Name}'");
-                }
+                mainPage.SetPageTitle(
+                    _isNewWiki ? "Add New Wiki" : $"Editing '{_currentWiki.Name}'"
+                );
+            }
 
-                var methodMatch = ConnectionMethodComboBoxControl
-                    .Items.OfType<ComboBoxItem>()
-                    .FirstOrDefault(i => Equals(i.Tag, _currentWiki.PreferredConnectionMethod));
+            var methodMatch = ConnectionMethodComboBoxControl
+                .Items.OfType<ComboBoxItem>()
+                .FirstOrDefault(i => Equals(i.Tag, _currentWiki.PreferredConnectionMethod));
 
-                if (methodMatch != null)
-                {
-                    ConnectionMethodComboBoxControl.SelectedItem = methodMatch;
-                }
+            if (methodMatch != null)
+            {
+                ConnectionMethodComboBoxControl.SelectedItem = methodMatch;
             }
         }
 
@@ -64,10 +67,6 @@ namespace WikiViewer.Shared.Uwp.Pages
             if (e.Parameter is Guid wikiId)
             {
                 _currentWiki = WikiManager.GetWikiById(wikiId);
-                if (_currentWiki != null)
-                {
-                    PopulateDetails();
-                }
             }
             else if (e.Parameter is bool isNew && isNew)
             {
@@ -75,26 +74,32 @@ namespace WikiViewer.Shared.Uwp.Pages
                 _currentWiki = new WikiInstance
                 {
                     Name = "New Wiki",
-                    BaseUrl = "https://www.example.com/",
+                    BaseUrl = "https://www.mediawiki.org/",
                     PreferredConnectionMethod = AppSettings.DefaultConnectionMethod,
                 };
-                PopulateDetails();
             }
 
             if (_currentWiki == null)
             {
-                Frame.GoBack();
+                if (Frame.CanGoBack)
+                    Frame.GoBack();
             }
         }
 
         private void PopulateDetails()
         {
+            PageTitleTextBlockControl.Text = _isNewWiki
+                ? "Add New Wiki"
+                : $"Editing '{_currentWiki.Name}'";
             WikiNameTextBoxControl.Text = _currentWiki.Name;
             WikiUrlTextBoxControl.Text = _currentWiki.BaseUrl;
             ScriptPathTextBoxControl.Text = _currentWiki.ScriptPath;
             ArticlePathTextBoxControl.Text = _currentWiki.ArticlePath;
 
             ConnectionMethodComboBoxControl.Items.Clear();
+            ConnectionMethodComboBoxControl.Items.Add(
+                new ComboBoxItem { Content = "Auto (Recommended)", Tag = ConnectionMethod.Auto }
+            );
             ConnectionMethodComboBoxControl.Items.Add(
                 new ComboBoxItem
                 {
@@ -199,68 +204,103 @@ namespace WikiViewer.Shared.Uwp.Pages
             }
 
             LoadingOverlayControl.Visibility = Visibility.Visible;
-            LoadingTextControl.Text = "Detecting paths...";
             DetectionStatusTextBlockControl.Visibility = Visibility.Collapsed;
 
-            var tempWikiForDetection = new WikiInstance
-            {
-                BaseUrl = urlToDetect,
-                PreferredConnectionMethod = (ConnectionMethod)
-                    ConnectionMethodComboBoxControl.SelectedValue,
-            };
+            var selectedMethod = (ConnectionMethod)ConnectionMethodComboBoxControl.SelectedValue;
 
-            using (var detectorWorker = App.ApiWorkerFactory.CreateApiWorker(tempWikiForDetection))
+            if (selectedMethod == ConnectionMethod.Auto)
             {
-                try
+                LoadingTextControl.Text = "Detecting best connection method and paths...";
+                var testResult = await ConnectionTesterService.FindWorkingMethodAndPathsAsync(
+                    urlToDetect,
+                    App.ApiWorkerFactory
+                );
+
+                if (testResult.IsSuccess)
                 {
-                    await detectorWorker.InitializeAsync(urlToDetect);
-                    var detectedPaths = await WikiPathDetectorService.DetectPathsAsync(
-                        urlToDetect,
-                        detectorWorker
+                    ScriptPathTextBoxControl.Text = testResult.DetectedPaths.ScriptPath;
+                    ArticlePathTextBoxControl.Text = testResult.DetectedPaths.ArticlePath;
+                    DetectionStatusTextBlockControl.Text =
+                        $"Success! Found a working connection using '{testResult.Method}'.";
+                    DetectionStatusTextBlockControl.Foreground = new SolidColorBrush(
+                        Windows.UI.Colors.Green
                     );
 
-                    if (detectedPaths.WasDetectedSuccessfully)
-                    {
-                        ScriptPathTextBoxControl.Text = detectedPaths.ScriptPath;
-                        ArticlePathTextBoxControl.Text = detectedPaths.ArticlePath;
-                        DetectionStatusTextBlockControl.Text =
-                            "Detection successful! Review the paths and click Save.";
-                        DetectionStatusTextBlockControl.Foreground = new SolidColorBrush(
-                            Colors.Green
-                        );
-                    }
-                    else
-                    {
-                        DetectionStatusTextBlockControl.Text =
-                            "Could not automatically detect paths. Please enter them manually.";
-                        DetectionStatusTextBlockControl.Foreground = new SolidColorBrush(
-                            Colors.Red
-                        );
-                    }
+                    await Dispatcher.RunAsync(
+                        Windows.UI.Core.CoreDispatcherPriority.Normal,
+                        () =>
+                        {
+                            ConnectionMethodComboBoxControl.SelectedValue = testResult.Method;
+
+                            var methodMatch = ConnectionMethodComboBoxControl
+                                .Items.OfType<ComboBoxItem>()
+                                .FirstOrDefault(i => Equals(i.Tag, testResult.Method));
+
+                            if (methodMatch != null)
+                            {
+                                ConnectionMethodComboBoxControl.SelectedItem = methodMatch;
+                            }
+                        }
+                    );
                 }
-                catch (NeedsUserVerificationException ex)
-                {
-#if UWP_1809
-                    ShowVerificationPanel(ex.Url);
-#else
-                    DetectionStatusTextBlockControl.Text =
-                        "Detection failed. This site is protected by a security check that is incompatible with this version of WebView. "
-                        + "Please switch the 'Connection Backend' to 'Proxy' below and try again.";
-                    DetectionStatusTextBlockControl.Foreground = new SolidColorBrush(Colors.Orange);
-#endif
-                }
-                catch (Exception ex)
+                else
                 {
                     DetectionStatusTextBlockControl.Text =
-                        $"An error occurred during detection: {ex.Message}";
-                    DetectionStatusTextBlockControl.Foreground = new SolidColorBrush(Colors.Red);
-                }
-                finally
-                {
-                    DetectionStatusTextBlockControl.Visibility = Visibility.Visible;
-                    LoadingOverlayControl.Visibility = Visibility.Collapsed;
+                        "Auto-detection failed. No working connection method found. The site may be offline or incompatible.";
+                    DetectionStatusTextBlockControl.Foreground = new SolidColorBrush(
+                        Windows.UI.Colors.Red
+                    );
                 }
             }
+            else
+            {
+                LoadingTextControl.Text = $"Testing with '{selectedMethod}' method...";
+                var tempWiki = new WikiInstance
+                {
+                    BaseUrl = urlToDetect,
+                    PreferredConnectionMethod = selectedMethod,
+                };
+                using (var worker = App.ApiWorkerFactory.CreateApiWorker(tempWiki))
+                {
+                    try
+                    {
+                        await worker.InitializeAsync(urlToDetect);
+                        var paths = await WikiPathDetectorService.DetectPathsAsync(
+                            urlToDetect,
+                            worker
+                        );
+                        if (paths.WasDetectedSuccessfully)
+                        {
+                            ScriptPathTextBoxControl.Text = paths.ScriptPath;
+                            ArticlePathTextBoxControl.Text = paths.ArticlePath;
+                            DetectionStatusTextBlockControl.Text =
+                                $"Success! Connection with '{selectedMethod}' method works.";
+                            DetectionStatusTextBlockControl.Foreground = new SolidColorBrush(
+                                Windows.UI.Colors.Green
+                            );
+                        }
+                        else
+                        {
+                            DetectionStatusTextBlockControl.Text =
+                                $"Failed to detect paths using the '{selectedMethod}' method.";
+                            DetectionStatusTextBlockControl.Foreground = new SolidColorBrush(
+                                Windows.UI.Colors.Red
+                            );
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        DetectionStatusTextBlockControl.Text =
+                            $"Failed to connect using '{selectedMethod}': {ex.Message}";
+                        DetectionStatusTextBlockControl.Foreground = new SolidColorBrush(
+                            Windows.UI.Colors.Red
+                        );
+                    }
+                }
+            }
+
+            DetectionStatusTextBlockControl.Visibility = Visibility.Visible;
+            LoadingOverlayControl.Visibility = Visibility.Collapsed;
         }
     }
 }

@@ -134,6 +134,9 @@ namespace WikiViewer.Shared.Uwp.Pages
         {
             DefaultConnectionMethodComboBoxControl.Items.Clear();
             DefaultConnectionMethodComboBoxControl.Items.Add(
+                new ComboBoxItem { Content = "Auto (Recommended)", Tag = ConnectionMethod.Auto }
+            );
+            DefaultConnectionMethodComboBoxControl.Items.Add(
                 new ComboBoxItem
                 {
                     Content = "HttpClient (Recommended - Fastest)",

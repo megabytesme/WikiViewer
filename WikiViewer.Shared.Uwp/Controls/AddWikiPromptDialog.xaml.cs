@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 using WikiViewer.Core;
+using WikiViewer.Core.Enums;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
 using Windows.UI.Xaml;
@@ -40,66 +41,30 @@ namespace WikiViewer.Shared.Uwp.Controls
         {
             this.IsPrimaryButtonEnabled = false;
             var baseUrl = $"{_targetUri.Scheme}://{_targetUri.Host}";
+            LoadingText.Text = "Finding best connection method...";
 
-            var tempWikiForDetection = new WikiInstance
+            var testResult = await ConnectionTesterService.FindWorkingMethodAndPathsAsync(baseUrl, App.ApiWorkerFactory);
+
+            if (testResult.IsSuccess)
             {
-                BaseUrl = baseUrl,
-                PreferredConnectionMethod = AppSettings.DefaultConnectionMethod,
-            };
+                NewWikiInstance = new WikiInstance
+                {
+                    BaseUrl = baseUrl,
+                    ScriptPath = testResult.DetectedPaths.ScriptPath,
+                    ArticlePath = testResult.DetectedPaths.ArticlePath,
+                    PreferredConnectionMethod = ConnectionMethod.Auto
+                };
 
-            LoadingText.Text =
-                $"Analyzing link using '{tempWikiForDetection.PreferredConnectionMethod}' method...";
-
-            using (var detectorWorker = App.ApiWorkerFactory.CreateApiWorker(tempWikiForDetection))
+                LoadingPanel.Visibility = Visibility.Collapsed;
+                ResultPanel.Visibility = Visibility.Visible;
+                ResultMessage.Text = $"Successfully connected to '{_targetUri.Host}' using the '{testResult.Method}' method. Add to app?";
+                WikiNameTextBox.Text = _targetUri.Host;
+                WikiNameTextBox.Visibility = Visibility.Visible;
+                this.IsPrimaryButtonEnabled = true;
+            }
+            else
             {
-                try
-                {
-                    await detectorWorker.InitializeAsync(baseUrl);
-                    var detectedPaths = await WikiPathDetectorService.DetectPathsAsync(
-                        baseUrl,
-                        detectorWorker
-                    );
-
-                    if (detectedPaths.WasDetectedSuccessfully)
-                    {
-                        NewWikiInstance = new WikiInstance
-                        {
-                            BaseUrl = baseUrl,
-                            ScriptPath = detectedPaths.ScriptPath,
-                            ArticlePath = detectedPaths.ArticlePath,
-                            PreferredConnectionMethod = AppSettings.DefaultConnectionMethod,
-                        };
-
-                        LoadingPanel.Visibility = Visibility.Collapsed;
-                        ResultPanel.Visibility = Visibility.Visible;
-                        ResultMessage.Text =
-                            $"This link appears to be a MediaWiki site. Would you like to add '{_targetUri.Host}' to the app?";
-                        WikiNameTextBox.Text = _targetUri.Host;
-                        WikiNameTextBox.Visibility = Visibility.Visible;
-                        this.IsPrimaryButtonEnabled = true;
-                    }
-                    else
-                    {
-                        ShowNonWikiResult();
-                    }
-                }
-                catch (NeedsUserVerificationException)
-                {
-                    LoadingPanel.Visibility = Visibility.Collapsed;
-                    ResultPanel.Visibility = Visibility.Visible;
-                    ResultMessage.Text =
-                        $"Detection failed: This site is protected by a security check (like Cloudflare).\n\nPlease go to Settings, change the 'Default connection method for new wikis' to 'Proxy', and try again.";
-
-                    this.PrimaryButtonText = "";
-                    this.SecondaryButtonText = "Close";
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine(
-                        $"[AddWikiPrompt] Detection failed with general exception: {ex.Message}"
-                    );
-                    ShowNonWikiResult();
-                }
+                ShowNonWikiResult();
             }
         }
 

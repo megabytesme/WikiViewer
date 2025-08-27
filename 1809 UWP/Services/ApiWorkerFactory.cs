@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Threading.Tasks;
 using WikiViewer.Core.Enums;
 using WikiViewer.Core.Interfaces;
@@ -10,7 +11,21 @@ namespace _1809_UWP.Services
     {
         public IApiWorker CreateApiWorker(WikiInstance wiki)
         {
-            switch (wiki.PreferredConnectionMethod)
+            var methodToUse = wiki.PreferredConnectionMethod;
+
+            if (methodToUse == ConnectionMethod.Auto)
+            {
+                if (wiki.ResolvedConnectionMethod.HasValue)
+                {
+                    methodToUse = wiki.ResolvedConnectionMethod.Value;
+                }
+                else
+                {
+                    methodToUse = ConnectionMethod.WebView;
+                }
+            }
+
+            switch (methodToUse)
             {
                 case ConnectionMethod.HttpClient:
                     return new HttpClientApiWorker();
@@ -22,9 +37,24 @@ namespace _1809_UWP.Services
             }
         }
 
-        public Task<IApiWorker> CreateApiWorkerAsync(WikiInstance wiki)
+        public async Task<IApiWorker> CreateApiWorkerAsync(WikiInstance wiki)
         {
-            return Task.FromResult(CreateApiWorker(wiki));
+            if (wiki.PreferredConnectionMethod == ConnectionMethod.Auto && !wiki.ResolvedConnectionMethod.HasValue)
+            {
+                Debug.WriteLine($"[ApiWorkerFactory] Auto-detecting best connection method for {wiki.Host}...");
+                var testResult = await ConnectionTesterService.FindWorkingMethodAndPathsAsync(wiki.BaseUrl, this);
+                if (testResult.IsSuccess)
+                {
+                    Debug.WriteLine($"[ApiWorkerFactory] Auto-detection successful: {testResult.Method}");
+                    wiki.ResolvedConnectionMethod = testResult.Method;
+                }
+                else
+                {
+                    Debug.WriteLine($"[ApiWorkerFactory] Auto-detection failed. Falling back to WebView2.");
+                    wiki.ResolvedConnectionMethod = ConnectionMethod.WebView;
+                }
+            }
+            return CreateApiWorker(wiki);
         }
     }
 }
