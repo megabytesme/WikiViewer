@@ -40,12 +40,6 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected abstract Grid AppTitleBarGrid { get; }
         protected abstract ColumnDefinition LeftPaddingColumn { get; }
         protected abstract ColumnDefinition RightPaddingColumn { get; }
-        protected abstract void ShowConnectionInfoBar(
-            string title,
-            string message,
-            bool showActionButton,
-            bool isClosable
-        );
         protected abstract void HideConnectionInfoBar();
         protected abstract Task ShowDialogAsync(string title, string message);
         protected abstract bool TryGoBack();
@@ -54,17 +48,22 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected abstract Type GetFavouritesPageType();
         protected abstract Type GetLoginPageType();
         protected abstract Type GetSettingsPageType();
-
         protected abstract void ClearWikiNavItems();
         protected abstract void AddWikiNavItem(WikiInstance wiki);
         protected abstract void AddStandardNavItems();
+        protected abstract void SetPageTitle_Platform(string title);
+
+        protected abstract Task ShowConnectionInfoBarAsync(
+            string title,
+            string message,
+            bool showActionButton,
+            bool isClosable
+        );
 
         public void SetPageTitle(string title)
         {
             SetPageTitle_Platform(title);
         }
-
-        protected abstract void SetPageTitle_Platform(string title);
 
         private readonly ObservableCollection<SearchSuggestionViewModel> _suggestions =
             new ObservableCollection<SearchSuggestionViewModel>();
@@ -154,7 +153,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                     }
                     else
                     {
-                        ShowConnectionInfoBar(
+                        await ShowConnectionInfoBarAsync(
                             "Login Failed",
                             $"Could not automatically sign in to '{e.Wiki.Name}'. Please check your connection or credentials.",
                             false,
@@ -224,22 +223,32 @@ namespace WikiViewer.Shared.Uwp.Pages
                 .Select(wiki =>
                     Task.Run(async () =>
                     {
-                        string originalIconUrl = wiki.IconUrl;
-                        bool shouldForce = !wiki.IsIconUserSet;
-
-                        using (var worker = App.ApiWorkerFactory.CreateApiWorker(wiki))
+                        try
                         {
-                            await worker.InitializeAsync();
-                            await FaviconService.FetchAndCacheFaviconUrlAsync(
-                                wiki,
-                                worker,
-                                forceRefresh: shouldForce
-                            );
+                            string originalIconUrl = wiki.IconUrl;
+                            bool shouldForce = !wiki.IsIconUserSet;
+
+                            using (var worker = App.ApiWorkerFactory.CreateApiWorker(wiki))
+                            {
+                                await worker.InitializeAsync(wiki.BaseUrl);
+
+                                await FaviconService.FetchAndCacheFaviconUrlAsync(
+                                    wiki,
+                                    worker,
+                                    forceRefresh: shouldForce
+                                );
+                            }
+
+                            if (originalIconUrl != wiki.IconUrl)
+                            {
+                                iconsWereUpdated = true;
+                            }
                         }
-
-                        if (originalIconUrl != wiki.IconUrl)
+                        catch (Exception ex)
                         {
-                            iconsWereUpdated = true;
+                            Debug.WriteLine(
+                                $"[MainPage-FaviconRefresh] FAILED for {wiki.Name}: {ex.Message}"
+                            );
                         }
                     })
                 )
@@ -272,12 +281,13 @@ namespace WikiViewer.Shared.Uwp.Pages
             try
             {
                 var worker = SessionManager.GetAnonymousWorkerForWiki(firstWiki);
+                await worker.InitializeAsync(firstWiki.BaseUrl);
                 await ArticleProcessingService.PageExistsAsync("Main Page", worker, firstWiki);
             }
             catch (NeedsUserVerificationException ex)
             {
                 _verificationUrl = ex.Url;
-                ShowConnectionInfoBar(
+                await ShowConnectionInfoBarAsync(
                     "Verification Required",
                     "A security check is required to continue.",
                     true,
@@ -299,7 +309,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                 }
                 else
                 {
-                    ShowConnectionInfoBar(
+                    await ShowConnectionInfoBarAsync(
                         "Offline Mode",
                         $"Could not connect to {firstWiki.Host}. Only cached articles are available.",
                         false,
@@ -428,6 +438,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                             return;
 
                         var worker = SessionManager.GetAnonymousWorkerForWiki(wiki);
+                        await worker.InitializeAsync(wiki.BaseUrl);
                         string url =
                             $"{wiki.ApiEndpoint}?action=opensearch&format=json&limit=5&search={Uri.EscapeDataString(query)}";
                         string json = await worker.GetJsonFromApiAsync(url);
@@ -525,7 +536,7 @@ namespace WikiViewer.Shared.Uwp.Pages
             _wikiNeedingVerification = wiki;
             _verificationUrl = wiki.BaseUrl;
 
-            ShowConnectionInfoBar(
+            _ = ShowConnectionInfoBarAsync(
                 "Verification Required",
                 $"Access to '{wiki.Name}' is blocked by a security check. Please click 'Action' to continue.",
                 true,

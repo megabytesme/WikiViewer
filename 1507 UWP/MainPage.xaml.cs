@@ -1,5 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using _1507_UWP.ViewModels;
 using WikiViewer.Core.Models;
@@ -19,6 +22,17 @@ namespace _1507_UWP.Pages
             this.PageHeaderControl.SearchQuerySubmitted += base.SearchBox_QuerySubmitted;
         }
 
+        private readonly Queue<DialogInfo> _infoDialogQueue = new Queue<DialogInfo>();
+        private readonly SemaphoreSlim _infoDialogSemaphore = new SemaphoreSlim(1, 1);
+
+        private struct DialogInfo
+        {
+            public string Title;
+            public string Message;
+            public bool ShowActionButton;
+            public bool IsClosable;
+        }
+
         protected override Frame ContentFrame => this.PageContentFrame;
         protected override AutoSuggestBox SearchBox => this.PageHeaderControl.SearchBox;
         protected override Grid AppTitleBarGrid => this.AppTitleBar;
@@ -34,8 +48,6 @@ namespace _1507_UWP.Pages
         protected override Type GetLoginPageType() => typeof(_1507_UWP.LoginPage);
 
         protected override Type GetSettingsPageType() => typeof(SettingsPage);
-
-        private ContentDialog _currentInfoDialog;
 
         private void MainPage_SizeChanged(object sender, SizeChangedEventArgs e)
         {
@@ -68,45 +80,72 @@ namespace _1507_UWP.Pages
             this.PageHeaderControl.Title = title;
         }
 
-        protected override async void ShowConnectionInfoBar(
+        protected override async Task ShowConnectionInfoBarAsync(
             string title,
             string message,
             bool showActionButton,
             bool isClosable
         )
         {
-            if (_currentInfoDialog != null)
-                return;
+            _infoDialogQueue.Enqueue(
+                new DialogInfo
+                {
+                    Title = title,
+                    Message = message,
+                    ShowActionButton = showActionButton,
+                    IsClosable = isClosable,
+                }
+            );
 
-            var dialog = new ContentDialog
-            {
-                Title = title,
-                Content = message,
-                PrimaryButtonText = "OK",
-            };
+            await ProcessInfoDialogQueueAsync();
+        }
 
-            if (showActionButton)
+        private async Task ProcessInfoDialogQueueAsync()
+        {
+            await _infoDialogSemaphore.WaitAsync();
+
+            try
             {
-                dialog.PrimaryButtonText = "Action";
-                dialog.SecondaryButtonText = "Cancel";
+                while (_infoDialogQueue.Count > 0)
+                {
+                    var dialogInfo = _infoDialogQueue.Dequeue();
+
+                    var dialog = new ContentDialog
+                    {
+                        Title = dialogInfo.Title,
+                        Content = dialogInfo.Message,
+                    };
+
+                    if (dialogInfo.ShowActionButton)
+                    {
+                        dialog.PrimaryButtonText = "Action";
+                        dialog.SecondaryButtonText = dialogInfo.IsClosable ? "Cancel" : "";
+                    }
+                    else
+                    {
+                        dialog.PrimaryButtonText = "OK";
+                        dialog.SecondaryButtonText = "";
+                    }
+
+                    var result = await dialog.ShowAsync();
+
+                    if (dialogInfo.ShowActionButton && result == ContentDialogResult.Primary)
+                    {
+                        if (this._postVerificationAction != null)
+                        {
+                            await this._postVerificationAction.Invoke();
+                            this._postVerificationAction = null;
+                        }
+                        else
+                        {
+                            InfoBarButton_Click(this, new RoutedEventArgs());
+                        }
+                    }
+                }
             }
-
-            _currentInfoDialog = dialog;
-            var result = await dialog.ShowAsync();
-            _currentInfoDialog = null;
-
-            if (showActionButton && result == ContentDialogResult.Primary)
+            finally
             {
-                var mainPageBase = this as MainPageBase;
-                if (mainPageBase?._postVerificationAction != null)
-                {
-                    await mainPageBase._postVerificationAction.Invoke();
-                    mainPageBase._postVerificationAction = null;
-                }
-                else
-                {
-                    InfoBarButton_Click(this, new RoutedEventArgs());
-                }
+                _infoDialogSemaphore.Release();
             }
         }
 
@@ -123,8 +162,9 @@ namespace _1507_UWP.Pages
 
         protected override void HideConnectionInfoBar()
         {
-            _currentInfoDialog?.Hide();
-            _currentInfoDialog = null;
+            Debug.WriteLine(
+                "[MainPage] HideConnectionInfoBar called, but queueing system is active. Manual hiding is not supported."
+            );
         }
 
         protected override void ClearWikiNavItems()
