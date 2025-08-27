@@ -8,19 +8,17 @@ using WikiViewer.Core.Models;
 
 namespace WikiViewer.Core.Services
 {
-    public class HttpClientApiWorker : IApiWorker
+    public class HttpClientApiWorker : IApiWorker, IDisposable
     {
-        private static readonly HttpClient _client;
+        private readonly HttpClient _client;
 
         public bool IsInitialized { get; private set; }
         public WikiInstance WikiContext { get; set; }
 
-        static HttpClientApiWorker()
+        public HttpClientApiWorker()
         {
             _client = new HttpClient();
-
             _client.DefaultRequestHeaders.UserAgent.ParseAdd("WikiViewerApp/2.0");
-
             _client.Timeout = TimeSpan.FromSeconds(30);
         }
 
@@ -41,7 +39,7 @@ namespace WikiViewer.Core.Services
         public async Task<byte[]> GetRawBytesFromUrlAsync(string url)
         {
             CheckInitialized();
-            Debug.WriteLine($"[HttpClientApiWorker] Attempting to GET BYTES for URL: {url}"); // <-- ADD THIS
+            Debug.WriteLine($"[HttpClientApiWorker] Attempting to GET BYTES for URL: {url}");
             try
             {
                 return await _client.GetByteArrayAsync(url);
@@ -58,7 +56,7 @@ namespace WikiViewer.Core.Services
         public async Task<string> GetRawHtmlFromUrlAsync(string url)
         {
             CheckInitialized();
-            Debug.WriteLine($"[HttpClientApiWorker] Attempting to GET URL: {url}"); // <-- ADD THIS
+            Debug.WriteLine($"[HttpClientApiWorker] Attempting to GET URL: {url}");
             try
             {
                 return await _client.GetStringAsync(url);
@@ -107,6 +105,9 @@ namespace WikiViewer.Core.Services
             return Task.CompletedTask;
         }
 
-        public void Dispose() { }
+        public void Dispose()
+        {
+            _client?.Dispose();
+        }
     }
 }

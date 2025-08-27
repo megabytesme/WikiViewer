@@ -12,13 +12,18 @@ using WikiViewer.Core.Models;
 
 namespace WikiViewer.Core.Services
 {
-    public class ProxyHttpClientApiWorker : IApiWorker
+    public class ProxyHttpClientApiWorker : IApiWorker, IDisposable
     {
-        private static readonly HttpClient _gatekeeperClient = new HttpClient();
+        private readonly HttpClient _gatekeeperClient;
         private const string GatekeeperEndpoint = "https://wikiflareresolverr.ddns.net";
 
         public bool IsInitialized { get; private set; }
         public WikiInstance WikiContext { get; set; }
+
+        public ProxyHttpClientApiWorker()
+        {
+            _gatekeeperClient = new HttpClient();
+        }
 
         public Task InitializeAsync(string baseUrl)
         {
@@ -36,7 +41,6 @@ namespace WikiViewer.Core.Services
 
         private string ExtractJsonFromHtml(string responseText)
         {
-            // (No changes needed here, logic is sound)
             if (string.IsNullOrWhiteSpace(responseText))
                 return null;
             string trimmedText = responseText.Trim();
@@ -135,6 +139,9 @@ namespace WikiViewer.Core.Services
 
         public Task CopyApiCookiesFromAsync(IApiWorker source) => Task.CompletedTask;
 
-        public void Dispose() { }
+        public void Dispose()
+        {
+            _gatekeeperClient?.Dispose();
+        }
     }
 }
