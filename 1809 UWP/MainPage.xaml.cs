@@ -65,6 +65,19 @@ namespace _1809_UWP.Pages
             return;
         }
 
+        public void UpdateBackButtonState()
+        {
+            bool canGoBackInFrame = ContentFrame.CanGoBack;
+            bool canGoBackInPage =
+                (ContentFrame.Content as ArticleViewerPage)?.CanGoBackInPage == true;
+            NavView.IsBackEnabled = canGoBackInFrame || canGoBackInPage;
+        }
+
+        public override void UpdatePlatformBackButton()
+        {
+            UpdateBackButtonState();
+        }
+
         protected override async Task ShowConnectionInfoBarAsync(
             string title,
             string message,
@@ -128,7 +141,6 @@ namespace _1809_UWP.Pages
         {
             if (ContentFrame.Content is ArticleViewerPage avp && avp.CanGoBackInPage)
             {
-                NavView.IsBackEnabled = ContentFrame.CanGoBack || avp.CanGoBackInPage;
                 return avp.GoBackInPage();
             }
             if (ContentFrame.CanGoBack)
@@ -305,14 +317,18 @@ namespace _1809_UWP.Pages
             Windows.UI.Xaml.Navigation.NavigationEventArgs e
         )
         {
-            NavView.IsBackEnabled =
-                ContentFrame.CanGoBack
-                || (ContentFrame.Content as ArticleViewerPage)?.CanGoBackInPage == true;
-            Windows
-                .UI.Core.SystemNavigationManager.GetForCurrentView()
-                .AppViewBackButtonVisibility = NavView.IsBackEnabled
-                ? Windows.UI.Core.AppViewBackButtonVisibility.Visible
-                : Windows.UI.Core.AppViewBackButtonVisibility.Collapsed;
+            if (ContentFrame.Content is ArticleViewerPage avp)
+            {
+                avp.UpdateSystemBackButton();
+            }
+            else
+            {
+                UpdateBackButtonState();
+                var navManager = Windows.UI.Core.SystemNavigationManager.GetForCurrentView();
+                navManager.AppViewBackButtonVisibility = ContentFrame.CanGoBack
+                    ? Windows.UI.Core.AppViewBackButtonVisibility.Visible
+                    : Windows.UI.Core.AppViewBackButtonVisibility.Collapsed;
+            }
 
             if (e.SourcePageType == GetSettingsPageType())
             {

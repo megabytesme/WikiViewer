@@ -51,6 +51,8 @@ namespace _1507_UWP.Pages
 
         protected override Type GetSettingsPageType() => typeof(SettingsPage);
 
+        public override void UpdatePlatformBackButton() { }
+
         private void MainPage_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             double width = e.NewSize.Width;
@@ -231,14 +233,18 @@ namespace _1507_UWP.Pages
         {
             if (ContentFrame == null)
                 return;
-            bool canGoBackInPage =
-                (ContentFrame.Content as ArticleViewerPage)?.CanGoBackInPage == true;
-            bool canGoBack = ContentFrame.CanGoBack || canGoBackInPage;
-            Windows
-                .UI.Core.SystemNavigationManager.GetForCurrentView()
-                .AppViewBackButtonVisibility = canGoBack
-                ? Windows.UI.Core.AppViewBackButtonVisibility.Visible
-                : Windows.UI.Core.AppViewBackButtonVisibility.Collapsed;
+
+            if (ContentFrame.Content is ArticleViewerPage avp)
+            {
+                avp.UpdateSystemBackButton();
+            }
+            else
+            {
+                var navManager = Windows.UI.Core.SystemNavigationManager.GetForCurrentView();
+                navManager.AppViewBackButtonVisibility = ContentFrame.CanGoBack
+                    ? Windows.UI.Core.AppViewBackButtonVisibility.Visible
+                    : Windows.UI.Core.AppViewBackButtonVisibility.Collapsed;
+            }
 
             if (e.SourcePageType == GetFavouritesPageType())
             {

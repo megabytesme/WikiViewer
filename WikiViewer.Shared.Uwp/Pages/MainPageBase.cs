@@ -60,6 +60,8 @@ namespace WikiViewer.Shared.Uwp.Pages
             bool isClosable
         );
 
+        public abstract void UpdatePlatformBackButton();
+
         public void SetPageTitle(string title)
         {
             SetPageTitle_Platform(title);

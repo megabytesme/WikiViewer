@@ -55,6 +55,20 @@ namespace WikiViewer.Shared.Uwp.Pages
             this.Unloaded += Page_Unloaded;
         }
 
+        public void UpdateSystemBackButton()
+        {
+            bool canGoBackInFrame = this.Frame.CanGoBack;
+            bool canGoBack = canGoBackInFrame || this.CanGoBackInPage;
+
+            var navManager = Windows.UI.Core.SystemNavigationManager.GetForCurrentView();
+            navManager.AppViewBackButtonVisibility = canGoBack
+                ? Windows.UI.Core.AppViewBackButtonVisibility.Visible
+                : Windows.UI.Core.AppViewBackButtonVisibility.Collapsed;
+
+            var mainPage = this.FindParent<MainPageBase>();
+            mainPage?.UpdatePlatformBackButton();
+        }
+
         private void EnhanceDisplayedHtmlWithCachedMediaAsync(string html)
         {
             if (string.IsNullOrEmpty(html) || _pageWikiContext == null)
@@ -214,6 +228,7 @@ namespace WikiViewer.Shared.Uwp.Pages
             {
                 StartArticleFetch();
             }
+            UpdateSystemBackButton();
         }
 
         protected void NavigateToInternalPage(string newTitle)
@@ -221,6 +236,7 @@ namespace WikiViewer.Shared.Uwp.Pages
             string normalizedTitle = newTitle.Replace(' ', '_');
             _pageTitleToFetch = normalizedTitle;
             _articleHistory.Push(_pageTitleToFetch);
+            UpdateSystemBackButton();
             StartArticleFetch();
         }
 
@@ -305,6 +321,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                     if (_articleHistory.Any())
                     {
                         _articleHistory.Pop();
+                        UpdateSystemBackButton();
                     }
                     return;
                 }
@@ -371,6 +388,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                         if (_articleHistory.Any())
                             _articleHistory.Pop();
                         _articleHistory.Push(_pageTitleToFetch);
+                        UpdateSystemBackButton();
                         ArticleTitleTextBlock.Text = resolvedTitle;
                         mainPage?.SetPageTitle(resolvedTitle);
                     }
@@ -441,6 +459,7 @@ namespace WikiViewer.Shared.Uwp.Pages
             {
                 _articleHistory.Pop();
                 _pageTitleToFetch = _articleHistory.Peek();
+                UpdateSystemBackButton();
                 StartArticleFetch();
                 return true;
             }
@@ -553,7 +572,7 @@ namespace WikiViewer.Shared.Uwp.Pages
             );
             if (_pageWikiContext == null || string.IsNullOrEmpty(_pageTitleToFetch))
             {
-                Debug.WriteLine("[EditCheck] Missing wiki context or page title — aborting.");
+                Debug.WriteLine("[EditCheck] Missing wiki context or page title   aborting.");
                 return;
             }
 
@@ -607,7 +626,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                             if (!groups.Contains(level))
                             {
                                 Debug.WriteLine(
-                                    "[EditCheck] User does not meet restriction level — disabling edit."
+                                    "[EditCheck] User does not meet restriction level   disabling edit."
                                 );
                                 canEdit = false;
                             }
