@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using WikiViewer.Core.Models;
@@ -31,6 +33,17 @@ namespace _1809_UWP.Pages
             SetupTitleBar();
         }
 
+        private readonly Queue<DialogInfo> _infoBarQueue = new Queue<DialogInfo>();
+        private readonly SemaphoreSlim _infoBarSemaphore = new SemaphoreSlim(1, 1);
+
+        private struct DialogInfo
+        {
+            public string Title;
+            public string Message;
+            public bool ShowActionButton;
+            public bool IsClosable;
+        }
+
         protected override Frame ContentFrame => this.PageContentFrame;
         protected override AutoSuggestBox SearchBox => this.NavSearchBox;
         protected override Grid AppTitleBarGrid => this.AppTitleBar;
@@ -52,26 +65,62 @@ namespace _1809_UWP.Pages
             return;
         }
 
-        protected override void ShowConnectionInfoBar(
+        protected override async Task ShowConnectionInfoBarAsync(
             string title,
             string message,
             bool showActionButton,
             bool isClosable
         )
         {
-            ConnectionInfoBar.Title = title;
-            ConnectionInfoBar.Message = message;
-            InfoBarButton.Visibility = showActionButton ? Visibility.Visible : Visibility.Collapsed;
-            ConnectionInfoBar.IsClosable = isClosable;
-            ConnectionInfoBar.IsOpen = true;
+            _infoBarQueue.Enqueue(
+                new DialogInfo
+                {
+                    Title = title,
+                    Message = message,
+                    ShowActionButton = showActionButton,
+                    IsClosable = isClosable,
+                }
+            );
+            await ProcessInfoBarQueueAsync();
         }
 
-        protected override Task ShowDialogAsync(string title, string message)
+        private async Task ProcessInfoBarQueueAsync()
         {
-            return Task.CompletedTask;
+            await _infoBarSemaphore.WaitAsync();
+            try
+            {
+                if (!_infoBarQueue.Any() || ConnectionInfoBar.IsOpen)
+                {
+                    return;
+                }
+
+                var info = _infoBarQueue.Dequeue();
+                ConnectionInfoBar.Title = info.Title;
+                ConnectionInfoBar.Message = info.Message;
+                InfoBarButton.Visibility = info.ShowActionButton
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+                ConnectionInfoBar.IsClosable = info.IsClosable;
+                ConnectionInfoBar.IsOpen = true;
+            }
+            finally
+            {
+                _infoBarSemaphore.Release();
+            }
         }
 
-        protected override void HideConnectionInfoBar() => ConnectionInfoBar.IsOpen = false;
+        protected override async Task ShowDialogAsync(string title, string message)
+        {
+            await ShowConnectionInfoBarAsync(title, message, false, true);
+        }
+
+        private async void ConnectionInfoBar_CloseButtonClick(
+            Microsoft.UI.Xaml.Controls.InfoBar sender,
+            object args
+        )
+        {
+            await ProcessInfoBarQueueAsync();
+        }
 
         protected override bool TryGoBack()
         {

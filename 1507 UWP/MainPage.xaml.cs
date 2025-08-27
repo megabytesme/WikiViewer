@@ -24,13 +24,15 @@ namespace _1507_UWP.Pages
 
         private readonly Queue<DialogInfo> _infoDialogQueue = new Queue<DialogInfo>();
         private readonly SemaphoreSlim _infoDialogSemaphore = new SemaphoreSlim(1, 1);
+        private ContentDialog _currentInfoDialog = null;
 
-        private struct DialogInfo
+        private class DialogInfo
         {
-            public string Title;
-            public string Message;
-            public bool ShowActionButton;
-            public bool IsClosable;
+            public string Title { get; set; }
+            public string Message { get; set; }
+            public bool ShowActionButton { get; set; } = false;
+            public bool IsClosable { get; set; } = true;
+            public TaskCompletionSource<ContentDialogResult> Tcs { get; set; }
         }
 
         protected override Frame ContentFrame => this.PageContentFrame;
@@ -87,84 +89,107 @@ namespace _1507_UWP.Pages
             bool isClosable
         )
         {
-            _infoDialogQueue.Enqueue(
-                new DialogInfo
-                {
-                    Title = title,
-                    Message = message,
-                    ShowActionButton = showActionButton,
-                    IsClosable = isClosable,
-                }
-            );
-
-            await ProcessInfoDialogQueueAsync();
-        }
-
-        private async Task ProcessInfoDialogQueueAsync()
-        {
-            await _infoDialogSemaphore.WaitAsync();
-
-            try
+            var info = new DialogInfo
             {
-                while (_infoDialogQueue.Count > 0)
-                {
-                    var dialogInfo = _infoDialogQueue.Dequeue();
-
-                    var dialog = new ContentDialog
-                    {
-                        Title = dialogInfo.Title,
-                        Content = dialogInfo.Message,
-                    };
-
-                    if (dialogInfo.ShowActionButton)
-                    {
-                        dialog.PrimaryButtonText = "Action";
-                        dialog.SecondaryButtonText = dialogInfo.IsClosable ? "Cancel" : "";
-                    }
-                    else
-                    {
-                        dialog.PrimaryButtonText = "OK";
-                        dialog.SecondaryButtonText = "";
-                    }
-
-                    var result = await dialog.ShowAsync();
-
-                    if (dialogInfo.ShowActionButton && result == ContentDialogResult.Primary)
-                    {
-                        if (this._postVerificationAction != null)
-                        {
-                            await this._postVerificationAction.Invoke();
-                            this._postVerificationAction = null;
-                        }
-                        else
-                        {
-                            InfoBarButton_Click(this, new RoutedEventArgs());
-                        }
-                    }
-                }
-            }
-            finally
-            {
-                _infoDialogSemaphore.Release();
-            }
+                Title = title,
+                Message = message,
+                ShowActionButton = showActionButton,
+                IsClosable = isClosable,
+            };
+            await ShowDialogInternalAsync(info);
         }
 
         protected override async Task ShowDialogAsync(string title, string message)
         {
-            var dialog = new ContentDialog
+            var info = new DialogInfo
             {
                 Title = title,
-                Content = message,
-                PrimaryButtonText = "OK",
+                Message = message,
+                ShowActionButton = false,
+                IsClosable = true,
             };
-            await dialog.ShowAsync();
+            await ShowDialogInternalAsync(info);
+        }
+
+        private async Task<ContentDialogResult> ShowDialogInternalAsync(DialogInfo dialogInfo)
+        {
+            dialogInfo.Tcs = new TaskCompletionSource<ContentDialogResult>();
+            _infoDialogQueue.Enqueue(dialogInfo);
+
+            _ = ProcessInfoDialogQueueAsync();
+            return await dialogInfo.Tcs.Task;
+        }
+
+        private async Task ProcessInfoDialogQueueAsync()
+        {
+            if (await _infoDialogSemaphore.WaitAsync(0))
+            {
+                try
+                {
+                    while (_infoDialogQueue.Count > 0)
+                    {
+                        var dialogInfo = _infoDialogQueue.Dequeue();
+                        var dialog = new ContentDialog
+                        {
+                            Title = dialogInfo.Title,
+                            Content = new TextBlock
+                            {
+                                Text = dialogInfo.Message,
+                                TextWrapping = TextWrapping.Wrap,
+                            },
+                        };
+
+                        if (dialogInfo.ShowActionButton)
+                        {
+                            dialog.PrimaryButtonText = "Action";
+                            dialog.SecondaryButtonText = dialogInfo.IsClosable ? "Cancel" : "";
+                        }
+                        else
+                        {
+                            dialog.PrimaryButtonText = "OK";
+                            dialog.SecondaryButtonText = "";
+                        }
+
+                        _currentInfoDialog = dialog;
+                        ContentDialogResult result = ContentDialogResult.None;
+                        try
+                        {
+                            result = await dialog.ShowAsync();
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"[DialogQueue] ShowAsync failed: {ex.Message}");
+                        }
+                        finally
+                        {
+                            _currentInfoDialog = null;
+                            dialogInfo.Tcs.SetResult(result);
+                        }
+
+                        if (dialogInfo.ShowActionButton && result == ContentDialogResult.Primary)
+                        {
+                            if (this._postVerificationAction != null)
+                            {
+                                await this._postVerificationAction.Invoke();
+                                this._postVerificationAction = null;
+                            }
+                            else
+                            {
+                                InfoBarButton_Click(this, new RoutedEventArgs());
+                            }
+                        }
+                    }
+                }
+                finally
+                {
+                    _infoDialogSemaphore.Release();
+                }
+            }
         }
 
         protected override void HideConnectionInfoBar()
         {
-            Debug.WriteLine(
-                "[MainPage] HideConnectionInfoBar called, but queueing system is active. Manual hiding is not supported."
-            );
+            _currentInfoDialog?.Hide();
         }
 
         protected override void ClearWikiNavItems()
