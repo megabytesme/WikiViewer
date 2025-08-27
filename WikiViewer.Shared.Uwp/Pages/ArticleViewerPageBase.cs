@@ -234,14 +234,23 @@ namespace WikiViewer.Shared.Uwp.Pages
                 return false;
 
             string pathAndQuery = uri.PathAndQuery.ToLowerInvariant();
-            if (pathAndQuery.Contains("special:login"))
-            {
-                Frame.Navigate(GetLoginPageType(), _pageWikiContext.Id);
-                return true;
-            }
-            if (pathAndQuery.Contains("special:createaccount"))
+            if (
+                pathAndQuery.Contains("special:createaccount")
+                || (
+                    pathAndQuery.Contains("special:userlogin")
+                    && pathAndQuery.Contains("type=signup")
+                )
+            )
             {
                 Frame.Navigate(GetCreateAccountPageType(), _pageWikiContext.Id);
+                return true;
+            }
+
+            if (
+                pathAndQuery.Contains("special:login") || pathAndQuery.Contains("special:userlogin")
+            )
+            {
+                Frame.Navigate(GetLoginPageType(), _pageWikiContext.Id);
                 return true;
             }
 
