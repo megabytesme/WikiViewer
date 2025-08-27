@@ -22,6 +22,9 @@ namespace _1507_UWP
         protected override TextBlock DetectionStatusTextBlockControl => this.DetectionStatusTextBlock;
         protected override Grid LoadingOverlayControl => this.LoadingOverlay;
         protected override TextBlock LoadingTextControl => this.LoadingText;
+        protected override Image IconPreviewImageControl => this.IconPreviewImage;
+        protected override Button SetIconButtonControl => this.SetIconButton;
+        protected override Button RemoveIconButtonControl => this.RemoveIconButton;
 
         protected override void ShowVerificationPanel(string url)
         {

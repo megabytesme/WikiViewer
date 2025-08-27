@@ -1,10 +1,15 @@
 ﻿using System;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using WikiViewer.Core;
 using WikiViewer.Core.Enums;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
+using WikiViewer.Shared.Uwp.Converters;
 using WikiViewer.Shared.Uwp.Services;
+using Windows.Storage;
+using Windows.Storage.Pickers;
 using Windows.UI;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
@@ -27,6 +32,12 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected abstract TextBlock DetectionStatusTextBlockControl { get; }
         protected abstract Grid LoadingOverlayControl { get; }
         protected abstract TextBlock LoadingTextControl { get; }
+        protected abstract Image IconPreviewImageControl { get; }
+        protected abstract Button SetIconButtonControl { get; }
+        protected abstract Button RemoveIconButtonControl { get; }
+
+        private readonly StringToBitmapImageConverter _iconConverter =
+            new StringToBitmapImageConverter();
 
         protected abstract void ShowVerificationPanel(string url);
 
@@ -37,26 +48,28 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         private void OnLoaded(object sender, RoutedEventArgs e)
         {
-            if (_currentWiki == null)
-                return;
-
-            PopulateDetails();
-
-            var mainPage = this.FindParent<MainPageBase>();
-            if (mainPage != null)
+            if (_currentWiki != null)
             {
-                mainPage.SetPageTitle(
-                    _isNewWiki ? "Add New Wiki" : $"Editing '{_currentWiki.Name}'"
-                );
-            }
+                PopulateDetails();
 
-            var methodMatch = ConnectionMethodComboBoxControl
-                .Items.OfType<ComboBoxItem>()
-                .FirstOrDefault(i => Equals(i.Tag, _currentWiki.PreferredConnectionMethod));
+                var mainPage = this.FindParent<MainPageBase>();
+                if (mainPage != null)
+                {
+                    mainPage.SetPageTitle(
+                        _isNewWiki ? "Add New Wiki" : $"Editing '{_currentWiki.Name}'"
+                    );
+                }
 
-            if (methodMatch != null)
-            {
-                ConnectionMethodComboBoxControl.SelectedItem = methodMatch;
+                var methodMatch = ConnectionMethodComboBoxControl
+                    .Items.OfType<ComboBoxItem>()
+                    .FirstOrDefault(i => Equals(i.Tag, _currentWiki.PreferredConnectionMethod));
+
+                if (methodMatch != null)
+                {
+                    ConnectionMethodComboBoxControl.SelectedItem = methodMatch;
+                }
+
+                UpdateIconState();
             }
         }
 
@@ -301,6 +314,96 @@ namespace WikiViewer.Shared.Uwp.Pages
 
             DetectionStatusTextBlockControl.Visibility = Visibility.Visible;
             LoadingOverlayControl.Visibility = Visibility.Collapsed;
+        }
+
+        protected async void SetIconButton_Click(object sender, RoutedEventArgs e)
+        {
+            var picker = new FileOpenPicker
+            {
+                ViewMode = PickerViewMode.Thumbnail,
+                SuggestedStartLocation = PickerLocationId.PicturesLibrary,
+            };
+            picker.FileTypeFilter.Add(".png");
+            picker.FileTypeFilter.Add(".jpg");
+            picker.FileTypeFilter.Add(".jpeg");
+            picker.FileTypeFilter.Add(".gif");
+            picker.FileTypeFilter.Add(".ico");
+
+            StorageFile file = await picker.PickSingleFileAsync();
+            if (file != null)
+            {
+                var iconsFolder = await ApplicationData.Current.LocalFolder.CreateFolderAsync(
+                    "favicons",
+                    CreationCollisionOption.OpenIfExists
+                );
+
+                string newFileName = _currentWiki.Id.ToString() + Path.GetExtension(file.Name);
+                await file.CopyAsync(iconsFolder, newFileName, NameCollisionOption.ReplaceExisting);
+
+                _currentWiki.IconUrl = $"ms-appdata:///local/favicons/{newFileName}";
+                _currentWiki.IsIconUserSet = true;
+
+                UpdateIconState();
+            }
+        }
+
+        protected async void RemoveIconButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentWiki == null)
+                return;
+
+            if (_currentWiki.IsIconUserSet && !string.IsNullOrEmpty(_currentWiki.IconUrl))
+            {
+                try
+                {
+                    var file = await StorageFile.GetFileFromApplicationUriAsync(
+                        new Uri(_currentWiki.IconUrl)
+                    );
+                    await file.DeleteAsync();
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine(
+                        $"[CustomIcon] Could not delete custom icon file: {ex.Message}"
+                    );
+                }
+            }
+
+            _currentWiki.IconUrl = null;
+            _currentWiki.IsIconUserSet = false;
+            UpdateIconState();
+
+            LoadingOverlayControl.Visibility = Visibility.Visible;
+            LoadingTextControl.Text = "Re-fetching original favicon...";
+
+            using (var worker = App.ApiWorkerFactory.CreateApiWorker(_currentWiki))
+            {
+                await FaviconService.FetchAndCacheFaviconUrlAsync(
+                    _currentWiki,
+                    worker,
+                    forceRefresh: true
+                );
+            }
+
+            UpdateIconState();
+            LoadingOverlayControl.Visibility = Visibility.Collapsed;
+        }
+
+        private void UpdateIconState()
+        {
+            string iconUrl = _currentWiki?.IconUrl;
+            if (string.IsNullOrEmpty(iconUrl))
+            {
+                iconUrl = "ms-appx:///Assets/Square150x150Logo.png";
+            }
+
+            IconPreviewImageControl.Source = (Windows.UI.Xaml.Media.ImageSource)
+                _iconConverter.Convert(iconUrl, null, null, null);
+
+            RemoveIconButtonControl.Visibility =
+                _currentWiki != null && _currentWiki.IsIconUserSet
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
         }
     }
 }

@@ -1,9 +1,10 @@
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
 using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
 
@@ -14,6 +15,7 @@ namespace WikiViewer.Core.Services
         public static IStorageProvider StorageProvider { get; set; }
         private const string WikisFileName = "wikis.json";
         private static List<WikiInstance> _wikis;
+        private static readonly SemaphoreSlim _saveSemaphore = new SemaphoreSlim(1, 1);
 
         public static event Func<Task> WikisChanged;
 
@@ -54,12 +56,20 @@ namespace WikiViewer.Core.Services
             if (StorageProvider == null)
                 throw new InvalidOperationException("StorageProvider not set for WikiManager.");
 
-            string json = JsonConvert.SerializeObject(_wikis, Formatting.Indented);
-            await StorageProvider.WriteTextAsync(WikisFileName, json);
-
-            if (WikisChanged != null)
+            await _saveSemaphore.WaitAsync();
+            try
             {
-                await WikisChanged.Invoke();
+                string json = JsonConvert.SerializeObject(_wikis, Formatting.Indented);
+                await StorageProvider.WriteTextAsync(WikisFileName, json);
+
+                if (WikisChanged != null)
+                {
+                    await WikisChanged.Invoke();
+                }
+            }
+            finally
+            {
+                _saveSemaphore.Release();
             }
         }
 

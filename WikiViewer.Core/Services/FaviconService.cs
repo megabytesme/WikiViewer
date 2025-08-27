@@ -19,6 +19,11 @@ namespace WikiViewer.Core.Services
             if (wiki == null || worker == null)
                 return null;
 
+            if (wiki.IsIconUserSet && !forceRefresh)
+            {
+                return wiki.IconUrl;
+            }
+
             var faviconsFolder = await ApplicationData.Current.LocalFolder.CreateFolderAsync(
                 "favicons",
                 CreationCollisionOption.OpenIfExists
@@ -107,7 +112,6 @@ namespace WikiViewer.Core.Services
                     if (wiki.IconUrl != newIconUrl)
                     {
                         wiki.IconUrl = newIconUrl;
-                        await WikiManager.SaveAsync();
                     }
                     return wiki.IconUrl;
                 }

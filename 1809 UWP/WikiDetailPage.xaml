@@ -28,6 +28,22 @@
                             <TextBox x:Name="WikiNameTextBox"
                                      Header="Wiki Name"
                                      PlaceholderText="Enter wiki name"/>
+                            <StackPanel Margin="0,0,0,12">
+                                <TextBlock Text="Wiki Icon" Style="{ThemeResource BodyTextBlockStyle}" Opacity="0.7"/>
+                                <Grid Margin="0,4,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Border BorderBrush="{ThemeResource SystemControlForegroundBaseLowBrush}" BorderThickness="1" Width="48" Height="48" VerticalAlignment="Center">
+                                        <Image x:Name="IconPreviewImage" Width="40" Height="40" Stretch="Uniform"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                                        <Button x:Name="SetIconButton" Content="Set Custom Icon..." Click="SetIconButton_Click"/>
+                                        <Button x:Name="RemoveIconButton" Content="Remove Custom Icon" Click="RemoveIconButton_Click" Visibility="Collapsed" Margin="0,4,0,0"/>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
                             <TextBox x:Name="WikiUrlTextBox"
                                      Header="MediaWiki Base URL"
                                      PlaceholderText="https://en.wikipedia.org/"/>

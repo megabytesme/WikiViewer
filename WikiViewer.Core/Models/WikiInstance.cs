@@ -13,6 +13,7 @@ namespace WikiViewer.Core.Models
         public string ArticlePath { get; set; } = "wiki/";
         public ConnectionMethod PreferredConnectionMethod { get; set; } = ConnectionMethod.Auto;
         public string IconUrl { get; set; }
+        public bool IsIconUserSet { get; set; } = false;
 
         [JsonIgnore]
         public ConnectionMethod? ResolvedConnectionMethod { get; set; }

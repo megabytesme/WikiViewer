@@ -180,13 +180,6 @@ namespace WikiViewer.Shared.Uwp.Pages
             var wikis = WikiManager.GetWikis();
             foreach (var wiki in wikis)
             {
-                _ = Task.Run(async () =>
-                {
-                    using (var worker = App.ApiWorkerFactory.CreateApiWorker(wiki))
-                    {
-                        await FaviconService.FetchAndCacheFaviconUrlAsync(wiki, worker);
-                    }
-                });
                 AddWikiNavItem(wiki);
             }
 
@@ -225,27 +218,47 @@ namespace WikiViewer.Shared.Uwp.Pages
         {
             Debug.WriteLine("[MainPage] Starting background favicon refresh...");
             var allWikis = WikiManager.GetWikis();
-            var refreshTasks = new List<Task>();
+            bool iconsWereUpdated = false;
 
-            foreach (var wiki in allWikis)
-            {
-                refreshTasks.Add(
+            var refreshTasks = allWikis
+                .Select(wiki =>
                     Task.Run(async () =>
                     {
+                        string originalIconUrl = wiki.IconUrl;
+                        bool shouldForce = !wiki.IsIconUserSet;
+
                         using (var worker = App.ApiWorkerFactory.CreateApiWorker(wiki))
                         {
                             await worker.InitializeAsync();
                             await FaviconService.FetchAndCacheFaviconUrlAsync(
                                 wiki,
                                 worker,
-                                forceRefresh: true
+                                forceRefresh: shouldForce
                             );
                         }
+
+                        if (originalIconUrl != wiki.IconUrl)
+                        {
+                            iconsWereUpdated = true;
+                        }
                     })
-                );
-            }
+                )
+                .ToList();
 
             await Task.WhenAll(refreshTasks);
+
+            if (iconsWereUpdated)
+            {
+                Debug.WriteLine(
+                    "[MainPage] Favicon changes detected. Saving and triggering UI update."
+                );
+                await WikiManager.SaveAsync();
+            }
+            else
+            {
+                Debug.WriteLine("[MainPage] No favicon changes detected.");
+            }
+
             Debug.WriteLine("[MainPage] Background favicon refresh complete.");
         }
 
