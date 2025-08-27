@@ -35,6 +35,8 @@ namespace _1507_UWP.Pages
 
         protected override Type GetSettingsPageType() => typeof(SettingsPage);
 
+        private ContentDialog _currentInfoDialog;
+
         private void MainPage_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             double width = e.NewSize.Width;
@@ -66,19 +68,44 @@ namespace _1507_UWP.Pages
             this.PageHeaderControl.Title = title;
         }
 
-        protected override void ShowConnectionInfoBar(
+        protected override async void ShowConnectionInfoBar(
             string title,
             string message,
             bool showActionButton,
-            bool isClosable
-        )
+            bool isClosable)
         {
-            this.InfoBarTitle.Text = title;
-            this.InfoBarMessage.Text = message;
-            this.InfoBarButton.Visibility = showActionButton
-                ? Visibility.Visible
-                : Visibility.Collapsed;
-            this.ConnectionInfoBar.Visibility = Visibility.Visible;
+            if (_currentInfoDialog != null) return;
+
+            var dialog = new ContentDialog
+            {
+                Title = title,
+                Content = message,
+                PrimaryButtonText = "OK"
+            };
+
+            if (showActionButton)
+            {
+                dialog.PrimaryButtonText = "Action";
+                dialog.SecondaryButtonText = "Cancel";
+            }
+
+            _currentInfoDialog = dialog;
+            var result = await dialog.ShowAsync();
+            _currentInfoDialog = null;
+
+            if (showActionButton && result == ContentDialogResult.Primary)
+            {
+                var mainPageBase = this as MainPageBase;
+                if (mainPageBase?._postVerificationAction != null)
+                {
+                    await mainPageBase._postVerificationAction.Invoke();
+                    mainPageBase._postVerificationAction = null;
+                }
+                else
+                {
+                    InfoBarButton_Click(this, new RoutedEventArgs());
+                }
+            }
         }
 
         protected override async Task ShowDialogAsync(string title, string message)
@@ -92,8 +119,11 @@ namespace _1507_UWP.Pages
             await dialog.ShowAsync();
         }
 
-        protected override void HideConnectionInfoBar() =>
-            this.ConnectionInfoBar.Visibility = Visibility.Collapsed;
+        protected override void HideConnectionInfoBar()
+        {
+            _currentInfoDialog?.Hide();
+            _currentInfoDialog = null;
+        }
 
         protected override void ClearWikiNavItems()
         {
