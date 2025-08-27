@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.Web.WebView2.Core;
 using Newtonsoft.Json;
 using WikiViewer.Core;
+using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
 using WikiViewer.Shared.Uwp.Pages;
 using WikiViewer.Shared.Uwp.Services;
@@ -189,78 +190,89 @@ namespace _1809_UWP.Pages
         {
             args.Cancel = true;
 
-            if (string.IsNullOrEmpty(args.Uri))
+            if (
+                string.IsNullOrEmpty(args.Uri)
+                || !Uri.TryCreate(args.Uri, UriKind.Absolute, out var uri)
+            )
                 return;
 
-            if (
-                args.Uri.StartsWith(
-                    $"https://{GetVirtualHostName()}",
-                    StringComparison.OrdinalIgnoreCase
-                )
-            )
+            if (uri.Host.Equals(GetVirtualHostName(), StringComparison.OrdinalIgnoreCase))
             {
                 args.Cancel = false;
                 return;
             }
 
-            var uri = new Uri(args.Uri);
-
-            string path = uri.AbsolutePath;
-            int fileIndex = path.IndexOf("/File:", StringComparison.OrdinalIgnoreCase);
-            int imageIndex = path.IndexOf("/Image:", StringComparison.OrdinalIgnoreCase);
-            int startIndex = Math.Max(fileIndex, imageIndex);
-
-            if (
-                uri.Host.Equals(_pageWikiContext.Host, StringComparison.OrdinalIgnoreCase)
-                && startIndex != -1
-            )
-            {
-                string fileTitle = path.Substring(startIndex + 1);
-                _ = ShowImageViewerAsync(Uri.UnescapeDataString(fileTitle));
-                return;
-            }
-
-            if (HandleSpecialLink(uri))
-            {
-                return;
-            }
-
             var targetWiki = WikiManager.GetWikiByHost(uri.Host);
+
             if (targetWiki != null)
             {
-                string articlePathPrefix = $"/{targetWiki.ArticlePath}";
-                if (
-                    uri.AbsolutePath.StartsWith(
-                        articlePathPrefix,
-                        StringComparison.OrdinalIgnoreCase
-                    )
-                )
+                string cleanArticlePath = targetWiki.ArticlePath?.Trim('/');
+
+                if (!string.IsNullOrEmpty(cleanArticlePath))
                 {
-                    string newTitle = uri.AbsolutePath.Substring(articlePathPrefix.Length);
-                    if (!string.IsNullOrEmpty(newTitle))
+                    string articlePathPrefix = $"/{cleanArticlePath}/";
+
+                    if (
+                        uri.AbsolutePath.StartsWith(
+                            articlePathPrefix,
+                            StringComparison.OrdinalIgnoreCase
+                        )
+                    )
                     {
-                        if (targetWiki.Id == _pageWikiContext.Id)
-                        {
-                            NavigateToInternalPage(Uri.UnescapeDataString(newTitle));
-                        }
-                        else
-                        {
-                            Frame.Navigate(
-                                GetArticleViewerPageType(),
-                                new ArticleNavigationParameter
-                                {
-                                    WikiId = targetWiki.Id,
-                                    PageTitle = newTitle,
-                                }
-                            );
-                        }
+                        string pageTitle = uri.AbsolutePath.Substring(articlePathPrefix.Length);
+                        HandleValidPageNavigation(pageTitle, targetWiki, uri);
+                        return;
+                    }
+                }
+                else
+                {
+                    if (uri.AbsolutePath.Length > 1)
+                    {
+                        string pageTitle = uri.AbsolutePath.Substring(1);
+                        HandleValidPageNavigation(pageTitle, targetWiki, uri);
                         return;
                     }
                 }
             }
+
+            await ShowWikiDetectionPromptAsync(uri);
+        }
+
+        private void HandleValidPageNavigation(
+            string pageTitle,
+            WikiInstance targetWiki,
+            Uri originalUri
+        )
+        {
+            pageTitle = Uri.UnescapeDataString(pageTitle);
+
+            if (string.IsNullOrEmpty(pageTitle))
+                return;
+
+            if (
+                pageTitle.StartsWith("File:", StringComparison.OrdinalIgnoreCase)
+                || pageTitle.StartsWith("Image:", StringComparison.OrdinalIgnoreCase)
+            )
+            {
+                _ = ShowImageViewerAsync(pageTitle);
+                return;
+            }
+
+            if (HandleSpecialLink(originalUri))
+            {
+                return;
+            }
+
+            if (targetWiki.Id == _pageWikiContext.Id)
+            {
+                NavigateToInternalPage(pageTitle);
+            }
             else
             {
-                await ShowWikiDetectionPromptAsync(uri);
+                Frame.Navigate(
+                    GetArticleViewerPageType(),
+                    new ArticleNavigationParameter { WikiId = targetWiki.Id, PageTitle = pageTitle }
+                );
             }
         }
 

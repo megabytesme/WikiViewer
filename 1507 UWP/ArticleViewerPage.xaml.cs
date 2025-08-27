@@ -182,48 +182,49 @@ namespace _1507_UWP.Pages
                 return;
             }
 
-            int fileIndex = args.Uri.AbsolutePath.IndexOf(
-                "/File:",
-                StringComparison.OrdinalIgnoreCase
-            );
-            int imageIndex = args.Uri.AbsolutePath.IndexOf(
-                "/Image:",
-                StringComparison.OrdinalIgnoreCase
-            );
-            int startIndex = Math.Max(fileIndex, imageIndex);
-
-            if (
-                startIndex != -1
-                && args.Uri.Host.Equals(_pageWikiContext.Host, StringComparison.OrdinalIgnoreCase)
-            )
-            {
-                string fileTitle = args.Uri.AbsolutePath.Substring(startIndex + 1);
-                _ = ShowImageViewerAsync(Uri.UnescapeDataString(fileTitle));
-                return;
-            }
-
-            if (HandleSpecialLink(args.Uri))
-            {
-                return;
-            }
-
             var targetWiki = WikiManager.GetWikiByHost(args.Uri.Host);
+
             if (targetWiki != null)
             {
-                string articlePathPrefix = $"/{targetWiki.ArticlePath}";
+                string articlePathWithSlashes = $"/{targetWiki.ArticlePath.Trim('/')}/";
+
+                if (targetWiki.ArticlePath.Trim() == "")
+                {
+                    articlePathWithSlashes = "/";
+                }
+
                 if (
                     args.Uri.AbsolutePath.StartsWith(
-                        articlePathPrefix,
+                        articlePathWithSlashes,
                         StringComparison.OrdinalIgnoreCase
                     )
                 )
                 {
-                    string newTitle = args.Uri.AbsolutePath.Substring(articlePathPrefix.Length);
-                    if (!string.IsNullOrEmpty(newTitle))
+                    string pageTitle = args.Uri.AbsolutePath.Substring(
+                        articlePathWithSlashes.Length
+                    );
+
+                    pageTitle = Uri.UnescapeDataString(pageTitle);
+
+                    if (!string.IsNullOrEmpty(pageTitle))
                     {
+                        if (
+                            pageTitle.StartsWith("File:", StringComparison.OrdinalIgnoreCase)
+                            || pageTitle.StartsWith("Image:", StringComparison.OrdinalIgnoreCase)
+                        )
+                        {
+                            _ = ShowImageViewerAsync(pageTitle);
+                            return;
+                        }
+
+                        if (HandleSpecialLink(args.Uri))
+                        {
+                            return;
+                        }
+
                         if (targetWiki.Id == _pageWikiContext.Id)
                         {
-                            NavigateToInternalPage(Uri.UnescapeDataString(newTitle));
+                            NavigateToInternalPage(pageTitle);
                         }
                         else
                         {
@@ -232,7 +233,7 @@ namespace _1507_UWP.Pages
                                 new ArticleNavigationParameter
                                 {
                                     WikiId = targetWiki.Id,
-                                    PageTitle = newTitle,
+                                    PageTitle = pageTitle,
                                 }
                             );
                         }
