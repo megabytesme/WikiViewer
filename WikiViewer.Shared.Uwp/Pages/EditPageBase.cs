@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
@@ -223,18 +224,34 @@ namespace WikiViewer.Shared.Uwp.Pages
             _highlightDebounceTimer.Tick += HighlightDebounceTimer_Tick;
             WikitextEditorTextBox.TextChanged += Editor_TextChanged;
             WikitextEditorTextBox.SelectionChanged += Editor_SelectionChanged;
+            Window.Current.CoreWindow.CharacterReceived += CoreWindow_CharacterReceived;
             Window.Current.CoreWindow.KeyDown += CoreWindow_KeyDown;
         }
 
         protected override void OnNavigatingFrom(NavigatingCancelEventArgs e)
         {
+            Window.Current.CoreWindow.CharacterReceived -= CoreWindow_CharacterReceived;
             Window.Current.CoreWindow.KeyDown -= CoreWindow_KeyDown;
             base.OnNavigatingFrom(e);
         }
 
+        private void CoreWindow_CharacterReceived(CoreWindow sender, CharacterReceivedEventArgs e)
+        {
+            if (FocusManager.GetFocusedElement() != WikitextEditorTextBox)
+                return;
+
+            char typedChar = (char)e.KeyCode;
+
+            Debug.WriteLine($"User typed: '{typedChar}'");
+
+            HandleAutoCompletion();
+            _highlightDebounceTimer.Start();
+        }
+
         private void CoreWindow_KeyDown(CoreWindow sender, KeyEventArgs e)
         {
-            if (FocusManager.GetFocusedElement() != WikitextEditorTextBox) return;
+            if (FocusManager.GetFocusedElement() != WikitextEditorTextBox)
+                return;
 
             var coreWindow = Window.Current.CoreWindow;
             var ctrlState = coreWindow.GetKeyState(Windows.System.VirtualKey.Control);
@@ -291,23 +308,36 @@ namespace WikiViewer.Shared.Uwp.Pages
             {
                 var document = WikitextEditorTextBox.Document;
                 var selection = document.Selection;
-                if (selection.Length > 0) return;
+                if (selection.Length > 0)
+                    return;
                 var caretPos = selection.StartPosition;
                 document.GetText(TextGetOptions.None, out var text);
-                if (caretPos == 0 || caretPos >= text.Length) return;
+                if (caretPos == 0 || caretPos >= text.Length)
+                    return;
                 foreach (var pair in _wikitextPairs)
                 {
-                    if (caretPos >= pair.OpenString.Length && text.Substring(caretPos - pair.OpenString.Length, pair.OpenString.Length) == pair.OpenString &&
-                        caretPos + pair.CloseString.Length <= text.Length && text.Substring(caretPos, pair.CloseString.Length) == pair.CloseString)
+                    if (
+                        caretPos >= pair.OpenString.Length
+                        && text.Substring(caretPos - pair.OpenString.Length, pair.OpenString.Length)
+                            == pair.OpenString
+                        && caretPos + pair.CloseString.Length <= text.Length
+                        && text.Substring(caretPos, pair.CloseString.Length) == pair.CloseString
+                    )
                     {
                         try
                         {
                             _isUpdatingText = true;
                             document.BeginUndoGroup();
-                            var rangeToDelete = document.GetRange(caretPos - pair.OpenString.Length, caretPos + pair.CloseString.Length);
+                            var rangeToDelete = document.GetRange(
+                                caretPos - pair.OpenString.Length,
+                                caretPos + pair.CloseString.Length
+                            );
                             rangeToDelete.Text = string.Empty;
                         }
-                        finally { document.EndUndoGroup(); }
+                        finally
+                        {
+                            document.EndUndoGroup();
+                        }
                         e.Handled = true;
                         return;
                     }
@@ -354,7 +384,6 @@ namespace WikiViewer.Shared.Uwp.Pages
                 _isUpdatingText = false;
                 return;
             }
-            HandleAutoCompletion();
             _highlightDebounceTimer.Start();
         }
 
@@ -483,112 +512,138 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         private List<TokenMatch> ScanDocumentForAllTokens(string text)
         {
-            var matches = new List<TokenMatch>();
-            var stack = new Stack<TokenMatch>();
-            int index = 0;
-            while (index < text.Length)
+            var stopwatch = Stopwatch.StartNew();
+            int numChunks = Environment.ProcessorCount;
+            int chunkSize = (int)Math.Ceiling((double)text.Length / numChunks);
+            var chunks = new List<Tuple<string, int>>();
+            for (int i = 0; i < text.Length; i += chunkSize)
             {
-                bool matchedThisTurn = false;
-                if (stack.Any() && stack.Peek().Pair.IsRawContent)
+                chunks.Add(
+                    Tuple.Create(text.Substring(i, Math.Min(chunkSize, text.Length - i)), i)
+                );
+            }
+            var allTokens = chunks
+                .AsParallel()
+                .Select(chunk =>
                 {
-                    var currentPair = stack.Peek().Pair;
-                    var closeMatch = currentPair.ClosePattern.Match(text, index);
-                    if (closeMatch.Success && closeMatch.Index == index)
+                    var chunkText = chunk.Item1;
+                    var offset = chunk.Item2;
+                    var localMatches = new List<TokenMatch>();
+                    var stack = new Stack<TokenMatch>();
+                    int index = 0;
+                    while (index < chunkText.Length)
                     {
-                        var opener = stack.Pop();
-                        var token = new TokenMatch
+                        bool matchedThisTurn = false;
+                        if (stack.Any() && stack.Peek().Pair.IsRawContent)
                         {
-                            Position = index,
-                            Length = closeMatch.Length,
-                            IsOpening = false,
-                            Pair = currentPair,
-                            IsMatched = true,
-                            MatchPosition = opener.Position,
-                        };
-                        opener.IsMatched = true;
-                        opener.MatchPosition = index;
-                        matches.Add(token);
-                        index += closeMatch.Length;
-                        matchedThisTurn = true;
-                    }
-                }
-                else
-                {
-                    foreach (var pair in _wikitextPairs)
-                    {
-                        var openMatch = pair.OpenPattern.Match(text, index);
-                        if (openMatch.Success && openMatch.Index == index)
-                        {
-                            bool isOpening = !(
-                                stack.Any()
-                                && stack.Peek().Pair.Name == pair.Name
-                                && pair.OpenPattern.ToString() == pair.ClosePattern.ToString()
-                            );
-                            if (isOpening)
-                            {
-                                var token = new TokenMatch
-                                {
-                                    Position = index,
-                                    Length = openMatch.Length,
-                                    IsOpening = true,
-                                    Pair = pair,
-                                };
-                                stack.Push(token);
-                                matches.Add(token);
-                            }
-                            else
+                            var currentPair = stack.Peek().Pair;
+                            var closeMatch = currentPair.ClosePattern.Match(chunkText, index);
+                            if (closeMatch.Success && closeMatch.Index == index)
                             {
                                 var opener = stack.Pop();
                                 var token = new TokenMatch
                                 {
-                                    Position = index,
-                                    Length = openMatch.Length,
+                                    Position = index + offset,
+                                    Length = closeMatch.Length,
                                     IsOpening = false,
-                                    Pair = pair,
+                                    Pair = currentPair,
                                     IsMatched = true,
                                     MatchPosition = opener.Position,
                                 };
                                 opener.IsMatched = true;
-                                opener.MatchPosition = index;
-                                matches.Add(token);
+                                opener.MatchPosition = index + offset;
+                                localMatches.Add(token);
+                                index += closeMatch.Length;
+                                matchedThisTurn = true;
                             }
-                            index += openMatch.Length;
-                            matchedThisTurn = true;
-                            break;
                         }
-                        var closeMatch = pair.ClosePattern.Match(text, index);
-                        if (
-                            stack.Any()
-                            && stack.Peek().Pair.Name == pair.Name
-                            && closeMatch.Success
-                            && closeMatch.Index == index
-                        )
+                        else
                         {
-                            var opener = stack.Pop();
-                            var token = new TokenMatch
+                            foreach (var pair in _wikitextPairs)
                             {
-                                Position = index,
-                                Length = closeMatch.Length,
-                                IsOpening = false,
-                                Pair = pair,
-                                IsMatched = true,
-                                MatchPosition = opener.Position,
-                            };
-                            opener.IsMatched = true;
-                            opener.MatchPosition = index;
-                            matches.Add(token);
-                            index += closeMatch.Length;
-                            matchedThisTurn = true;
-                            break;
+                                var openMatch = pair.OpenPattern.Match(chunkText, index);
+                                if (openMatch.Success && openMatch.Index == index)
+                                {
+                                    bool isOpening = !(
+                                        stack.Any()
+                                        && stack.Peek().Pair.Name == pair.Name
+                                        && pair.OpenPattern.ToString()
+                                            == pair.ClosePattern.ToString()
+                                    );
+                                    if (isOpening)
+                                    {
+                                        var token = new TokenMatch
+                                        {
+                                            Position = index + offset,
+                                            Length = openMatch.Length,
+                                            IsOpening = true,
+                                            Pair = pair,
+                                        };
+                                        stack.Push(token);
+                                        localMatches.Add(token);
+                                    }
+                                    else
+                                    {
+                                        var opener = stack.Pop();
+                                        var token = new TokenMatch
+                                        {
+                                            Position = index + offset,
+                                            Length = openMatch.Length,
+                                            IsOpening = false,
+                                            Pair = pair,
+                                            IsMatched = true,
+                                            MatchPosition = opener.Position,
+                                        };
+                                        opener.IsMatched = true;
+                                        opener.MatchPosition = index + offset;
+                                        localMatches.Add(token);
+                                    }
+                                    index += openMatch.Length;
+                                    matchedThisTurn = true;
+                                    break;
+                                }
+                                var closeMatch = pair.ClosePattern.Match(chunkText, index);
+                                if (
+                                    stack.Any()
+                                    && stack.Peek().Pair.Name == pair.Name
+                                    && closeMatch.Success
+                                    && closeMatch.Index == index
+                                )
+                                {
+                                    var opener = stack.Pop();
+                                    var token = new TokenMatch
+                                    {
+                                        Position = index + offset,
+                                        Length = closeMatch.Length,
+                                        IsOpening = false,
+                                        Pair = pair,
+                                        IsMatched = true,
+                                        MatchPosition = opener.Position,
+                                    };
+                                    opener.IsMatched = true;
+                                    opener.MatchPosition = index + offset;
+                                    localMatches.Add(token);
+                                    index += closeMatch.Length;
+                                    matchedThisTurn = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (!matchedThisTurn)
+                        {
+                            index++;
                         }
                     }
-                }
-                if (!matchedThisTurn)
-                {
-                    index++;
-                }
-            }
-            return matches;
+                    return localMatches;
+                })
+                .SelectMany(list => list)
+                .OrderBy(t => t.Position)
+                .ToList();
+            stopwatch.Stop();
+            Debug.WriteLine(
+                $"[Highlighting] Multi-threaded scan completed in {stopwatch.ElapsedMilliseconds}ms on {numChunks} cores."
+            );
+            return allTokens;
         }
 
         private void ClearBracketHighlight()
