@@ -2099,6 +2099,236 @@ namespace WikiViewer.Core.Services
               margin-right: 8px;
             }
 
+            /* ================================================================ */
+            /* =================== WIKINEWS MAIN PAGE STYLES ================== */
+            /* ================================================================ */
+            .the_table,
+            .the_table > tbody {
+              display: flex;
+              flex-direction: column;
+              gap: 24px;
+            }
+
+            .the_table > tbody > tr {
+              display: flex;
+              flex-direction: row;
+              flex-wrap: wrap;
+              gap: 24px;
+            }
+
+            .the_table > tbody > tr > th,
+            .the_table > tbody > tr > td {
+              display: flex;
+              flex-direction: column;
+              background-color: transparent !important;
+              border: none !important;
+              padding: 0 !important;
+              flex: 1 1 300px;
+              min-width: 300px;
+            }
+
+            .the_table > tbody > tr > th[colspan=""3""] {
+              flex-basis: 100%;
+            }
+            .the_table > tbody > tr > td[colspan=""2""] {
+              flex: 2 1 600px;
+            }
+
+            .mp_header {
+              background-color: var(--card-background);
+              border: 1px solid var(--card-border);
+              border-radius: 8px;
+              box-shadow: 0 4px 12px var(--card-shadow);
+              padding: 16px 24px;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              flex-wrap: wrap;
+              gap: 16px;
+              width: 100%;
+              box-sizing: border-box;
+            }
+            .mp_header_left .welcome_to_wn {
+              font-size: 1.8em;
+              font-weight: 700;
+              color: var(--text-primary);
+            }
+            .mp_header_left .freenews {
+              color: var(--text-secondary);
+              margin-top: 4px;
+            }
+            .mp_header_right {
+              text-align: right;
+            }
+            .mp_header_right .header_left_text {
+              font-size: 0.85em;
+              color: var(--text-secondary);
+              line-height: 1.6;
+            }
+
+            .l_table,
+            .latest_news,
+            .portals,
+            .main_popular,
+            .recent_interviews,
+            .original_stories,
+            .main_about,
+            .main_write,
+            .main_devel,
+            td[colspan=""3""] > div[style*=""text-align:center""],
+            .plainlinks > table[align=""center""] {
+              background-color: var(--card-background) !important;
+              border: 1px solid var(--card-border) !important;
+              border-radius: 8px !important;
+              box-shadow: 0 4px 12px var(--card-shadow) !important;
+              padding: 24px !important;
+              box-sizing: border-box !important;
+              width: 100% !important;
+              height: 100%;
+              display: flex;
+              flex-direction: column;
+            }
+
+            .l_table {
+              padding: 0 !important;
+              overflow: hidden;
+            }
+            .l_box {
+              padding: 24px;
+            }
+            .l_title {
+              font-size: 1.5em;
+              font-weight: 600;
+              margin-bottom: 12px;
+              display: block;
+            }
+            .l_summary {
+              color: var(--text-secondary);
+              line-height: 1.6;
+            }
+            .l_image {
+              margin-bottom: 16px;
+            }
+            .l_image img {
+              width: 100%;
+              height: auto;
+              object-fit: cover;
+              max-height: 200px;
+            }
+            .lead_big .l_title {
+              font-size: 2em;
+            }
+
+            .latest_news .more_news {
+              font-size: 1.5em;
+              font-weight: 600;
+              padding-bottom: 8px;
+              margin-bottom: 12px;
+              border-bottom: 1px solid var(--divider-color);
+              color: var(--text-primary);
+            }
+            .latest_news_text ul {
+              list-style: none;
+              padding: 0;
+              margin: 0;
+            }
+            .latest_news_text li {
+              padding: 8px 0;
+              border-bottom: 1px solid var(--divider-color);
+            }
+            .latest_news_text li:last-child {
+              border-bottom: none;
+            }
+            .latest_news_text li a {
+              font-weight: 500;
+            }
+            .latest_news .more {
+              margin-top: auto;
+              padding-top: 16px;
+              text-align: right;
+              font-weight: bold;
+            }
+
+            .minihead {
+              font-size: 1.5em;
+              font-weight: 600;
+              padding-bottom: 8px;
+              margin-bottom: 12px;
+              border-bottom: 1px solid var(--divider-color);
+              color: var(--text-primary);
+            }
+            .recent_interviews ul,
+            .original_stories ul,
+            .main_write ul,
+            .main_devel ul {
+              padding-left: 20px;
+              margin: 0;
+            }
+            .recent_interviews li,
+            .original_stories li,
+            .main_write li,
+            .main_devel li {
+              margin-bottom: 8px;
+            }
+            .main_popular p,
+            .main_about p {
+              color: var(--text-secondary);
+              line-height: 1.6;
+            }
+            .more {
+              margin-top: auto;
+              padding-top: 16px;
+              text-align: right;
+              font-weight: bold;
+            }
+
+            .portals hr {
+              display: none;
+            }
+            .portals big b {
+              display: flex;
+              flex-wrap: wrap;
+              justify-content: center;
+              gap: 8px 16px;
+              font-size: 1.1em;
+            }
+            .portals > div > b {
+              display: flex;
+              flex-wrap: wrap;
+              justify-content: center;
+              gap: 8px 16px;
+              line-height: 1.8;
+            }
+            div[style*=""text-align:center""] a {
+              white-space: nowrap;
+            }
+
+            .plainlinks > table[align=""center""] td {
+              padding: 8px !important;
+            }
+            .plainlinks > table[align=""center""] tr:first-child td {
+              text-align: center;
+              color: var(--text-secondary);
+              padding-bottom: 16px !important;
+              border-bottom: 1px solid var(--divider-color);
+            }
+            .plainlinks > table[align=""center""] tr:not(:first-child) {
+              display: grid;
+              grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+              gap: 16px;
+              padding-top: 16px;
+            }
+            .plainlinks > table[align=""center""] tr:not(:first-child) td {
+              display: flex;
+              align-items: center;
+              gap: 12px;
+            }
+            .plainlinks > table[align=""center""] img {
+              width: 30px;
+              height: 30px;
+              object-fit: contain;
+              border-radius: 4px;
+            }
             ";
         }
 
