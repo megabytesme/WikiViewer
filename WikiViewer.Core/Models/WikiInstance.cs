@@ -19,13 +19,46 @@ namespace WikiViewer.Core.Models
         public ConnectionMethod? ResolvedConnectionMethod { get; set; }
 
         [JsonIgnore]
-        public string ApiEndpoint => $"{BaseUrl.TrimEnd('/')}/{ScriptPath.Trim('/')}/api.php";
+        public string ApiEndpoint
+        {
+            get
+            {
+                var baseUri = BaseUrl.TrimEnd('/');
+                var script = ScriptPath?.Trim('/');
+                return string.IsNullOrEmpty(script)
+                    ? $"{baseUri}/api.php"
+                    : $"{baseUri}/{script}/api.php";
+            }
+        }
 
         [JsonIgnore]
-        public string IndexEndpoint => $"{BaseUrl.TrimEnd('/')}/{ScriptPath.Trim('/')}/index.php";
+        public string IndexEndpoint
+        {
+            get
+            {
+                var baseUri = BaseUrl.TrimEnd('/');
+                var script = ScriptPath?.Trim('/');
+                return string.IsNullOrEmpty(script)
+                    ? $"{baseUri}/index.php"
+                    : $"{baseUri}/{script}/index.php";
+            }
+        }
 
         [JsonIgnore]
-        public string Host => new Uri(BaseUrl).Host;
+        public string Host
+        {
+            get
+            {
+                if (
+                    string.IsNullOrEmpty(BaseUrl)
+                    || !Uri.TryCreate(BaseUrl, UriKind.Absolute, out var uri)
+                )
+                {
+                    return null;
+                }
+                return uri.Host;
+            }
+        }
 
         public string GetWikiPageUrl(string pageTitle) =>
             $"{BaseUrl.TrimEnd('/')}/{ArticlePath.Trim('/')}/{Uri.EscapeDataString(pageTitle)}";
