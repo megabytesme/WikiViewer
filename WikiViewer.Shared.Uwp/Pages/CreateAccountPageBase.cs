@@ -8,6 +8,7 @@ using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Navigation;
+using Windows.UI.Xaml.Media.Imaging;
 #if UWP_1809
 using Microsoft.UI.Xaml.Controls;
 #endif
@@ -84,27 +85,56 @@ namespace WikiViewer.Shared.Uwp.Pages
 
                 foreach (var request in _requiredFields)
                 {
+                    // Handle hCaptcha (no changes)
                     if (
                         request.Id == "CaptchaAuthenticationRequest"
                         && request.Metadata?["type"]?.ToString() == "hcaptcha"
                     )
                     {
-                        var siteKey = request.Metadata["key"]?.ToString();
-                        var captchaField = request.Fields.FirstOrDefault();
-                        if (!string.IsNullOrEmpty(siteKey) && captchaField.Value != null)
-                        {
-                            FieldsStackPanel.Children.Add(
-                                new TextBlock
-                                {
-                                    Text = captchaField.Value.Label,
-                                    TextWrapping = TextWrapping.Wrap,
-                                }
-                            );
-
-                            AddCaptchaWebView(siteKey, captchaField.Key);
-                            renderedFields.Add(captchaField.Key);
-                        }
                         continue;
+                    }
+
+                    if (request.Id == "CaptchaAuthenticationRequest" && request.Metadata?["type"]?.ToString() == "image")
+                    {
+                        var imageInfoField = request.Fields.FirstOrDefault(f => f.Key == "captchaInfo");
+                        var answerField = request.Fields.FirstOrDefault(f => f.Key == "captchaWord");
+
+                        if (imageInfoField.Value != null && !string.IsNullOrEmpty(imageInfoField.Value.Value) && answerField.Value != null)
+                        {
+                            string relativeImageUrl = imageInfoField.Value.Value;
+                            var absoluteImageUrl = new Uri(new Uri(_wikiForAccountCreation.BaseUrl), relativeImageUrl).AbsoluteUri;
+
+                            var promptText = new TextBlock
+                            {
+                                Text = imageInfoField.Value.Label,
+                                TextWrapping = TextWrapping.Wrap,
+                                Margin = new Thickness(0, 8, 0, 0)
+                            };
+                            FieldsStackPanel.Children.Add(promptText);
+
+                            var captchaImage = new Image
+                            {
+                                Source = new BitmapImage(new Uri(absoluteImageUrl)),
+                                Height = 80,
+                                Margin = new Thickness(0, 8, 0, 0)
+                            };
+                            FieldsStackPanel.Children.Add(captchaImage);
+
+                            var answerTextBox = new TextBox
+                            {
+                                Header = answerField.Value.Label,
+                                Tag = answerField.Key,
+                                PlaceholderText = answerField.Value.Help,
+                            };
+                            answerTextBox.TextChanged += ValidateInput;
+                            FieldsStackPanel.Children.Add(answerTextBox);
+
+                            foreach (var key in request.Fields.Keys)
+                            {
+                                renderedFields.Add(key);
+                            }
+                            continue;
+                        }
                     }
 
                     if (request.Fields == null)
@@ -182,7 +212,7 @@ namespace WikiViewer.Shared.Uwp.Pages
             }
         }
 
-        private void AddCaptchaWebView(string siteKey, string fieldName)
+private void AddCaptchaWebView(string siteKey, string fieldName)
         {
             string hostName = _wikiForAccountCreation.Host;
 
