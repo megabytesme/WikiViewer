@@ -14,15 +14,36 @@ namespace WikiViewer.Core.Services
 {
     public class ProxyHttpClientApiWorker : IApiWorker, IDisposable
     {
+        private static readonly HttpClient _sharedGatekeeperClient = new HttpClient();
+
         private readonly HttpClient _gatekeeperClient;
         private const string GatekeeperEndpoint = "https://wikiflareresolverr.ddns.net";
+
+        private readonly bool _isSharedClient;
 
         public bool IsInitialized { get; private set; }
         public WikiInstance WikiContext { get; set; }
 
+        static ProxyHttpClientApiWorker() {
+            _sharedGatekeeperClient.DefaultRequestHeaders.UserAgent.ParseAdd("WikiViewerApp/2.0");
+        }
+
         public ProxyHttpClientApiWorker()
+            : this(false) { }
+
+        public ProxyHttpClientApiWorker(bool useDedicatedClient)
         {
-            _gatekeeperClient = new HttpClient();
+            if (useDedicatedClient)
+            {
+                _gatekeeperClient = new HttpClient();
+                _isSharedClient = false;
+            }
+            else
+            {
+                _sharedGatekeeperClient.DefaultRequestHeaders.UserAgent.ParseAdd("WikiViewerApp/2.0");
+                _gatekeeperClient = _sharedGatekeeperClient;
+                _isSharedClient = true;
+            }
         }
 
         public Task InitializeAsync(string baseUrl)
@@ -141,7 +162,10 @@ namespace WikiViewer.Core.Services
 
         public void Dispose()
         {
-            _gatekeeperClient?.Dispose();
+            if (!_isSharedClient)
+            {
+                _gatekeeperClient?.Dispose();
+            }
         }
     }
 }
