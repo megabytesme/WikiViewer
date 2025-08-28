@@ -108,5 +108,21 @@ namespace WikiViewer.Shared.Uwp.Services
                 Debug.WriteLine($"Error clearing folder {relativePath}: {ex.Message}");
             }
         }
+
+        public async Task RecreateFolderAsync(string folderName)
+        {
+            try
+            {
+                var folder = await ApplicationData.Current.LocalFolder.GetFolderAsync(folderName);
+
+                await folder.DeleteAsync(StorageDeleteOption.PermanentDelete);
+            }
+            catch (FileNotFoundException) { }
+
+            await ApplicationData.Current.LocalFolder.CreateFolderAsync(
+                folderName,
+                CreationCollisionOption.OpenIfExists
+            );
+        }
     }
 }

@@ -37,8 +37,9 @@ namespace WikiViewer.Core.Managers
         {
             if (StorageProvider == null)
                 throw new InvalidOperationException("StorageProvider not set.");
-            await StorageProvider.ClearFolderAsync(ArticleCacheFolderName);
-            await StorageProvider.ClearFolderAsync(ImageCacheFolderName);
+
+            await StorageProvider.RecreateFolderAsync(ArticleCacheFolderName);
+            await StorageProvider.RecreateFolderAsync(ImageCacheFolderName);
         }
 
         private static string GetHashedFileName(string pageTitle, Guid wikiId)

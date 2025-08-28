@@ -9,6 +9,7 @@ namespace WikiViewer.Core.Interfaces
         Task WriteBytesAsync(string relativePath, byte[] content);
         Task<bool> FileExistsAsync(string relativePath);
         Task DeleteFileAsync(string relativePath);
+        Task RecreateFolderAsync(string folderName);
         Task<ulong> GetFolderSizeAsync(string relativePath);
         Task ClearFolderAsync(string relativePath);
     }
