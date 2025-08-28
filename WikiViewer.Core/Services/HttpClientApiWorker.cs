@@ -20,7 +20,19 @@ namespace WikiViewer.Core.Services
 
         static HttpClientApiWorker()
         {
-            _sharedClient.DefaultRequestHeaders.UserAgent.ParseAdd("WikiViewerApp/2.0");
+#if UWP_1507
+            _sharedClient.DefaultRequestHeaders.UserAgent.ParseAdd(
+                "WikiViewer/1.0.1.0 (https://github.com/megabytesme/WikiViewer) UWP/1507 (System.Net.Http.HttpClient)"
+            );
+#elif UWP_1809
+            _sharedClient.DefaultRequestHeaders.UserAgent.ParseAdd(
+                "WikiViewer/2.0.1.0 (https://github.com/megabytesme/WikiViewer) UWP/1809 (System.Net.Http.HttpClient)"
+            );
+#else
+            _sharedClient.DefaultRequestHeaders.UserAgent.ParseAdd(
+                "WikiViewer (https://github.com/megabytesme/WikiViewer) (System.Net.Http.HttpClient)"
+            );
+#endif
             _sharedClient.Timeout = TimeSpan.FromSeconds(30);
         }
 
@@ -35,7 +47,19 @@ namespace WikiViewer.Core.Services
             if (useDedicatedClient)
             {
                 _client = new HttpClient();
-                _client.DefaultRequestHeaders.UserAgent.ParseAdd("WikiViewerApp/2.0");
+#if UWP_1507
+                _client.DefaultRequestHeaders.UserAgent.ParseAdd(
+                    "WikiViewer/1.0.1.0 (https://github.com/megabytesme/WikiViewer) UWP/1507 (System.Net.Http.HttpClient)"
+                );
+#elif UWP_1809
+                _client.DefaultRequestHeaders.UserAgent.ParseAdd(
+                    "WikiViewer/2.0.1.0 (https://github.com/megabytesme/WikiViewer) UWP/1809 (System.Net.Http.HttpClient)"
+                );
+#else
+                _client.DefaultRequestHeaders.UserAgent.ParseAdd(
+                    "WikiViewer (https://github.com/megabytesme/WikiViewer) (System.Net.Http.HttpClient)"
+                );
+#endif
                 _client.Timeout = TimeSpan.FromSeconds(30);
                 _isSharedClient = false;
             }

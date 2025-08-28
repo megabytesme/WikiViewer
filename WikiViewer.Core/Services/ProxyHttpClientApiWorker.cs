@@ -24,8 +24,21 @@ namespace WikiViewer.Core.Services
         public bool IsInitialized { get; private set; }
         public WikiInstance WikiContext { get; set; }
 
-        static ProxyHttpClientApiWorker() {
-            _sharedGatekeeperClient.DefaultRequestHeaders.UserAgent.ParseAdd("WikiViewerApp/2.0");
+        static ProxyHttpClientApiWorker()
+        {
+#if UWP_1507
+            _sharedGatekeeperClient.DefaultRequestHeaders.UserAgent.ParseAdd(
+                "WikiViewer/1.0.1.0 (https://github.com/megabytesme/WikiViewer) UWP/1507 (System.Net.Http.HttpClient)"
+            );
+#elif UWP_1809
+            _sharedGatekeeperClient.DefaultRequestHeaders.UserAgent.ParseAdd(
+                "WikiViewer/2.0.1.0 (https://github.com/megabytesme/WikiViewer) UWP/1809 (System.Net.Http.HttpClient)"
+            );
+#else
+            _sharedGatekeeperClient.DefaultRequestHeaders.UserAgent.ParseAdd(
+                "WikiViewer (https://github.com/megabytesme/WikiViewer) (System.Net.Http.HttpClient)"
+            );
+#endif
         }
 
         public ProxyHttpClientApiWorker()
@@ -40,7 +53,19 @@ namespace WikiViewer.Core.Services
             }
             else
             {
-                _sharedGatekeeperClient.DefaultRequestHeaders.UserAgent.ParseAdd("WikiViewerApp/2.0");
+#if UWP_1507
+                _sharedGatekeeperClient.DefaultRequestHeaders.UserAgent.ParseAdd(
+                    "WikiViewer/1.0.1.0 (https://github.com/megabytesme/WikiViewer) UWP/1507 (System.Net.Http.HttpClient)"
+                );
+#elif UWP_1809
+                _sharedGatekeeperClient.DefaultRequestHeaders.UserAgent.ParseAdd(
+                    "WikiViewer/2.0.1.0 (https://github.com/megabytesme/WikiViewer) UWP/1809 (System.Net.Http.HttpClient)"
+                );
+#else
+                _sharedGatekeeperClient.DefaultRequestHeaders.UserAgent.ParseAdd(
+                    "WikiViewer (https://github.com/megabytesme/WikiViewer) (System.Net.Http.HttpClient)"
+                );
+#endif
                 _gatekeeperClient = _sharedGatekeeperClient;
                 _isSharedClient = true;
             }
