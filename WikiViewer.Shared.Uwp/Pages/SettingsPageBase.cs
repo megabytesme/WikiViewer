@@ -273,18 +273,18 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected async void AboutButton_Click(object sender, RoutedEventArgs e) =>
             await new ContentDialog
             {
-                Title = "About Wiki Viewer",
+                Title = "About WikiViewer",
                 Content = new ScrollViewer()
                 {
                     Content = new TextBlock()
                     {
                         Inlines =
                         {
-                            new Run() { Text = "Wiki Viewer" },
+                            new Run() { Text = "WikiViewer" },
                             new LineBreak(),
                             new Run() { Text = $"Version {GetAppVersion()} ({GetAppName()})" },
                             new LineBreak(),
-                            new Run() { Text = "Copyright   2025 MegaBytesMe" },
+                            new Run() { Text = "Copyright © 2025 MegaBytesMe" },
                             new LineBreak(),
                             new LineBreak(),
                             new Run() { Text = "Source code available on " },
