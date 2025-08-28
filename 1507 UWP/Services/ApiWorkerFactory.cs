@@ -37,7 +37,7 @@ namespace _1507_UWP.Services
                     return new ProxyHttpClientApiWorker();
                 case ConnectionMethod.WebView:
                 default:
-                    return new WebViewApiWorker { WikiContext = wiki };
+                    return new PooledWebViewProxyWorker(wiki);
             }
         }
 

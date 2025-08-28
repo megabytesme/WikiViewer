@@ -138,6 +138,8 @@
       <DependentUpon>LoginPage.xaml</DependentUpon>
     </Compile>
     <Compile Include="Services\ApiWorkerFactory.cs" />
+    <Compile Include="Services\PooledWebViewProxyWorker.cs" />
+    <Compile Include="Services\WebViewWorkerPool.cs" />
     <Compile Include="Services\WebViewApiWorker.cs" />
     <Compile Include="SettingsPage.xaml.cs">
       <DependentUpon>SettingsPage.xaml</DependentUpon>
