@@ -1,5 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using WikiViewer.Core;
@@ -34,7 +35,7 @@ namespace WikiViewer.Shared.Uwp.Pages
             this.Unloaded += OnUnloaded;
         }
 
-        private void OnLoaded(object sender, RoutedEventArgs e)
+        private async void OnLoaded(object sender, RoutedEventArgs e)
         {
             PopulateConcurrencyComboBox();
             PopulateDefaultConnectionMethodComboBox();
@@ -64,7 +65,18 @@ namespace WikiViewer.Shared.Uwp.Pages
                 DefaultConnectionMethodComboBox_SelectionChanged;
 
             CachingToggleControl.IsOn = AppSettings.IsCachingEnabled;
-            _ = UpdateCacheSizeAsync();
+
+            try
+            {
+                CacheSizeTextControl.Text = "Calculating...";
+                await UpdateCacheSizeAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to update cache size: {ex.Message}");
+                CacheSizeTextControl.Text = "Error";
+            }
+
             LoadWikis();
             WikiListViewControl.ItemsSource = Wikis;
             WikiManager.WikisChanged += OnWikisChanged;

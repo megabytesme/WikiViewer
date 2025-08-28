@@ -80,18 +80,46 @@ namespace WikiViewer.Shared.Uwp.Services
             }
         }
 
-        public async Task<ulong> GetFolderSizeAsync(string relativePath)
+        public async Task<ulong> GetFolderSizeAsync(string folderName)
         {
             try
             {
-                var targetFolder = await _folder.GetFolderAsync(relativePath);
-                var properties = await targetFolder.GetBasicPropertiesAsync();
-                return properties.Size;
+                var localFolder = ApplicationData.Current.LocalFolder;
+                var targetFolder = await localFolder.GetFolderAsync(folderName);
+
+                return await GetFolderSizeRecursiveAsync(targetFolder);
             }
-            catch (FileNotFoundException)
+            catch (System.IO.FileNotFoundException)
             {
                 return 0;
             }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(
+                    $"[StorageProvider] Failed to get size for folder '{folderName}': {ex.Message}"
+                );
+                return 0;
+            }
+        }
+
+        private async Task<ulong> GetFolderSizeRecursiveAsync(IStorageFolder folder)
+        {
+            ulong totalSize = 0;
+
+            var files = await folder.GetFilesAsync();
+            foreach (var file in files)
+            {
+                var properties = await file.GetBasicPropertiesAsync();
+                totalSize += properties.Size;
+            }
+
+            var subFolders = await folder.GetFoldersAsync();
+            foreach (var subFolder in subFolders)
+            {
+                totalSize += await GetFolderSizeRecursiveAsync(subFolder);
+            }
+
+            return totalSize;
         }
 
         public async Task ClearFolderAsync(string relativePath)
