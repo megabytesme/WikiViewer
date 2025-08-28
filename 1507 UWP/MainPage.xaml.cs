@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using _1507_UWP.ViewModels;
 using WikiViewer.Core.Models;
+using WikiViewer.Core.Services;
 using WikiViewer.Shared.Uwp.Pages;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
@@ -14,6 +15,8 @@ namespace _1507_UWP.Pages
 {
     public sealed partial class MainPage : MainPageBase
     {
+        private static readonly Random _random = new Random();
+
         public MainPage()
         {
             this.InitializeComponent();
@@ -323,6 +326,16 @@ namespace _1507_UWP.Pages
                 else if (tag == "settings")
                 {
                     NavigateToPage(GetSettingsPageType(), null);
+                }
+                else if (tag == "surprise_me")
+                {
+                    var allWikis = WikiManager.GetWikis().ToList();
+                    if (allWikis.Any())
+                    {
+                        var randomWiki = allWikis[_random.Next(allWikis.Count)];
+
+                        HandleWikiNavigation(randomWiki, "random");
+                    }
                 }
             }
         }

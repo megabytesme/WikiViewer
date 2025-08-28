@@ -22,6 +22,8 @@ namespace _1809_UWP.Pages
 {
     public sealed partial class MainPage : MainPageBase
     {
+        private static readonly Random _random = new Random();
+
         public MainPage()
         {
             this.InitializeComponent();
@@ -208,6 +210,14 @@ namespace _1809_UWP.Pages
             NavView.MenuItems.Add(
                 new Microsoft.UI.Xaml.Controls.NavigationViewItem
                 {
+                    Content = "Surprise Me",
+                    Tag = "surprise_me",
+                    Icon = new SymbolIcon(Symbol.Shuffle),
+                }
+            );
+            NavView.MenuItems.Add(
+                new Microsoft.UI.Xaml.Controls.NavigationViewItem
+                {
                     Content = "Favourites",
                     Tag = "favourites",
                     Icon = new SymbolIcon(Symbol.Favorite),
@@ -292,6 +302,23 @@ namespace _1809_UWP.Pages
                             {
                                 WikiId = wikiId,
                                 PageTitle = pageTitle,
+                            }
+                        );
+                    }
+                }
+                else if (tag == "surprise_me")
+                {
+                    var allWikis = WikiManager.GetWikis().ToList();
+                    if (allWikis.Any())
+                    {
+                        var randomWiki = allWikis[_random.Next(allWikis.Count)];
+
+                        NavigateToPage(
+                            GetArticleViewerPageType(),
+                            new ArticleNavigationParameter
+                            {
+                                WikiId = randomWiki.Id,
+                                PageTitle = "Special:Random",
                             }
                         );
                     }

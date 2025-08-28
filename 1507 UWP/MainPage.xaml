@@ -158,6 +158,12 @@
                                 <Setter Property="Padding" Value="0"/>
                             </Style>
                         </ListView.ItemContainerStyle>
+                        <ListViewItem Tag="surprise_me">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <SymbolIcon Symbol="Shuffle" Margin="12,0,12,0"/>
+                                <TextBlock Text="Surprise Me" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </ListViewItem>
                         <ListViewItem Tag="favourites">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                 <SymbolIcon Symbol="Favorite" Margin="12,0,12,0"/>
