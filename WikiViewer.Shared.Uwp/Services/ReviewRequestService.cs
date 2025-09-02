@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using Windows.Storage;
 #if UWP_1809
 using Windows.Services.Store;
@@ -58,8 +57,16 @@ namespace WikiViewer.Shared.Uwp.Services
                 _localSettings.Values[ReviewRequestShownKey] = true;
 #if UWP_1809
                 await _storeContext.RequestRateAndReviewAppAsync();
+#elif UWP_1507
+                string storeId = "9nxgg8m4xf48";
+
+                var reviewUri = new Uri($"ms-windows-store://review/?ProductId={storeId}");
+
+                await Windows.System.Launcher.LaunchUriAsync(reviewUri);
 #endif
+
             }
         }
     }
 }
+                
