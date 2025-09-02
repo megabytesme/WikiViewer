@@ -28,7 +28,7 @@ namespace WikiViewer.Shared.Uwp.Services
                 int launchCount = _localSettings.Values[LaunchCountKey] as int? ?? 0;
                 int pageLoadCount = _localSettings.Values[PageLoadCountKey] as int? ?? 0;
 
-                return !alreadyShown && launchCount >= 2 && pageLoadCount >= 3;
+                return !alreadyShown && launchCount >= 2 && pageLoadCount >= 5;
             }
         }
 
