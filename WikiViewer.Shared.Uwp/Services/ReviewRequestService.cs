@@ -20,6 +20,30 @@ namespace WikiViewer.Shared.Uwp.Services
         private const string PageLoadCountKey = "PageLoadCount";
         private const string ReviewRequestShownKey = "ReviewRequestShown";
 
+        public static bool CanRequestReview
+        {
+            get
+            {
+                bool alreadyShown = _localSettings.Values[ReviewRequestShownKey] as bool? ?? false;
+                int launchCount = _localSettings.Values[LaunchCountKey] as int? ?? 0;
+                int pageLoadCount = _localSettings.Values[PageLoadCountKey] as int? ?? 0;
+
+                return !alreadyShown && launchCount >= 2 && pageLoadCount >= 3;
+            }
+        }
+
+        public static bool HasRequestedReview
+        {
+            get
+            {
+                return _localSettings.Values[ReviewRequestShownKey] as bool? ?? false;
+            }
+            set
+            {
+                _localSettings.Values[ReviewRequestShownKey] = value;
+            }
+        }
+
         public static void Initialize()
         {
 #if UWP_1809
@@ -48,25 +72,17 @@ namespace WikiViewer.Shared.Uwp.Services
             if (_storeContext == null)
                 return;
 #endif
-            bool alreadyShown = _localSettings.Values[ReviewRequestShownKey] as bool? ?? false;
-            int launchCount = _localSettings.Values[LaunchCountKey] as int? ?? 0;
-            int pageLoadCount = _localSettings.Values[PageLoadCountKey] as int? ?? 0;
-
-            if (!alreadyShown && launchCount >= 2 && pageLoadCount >= 3)
+            if (CanRequestReview)
             {
                 _localSettings.Values[ReviewRequestShownKey] = true;
 #if UWP_1809
                 await _storeContext.RequestRateAndReviewAppAsync();
 #elif UWP_1507
                 string storeId = "9nxgg8m4xf48";
-
                 var reviewUri = new Uri($"ms-windows-store://review/?ProductId={storeId}");
-
                 await Windows.System.Launcher.LaunchUriAsync(reviewUri);
 #endif
-
             }
         }
     }
 }
-                

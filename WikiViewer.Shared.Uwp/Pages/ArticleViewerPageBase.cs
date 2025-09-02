@@ -328,7 +328,25 @@ namespace WikiViewer.Shared.Uwp.Pages
             }
 
             ReviewRequestService.IncrementPageLoadCount();
-            ReviewRequestService.TryRequestReview();
+            if (ReviewRequestService.CanRequestReview)
+            {
+                Debug.WriteLine("Conditions met to request review.");
+                ContentDialog reviewDialog = new ContentDialog
+                {
+                    Title = "Enjoying WikiViewer?",
+                    Content =
+                        "If you like using WikiViewer, would you mind taking a moment to rate it? It really helps! I won't ask this again.",
+                    PrimaryButtonText = "Rate Now",
+                    SecondaryButtonText = "No, Thanks",
+                };
+                var result = await reviewDialog.ShowAsync();
+                if (result == ContentDialogResult.Primary)
+                {
+                    ReviewRequestService.TryRequestReview();
+                }
+                ReviewRequestService.HasRequestedReview = true;
+            }
+
             var fetchStopwatch = Stopwatch.StartNew();
             ShowLoadingOverlay();
             LastUpdatedTextBlock.Visibility = Visibility.Collapsed;
