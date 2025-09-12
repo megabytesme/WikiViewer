@@ -590,7 +590,7 @@ namespace WikiViewer.Shared.Uwp.Pages
             );
             if (_pageWikiContext == null || string.IsNullOrEmpty(_pageTitleToFetch))
             {
-                Debug.WriteLine("[EditCheck] Missing wiki context or page title   aborting.");
+                Debug.WriteLine("[EditCheck] Missing wiki context or page title - aborting.");
                 return;
             }
 
@@ -605,19 +605,24 @@ namespace WikiViewer.Shared.Uwp.Pages
                     var json = await worker.GetJsonFromApiAsync(apiUrl);
                     Debug.WriteLine($"[EditCheck] JSON length: {json?.Length ?? 0}");
 
-                    dynamic result = JsonConvert.DeserializeObject(json);
-                    var rightsToken = result?.query?.userinfo?.rights;
-                    var rights =
-                        rightsToken != null
-                            ? ((JArray)rightsToken).Select(r => (string)r).ToList()
-                            : new List<string>();
+                    if (string.IsNullOrEmpty(json))
+                    {
+                        throw new InvalidOperationException(
+                            "Received an empty or null response from the API."
+                        );
+                    }
+
+                    var result = JObject.Parse(json);
+                    var rightsToken = result?["query"]?["userinfo"]?["rights"] as JArray;
+                    var rights = rightsToken?.Select(r => (string)r).ToList() ?? new List<string>();
+
                     Debug.WriteLine(
                         $"[EditCheck] Rights: {(rights.Any() ? string.Join(", ", rights) : "(none)")}"
                     );
                     bool canEdit = rights.Contains("edit");
                     Debug.WriteLine($"[EditCheck] Has 'edit' right: {canEdit}");
 
-                    var pagesObj = result?.query?.pages as JObject;
+                    var pagesObj = result?["query"]?["pages"] as JObject;
                     var page = pagesObj?.Properties().FirstOrDefault()?.Value as JObject;
 
                     if (
@@ -627,24 +632,23 @@ namespace WikiViewer.Shared.Uwp.Pages
                     )
                     {
                         Debug.WriteLine($"[EditCheck] Raw protection JSON: {protection}");
-                        Debug.WriteLine($"[EditCheck] Protection entries: {protection.Count}");
                         var editProt = protection.FirstOrDefault(p => (string)p["type"] == "edit");
                         if (editProt != null)
                         {
                             var level = (string)editProt["level"];
                             Debug.WriteLine($"[EditCheck] Edit restriction level: {level}");
-                            var groupsToken = result?.query?.userinfo?.groups;
+
+                            var groupsToken = result?["query"]?["userinfo"]?["groups"] as JArray;
                             var groups =
-                                groupsToken != null
-                                    ? ((JArray)groupsToken).Select(g => (string)g).ToList()
-                                    : new List<string>();
+                                groupsToken?.Select(g => (string)g).ToList() ?? new List<string>();
+
                             Debug.WriteLine(
                                 $"[EditCheck] Groups: {(groups.Any() ? string.Join(", ", groups) : "(none)")}"
                             );
                             if (!groups.Contains(level))
                             {
                                 Debug.WriteLine(
-                                    "[EditCheck] User does not meet restriction level   disabling edit."
+                                    "[EditCheck] User does not meet restriction level - disabling edit."
                                 );
                                 canEdit = false;
                             }
