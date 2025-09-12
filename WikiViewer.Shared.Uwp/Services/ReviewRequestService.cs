@@ -66,22 +66,27 @@ namespace WikiViewer.Shared.Uwp.Services
             _localSettings.Values[PageLoadCountKey] = pageLoads + 1;
         }
 
-        public static async void TryRequestReview()
+        public static async void RequestReview()
         {
 #if UWP_1809
             if (_storeContext == null)
                 return;
 #endif
-            if (CanRequestReview)
-            {
-                _localSettings.Values[ReviewRequestShownKey] = true;
+            _localSettings.Values[ReviewRequestShownKey] = true;
 #if UWP_1809
                 await _storeContext.RequestRateAndReviewAppAsync();
 #elif UWP_1507
-                string storeId = "9nxgg8m4xf48";
-                var reviewUri = new Uri($"ms-windows-store://review/?ProductId={storeId}");
-                await Windows.System.Launcher.LaunchUriAsync(reviewUri);
+            string storeId = "9nxgg8m4xf48";
+            var reviewUri = new Uri($"ms-windows-store://review/?ProductId={storeId}");
+            await Windows.System.Launcher.LaunchUriAsync(reviewUri);
 #endif
+        }
+
+        public static void TryRequestReview()
+        {
+            if (CanRequestReview)
+            {
+                RequestReview();
             }
         }
     }

@@ -8,6 +8,7 @@ using WikiViewer.Core.Enums;
 using WikiViewer.Core.Managers;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
+using WikiViewer.Shared.Uwp.Services;
 using Windows.Storage;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
@@ -270,15 +271,21 @@ namespace WikiViewer.Shared.Uwp.Pages
             button.IsEnabled = true;
         }
 
-        protected async void AboutButton_Click(object sender, RoutedEventArgs e) =>
-            await new ContentDialog
+        protected async void AboutButton_Click(object sender, RoutedEventArgs e)
+        {
+            var reviewButton = new Button
             {
-                Title = "About WikiViewer",
-                Content = new ScrollViewer()
+                Content = "Rate and Review This App",
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Margin = new Thickness(0, 8, 0, 0)
+            };
+            reviewButton.Click += ReviewButton_Click;
+
+            var scrollContent = new ScrollViewer()
+            {
+                Content = new TextBlock()
                 {
-                    Content = new TextBlock()
-                    {
-                        Inlines =
+                    Inlines =
                         {
                             new Run() { Text = "WikiViewer" },
                             new LineBreak(),
@@ -344,11 +351,28 @@ namespace WikiViewer.Shared.Uwp.Pages
                                     "WikiViewer is a client for browsing MediaWiki-based wikis without your web browser, online and offline (after caching).",
                             },
                         },
-                        TextWrapping = TextWrapping.Wrap,
-                    },
+                    TextWrapping = TextWrapping.Wrap,
                 },
-                PrimaryButtonText = "OK",
-            }.ShowAsync();
+            };
+
+            var dialogContent = new StackPanel();
+            dialogContent.Children.Add(scrollContent);
+            dialogContent.Children.Add(reviewButton);
+
+            var dialog = new ContentDialog
+            {
+                Title = "About WikiViewer",
+                Content = dialogContent,
+                PrimaryButtonText = "OK"
+            };
+
+            var result = await dialog.ShowAsync();
+        }
+
+        private void ReviewButton_Click(object sender, RoutedEventArgs e)
+        {
+            ReviewRequestService.RequestReview();
+        }
 
         protected async void DisclaimerButton_Click(object sender, RoutedEventArgs e)
         {
