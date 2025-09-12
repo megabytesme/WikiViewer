@@ -28,6 +28,7 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected abstract Button ClearCacheButtonControl { get; }
         protected abstract ListView WikiListViewControl { get; }
         protected abstract TextBlock ConcurrencyDescriptionTextControl { get; }
+        protected abstract ToggleSwitch EnableCustomThemingToggleControl { get; }
         protected abstract ToggleSwitch ShowCssRefreshButtonToggleControl { get; }
 
         public SettingsPageBase()
@@ -82,6 +83,9 @@ namespace WikiViewer.Shared.Uwp.Pages
             WikiListViewControl.ItemsSource = Wikis;
             WikiManager.WikisChanged += OnWikisChanged;
 
+            EnableCustomThemingToggleControl.IsOn = AppSettings.IsCustomThemingEnabled;
+            EnableCustomThemingToggleControl.Toggled += EnableCustomThemingToggle_Toggled;
+
             ShowCssRefreshButtonToggleControl.IsOn = AppSettings.ShowCssRefreshButton;
             ShowCssRefreshButtonToggleControl.Toggled += ShowCssRefreshButtonToggle_Toggled;
         }
@@ -90,6 +94,12 @@ namespace WikiViewer.Shared.Uwp.Pages
         {
             WikiManager.WikisChanged -= OnWikisChanged;
             ShowCssRefreshButtonToggleControl.Toggled -= ShowCssRefreshButtonToggle_Toggled;
+        }
+
+        protected void EnableCustomThemingToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            var toggle = sender as ToggleSwitch;
+            AppSettings.IsCustomThemingEnabled = toggle.IsOn;
         }
 
         protected void ShowCssRefreshButtonToggle_Toggled(object sender, RoutedEventArgs e)

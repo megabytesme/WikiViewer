@@ -16,7 +16,7 @@
                 <Border BorderThickness="1" BorderBrush="{ThemeResource SystemControlForegroundBaseLowBrush}" Padding="16" Margin="0,16,0,16">
                     <StackPanel>
                         <TextBlock Text="Manage Wikis" Style="{ThemeResource SubtitleTextBlockStyle}" Margin="0,0,0,8"/>
-                        <TextBlock Text="Add, remove, or edit the MediaWiki sites this app connects to." TextWrapping="Wrap" Opacity="0.7" Margin="0,0,0,12"/>
+                        <TextBlock Text="Add, remove, or edit the MediaWiki sites this app connects to." TextWrapping="WrapWholeWords" Opacity="0.7" Margin="0,0,0,12"/>
                         <ScrollViewer  MaxHeight="300" >
                             <ListView x:Name="WikiListView" IsItemClickEnabled="True" ItemClick="WikiListView_ItemClick" SelectionMode="None">
                                 <ListView.ItemTemplate>
@@ -74,20 +74,48 @@
                     </StackPanel>
                 </Border>
 
-                <Border BorderThickness="1" BorderBrush="{ThemeResource SystemControlForegroundBaseLowBrush}" Padding="16" Margin="0,0,0,16">
+                <Border BorderThickness="1"
+                        BorderBrush="{ThemeResource SystemControlForegroundBaseLowBrush}"
+                        Padding="16"
+                        Margin="0,0,0,16">
                     <StackPanel Margin="12">
                         <TextBlock Text="Appearance" Style="{ThemeResource SubtitleTextBlockStyle}"/>
-                        <TextBlock Text="Customize the look and feel of articles. After editing, use the refresh button on an article page to see your changes." TextWrapping="Wrap" Opacity="0.7"/>
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="12" >
+                        <TextBlock Text="Customize the look and feel of articles. After editing, use the refresh button on an article page to see your changes."
+                                   TextWrapping="Wrap"
+                                   Opacity="0.7"/>
+                        <StackPanel Orientation="Horizontal"
+                                    HorizontalAlignment="Left"
+                                    Margin="12">
                             <Button Content="Edit Custom Theme (CSS)" Click="EditThemeButton_Click" Margin="0,0,10,0"/>
                             <Button Content="Reset to Default Theme" Click="ResetThemeButton_Click"/>
                         </StackPanel>
+
                         <Grid Margin="0,12,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Enable Custom Theming"
+                                       VerticalAlignment="Center"
+                                       Style="{ThemeResource BodyTextBlockStyle}"/>
+                            <ToggleSwitch x:Name="EnableCustomThemingToggle"
+                                          Grid.Column="1"
+                                          Toggled="EnableCustomThemingToggle_Toggled"
+                                          VerticalAlignment="Center"
+                                          HorizontalAlignment="Right"/>
+                        </Grid>
+                        <StackPanel Orientation="Vertical">
+                            <TextBlock Text="Enables the custom (fluent) CSS styling within articles. Turn this off if you want the standard Wiki layout."
+                                       TextWrapping="WrapWholeWords"
+                                       Opacity="0.7"/>
+                        </StackPanel>
 
+                        <Grid Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0"
                                        Text="Show CSS Refresh button"
                                        VerticalAlignment="Center"
@@ -98,6 +126,11 @@
                                           VerticalAlignment="Center"
                                           HorizontalAlignment="Right"/>
                         </Grid>
+                        <StackPanel Orientation="Vertical">
+                            <TextBlock Text="Enables the refresh button on the article page to refresh the CSS styling within articles. Turn this on if you want to make live changes to the standard Wiki styling."
+                                       TextWrapping="Wrap"
+                                       Opacity="0.7"/>
+                        </StackPanel>
                     </StackPanel>
                 </Border>
 

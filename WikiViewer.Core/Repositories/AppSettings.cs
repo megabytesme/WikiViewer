@@ -24,6 +24,7 @@ namespace WikiViewer.Core
         private const string MaxConcurrentDownloadsKey = "MaxConcurrentDownloadsLevel";
         private const string ProxyDisclaimerKey = "HasAcceptedProxyDisclaimer";
         private const string EditorThemeKey = "EditorTheme";
+        private const string IsCustomThemingEnabledKey = "IsCustomThemingEnabled";
         private const string ShowCssRefreshButtonKey = "ShowCssRefreshButton";
         private const string DefaultConnectionMethodKey = "DefaultConnectionMethodForNewWikis";
 
@@ -71,6 +72,12 @@ namespace WikiViewer.Core
                     : ElementTheme.Default;
             }
             set => SettingsProvider.SetValue(EditorThemeKey, value.ToString());
+        }
+
+        public static bool IsCustomThemingEnabled
+        {
+            get => SettingsProvider.GetValue(IsCustomThemingEnabledKey, true);
+            set => SettingsProvider.SetValue(IsCustomThemingEnabledKey, value);
         }
 
         public static bool ShowCssRefreshButton

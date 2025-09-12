@@ -2342,6 +2342,19 @@ namespace WikiViewer.Core.Services
 
         public static async Task<string> GetThemeCssAsync()
         {
+            if (!AppSettings.IsCustomThemingEnabled)
+            {
+#if UWP_1809
+                return @"
+                html, body {
+                padding-top: 25px !important;
+                padding-bottom: 25px !important;
+                box-sizing: border-box !important;
+                }";
+#endif
+                return "";
+            }
+
             var file = await GetThemeFileAsync();
             string content = await FileIO.ReadTextAsync(file);
 
