@@ -1,12 +1,19 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
+#if WINDOWS_UWP
+using Windows.Security.Cryptography;
+using Windows.Security.Cryptography.Core;
+using Windows.Storage.Streams;
+#else
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
+#endif
 
 namespace WikiViewer.Core.Managers
 {
@@ -45,10 +52,22 @@ namespace WikiViewer.Core.Managers
         private static string GetHashedFileName(string pageTitle, Guid wikiId)
         {
             string uniqueCacheKey = $"{wikiId.ToString()}_{pageTitle.ToLowerInvariant()}";
-            var hash = System
-                .Security.Cryptography.SHA1.Create()
-                .ComputeHash(Encoding.UTF8.GetBytes(uniqueCacheKey));
-            return hash.Aggregate("", (s, b) => s + b.ToString("x2"));
+
+#if WINDOWS_UWP
+            var algProvider = HashAlgorithmProvider.OpenAlgorithm(HashAlgorithmNames.Sha1);
+            IBuffer buffer = CryptographicBuffer.ConvertStringToBinary(
+                uniqueCacheKey,
+                BinaryStringEncoding.Utf8
+            );
+            var hashedBuffer = algProvider.HashData(buffer);
+            return CryptographicBuffer.EncodeToHexString(hashedBuffer);
+#else
+            using (var sha1 = SHA1.Create())
+            {
+                var hash = sha1.ComputeHash(Encoding.UTF8.GetBytes(uniqueCacheKey));
+                return hash.Aggregate("", (s, b) => s + b.ToString("x2"));
+            }
+#endif
         }
 
         public static async Task<bool> IsArticleCachedAsync(string pageTitle, Guid wikiId)

@@ -2,12 +2,20 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
+#if WINDOWS_UWP
+using Windows.Security.Cryptography;
+using Windows.Security.Cryptography.Core;
+using Windows.Storage.Streams;
+#else
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
+#endif
 
 namespace WikiViewer.Core.Services
 {
@@ -152,6 +160,25 @@ namespace WikiViewer.Core.Services
             return finalPath;
         }
 
+        private static string GetHashedString(string input)
+        {
+#if WINDOWS_UWP
+            var algProvider = HashAlgorithmProvider.OpenAlgorithm(HashAlgorithmNames.Sha1);
+            IBuffer buffer = CryptographicBuffer.ConvertStringToBinary(
+                input,
+                BinaryStringEncoding.Utf8
+            );
+            var hashedBuffer = algProvider.HashData(buffer);
+            return CryptographicBuffer.EncodeToHexString(hashedBuffer);
+#else
+            using (var sha1 = SHA1.Create())
+            {
+                var hash = sha1.ComputeHash(Encoding.UTF8.GetBytes(input));
+                return hash.Aggregate("", (s, b) => s + b.ToString("x2"));
+            }
+#endif
+        }
+
         private static async Task<string> DownloadAndCacheAsync(string remoteUrl, WikiInstance wiki)
         {
             await _downloadSemaphore.WaitAsync();
@@ -164,9 +191,7 @@ namespace WikiViewer.Core.Services
 
                     if (imageBytes?.Length > 0)
                     {
-                        var hash = System
-                            .Security.Cryptography.SHA1.Create()
-                            .ComputeHash(System.Text.Encoding.UTF8.GetBytes(remoteUrl));
+                        string hashedUrl = GetHashedString(remoteUrl);
 
                         string fileExtension = System.IO.Path.GetExtension(
                             new Uri(remoteUrl).AbsolutePath
@@ -174,9 +199,7 @@ namespace WikiViewer.Core.Services
                         if (string.IsNullOrEmpty(fileExtension))
                             fileExtension = ".jpg";
 
-                        var fileName =
-                            string.Concat(hash.Select(b => b.ToString("x2"))) + fileExtension;
-
+                        var fileName = hashedUrl + fileExtension;
                         var relativePath = $"/cache/{fileName}";
 
                         await StorageProvider.WriteBytesAsync($"cache\\{fileName}", imageBytes);
