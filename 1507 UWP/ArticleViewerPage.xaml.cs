@@ -79,6 +79,10 @@ namespace _1507_UWP.Pages
             ArticleDisplayWebView.NavigationStarting += ArticleDisplayWebView_NavigationStarting;
             ArticleDisplayWebView.NavigationCompleted += ArticleDisplayWebView_NavigationCompleted;
             _uiSettings.ColorValuesChanged += ThemeChanged;
+            if (!AppSettings.IsCustomThemingEnabled)
+            {
+                ArticleDisplayWebView.DefaultBackgroundColor = Windows.UI.Colors.White;
+            }
         }
 
         protected override void UninitializePlatformControls()

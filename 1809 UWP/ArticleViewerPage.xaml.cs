@@ -163,7 +163,15 @@ namespace _1809_UWP.Pages
 
         protected override void InitializePlatformControls()
         {
-            Environment.SetEnvironmentVariable("WEBVIEW2_DEFAULT_BACKGROUND_COLOR", "00FFFFFF");
+            if (AppSettings.IsCustomThemingEnabled)
+            {
+                Environment.SetEnvironmentVariable("WEBVIEW2_DEFAULT_BACKGROUND_COLOR", "00FFFFFF");
+            }
+            else
+            {
+                Environment.SetEnvironmentVariable("WEBVIEW2_DEFAULT_BACKGROUND_COLOR", "FFFFFFFF");
+            }
+
             _ = InitializeWebView2Async();
         }
 

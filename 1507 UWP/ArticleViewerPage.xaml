@@ -90,8 +90,7 @@
             </StackPanel>
             <WebView x:Name="VerificationWebView"
                      Grid.Row="1"
-                     ScrollViewer.VerticalScrollBarVisibility="Visible"
-                     DefaultBackgroundColor="Transparent"/>
+                     ScrollViewer.VerticalScrollBarVisibility="Visible"/>
         </Grid>
     </Grid>
 </local:ArticleViewerPageBase>
