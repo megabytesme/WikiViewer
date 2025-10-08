@@ -1,3 +1,6 @@
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.Web.WebView2.Core;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -5,10 +8,8 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Runtime.InteropServices.WindowsRuntime;
+using System.Text;
 using System.Threading.Tasks;
-using Microsoft.UI.Xaml.Controls;
-using Microsoft.Web.WebView2.Core;
-using Newtonsoft.Json;
 using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
 using WikiViewer.Shared.Uwp.Services;
@@ -459,60 +460,86 @@ namespace _1809_UWP.Services
         )
         {
             await EnsureInitializedAsync();
+
             return await DispatcherTaskExtensions.RunTaskAsync(
                 CoreApplication.MainView.CoreWindow.Dispatcher,
                 async () =>
                 {
                     if (WebView?.CoreWebView2 == null)
-                        throw new InvalidOperationException(
-                            "CoreWebView2 could not be initialized for POST."
-                        );
+                        throw new InvalidOperationException("CoreWebView2 could not be initialized for POST.");
 
-                    var content = new FormUrlEncodedContent(postData);
-                    string postBody = await content.ReadAsStringAsync();
+                    var encodedItems = postData.Select(kvp =>
+                        System.Net.WebUtility.UrlEncode(kvp.Key) + "=" + System.Net.WebUtility.UrlEncode(kvp.Value)
+                    );
+                    var postBody = string.Join("&", encodedItems);
                     var postBytes = System.Text.Encoding.UTF8.GetBytes(postBody);
+
+                    var tcs = new TaskCompletionSource<string>();
+
+                    WebView.CoreWebView2.WebResourceResponseReceived += async (s, e) =>
+                    {
+                        try
+                        {
+                            if (e.Request.Uri.StartsWith(url, StringComparison.OrdinalIgnoreCase))
+                            {
+                                var contentStream = await e.Response.GetContentAsync();
+                                uint size = (uint)contentStream.Size;
+
+                                if (size == 0)
+                                {
+                                    System.Diagnostics.Debug.WriteLine("[WebView2ApiWorker] Response stream size is 0.");
+                                    return;
+                                }
+
+                                using (var reader = new Windows.Storage.Streams.DataReader(contentStream))
+                                {
+                                    await reader.LoadAsync(size);
+                                    byte[] bytes = new byte[size];
+                                    reader.ReadBytes(bytes);
+                                    string raw = Encoding.UTF8.GetString(bytes);
+
+                                    System.Diagnostics.Debug.WriteLine($"[WebView2ApiWorker] Received {bytes.Length} bytes from {e.Request.Uri}");
+
+                                    if (!string.IsNullOrWhiteSpace(raw) &&
+                                        (raw.Trim().StartsWith("{") || raw.Trim().StartsWith("[")))
+                                    {
+                                        tcs.TrySetResult(raw.Trim());
+                                    }
+                                    else
+                                    {
+                                        System.Diagnostics.Debug.WriteLine("[WebView2ApiWorker] Response did not look like JSON.");
+                                    }
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[WebView2ApiWorker] Exception reading response: {ex}");
+                            tcs.TrySetException(ex);
+                        }
+                    };
+
                     using (var stream = new InMemoryRandomAccessStream())
                     {
                         await stream.WriteAsync(postBytes.AsBuffer());
                         stream.Seek(0);
+
                         var request = WebView.CoreWebView2.Environment.CreateWebResourceRequest(
                             url,
                             "POST",
                             stream,
                             "Content-Type: application/x-www-form-urlencoded"
                         );
+
+                        System.Diagnostics.Debug.WriteLine($"[WebView2ApiWorker] Sending POST to {url} with body length {postBytes.Length}");
                         WebView.CoreWebView2.NavigateWithWebResourceRequest(request);
                     }
 
-                    var stopwatch = Stopwatch.StartNew();
-                    while (stopwatch.Elapsed.TotalSeconds < 15)
-                    {
-                        await Task.Delay(250);
-                        string scriptResult = await WebView.CoreWebView2.ExecuteScriptAsync(
-                            "document.documentElement.outerHTML"
-                        );
-                        if (string.IsNullOrEmpty(scriptResult))
-                            continue;
+                    var completedTask = await Task.WhenAny(tcs.Task, Task.Delay(15000));
+                    if (completedTask != tcs.Task)
+                        throw new TimeoutException($"Timed out waiting for POST response from {url}");
 
-                        string fullHtml = JsonConvert.DeserializeObject<string>(scriptResult);
-                        if (string.IsNullOrEmpty(fullHtml))
-                            continue;
-
-                        var doc = new HtmlAgilityPack.HtmlDocument();
-                        doc.LoadHtml(fullHtml);
-                        string json = doc.DocumentNode.SelectSingleNode("//body/pre")?.InnerText;
-
-                        if (!string.IsNullOrWhiteSpace(json))
-                        {
-                            string decodedJson = System.Net.WebUtility.HtmlDecode(json);
-                            if (
-                                decodedJson.Trim().StartsWith("{")
-                                || decodedJson.Trim().StartsWith("[")
-                            )
-                                return decodedJson.Trim();
-                        }
-                    }
-                    throw new TimeoutException($"Content validation timed out for POST URL: {url}");
+                    return await tcs.Task;
                 }
             );
         }

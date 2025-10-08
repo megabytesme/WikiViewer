@@ -1,12 +1,13 @@
+using HtmlAgilityPack;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
-using HtmlAgilityPack;
-using Newtonsoft.Json;
 using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
 
@@ -177,7 +178,13 @@ namespace WikiViewer.Core.Services
         )
         {
             CheckInitialized();
-            var payload = new { url, postData };
+
+            var encodedItems = postData.Select(kvp =>
+                System.Net.WebUtility.UrlEncode(kvp.Key) + "=" + System.Net.WebUtility.UrlEncode(kvp.Value)
+            );
+            var encodedContent = string.Join("&", encodedItems);
+
+            var payload = new { url, body = encodedContent, contentType = "application/x-www-form-urlencoded" };
             var bytes = await MakeGatekeeperRequest(payload);
             string responseText = Encoding.UTF8.GetString(bytes);
             return ExtractJsonFromHtml(responseText);

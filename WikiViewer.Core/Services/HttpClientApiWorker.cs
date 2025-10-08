@@ -4,6 +4,8 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
+using System.Linq;
+
 #if UWP_1507 || UWP_1809
 using Windows.Web.Http;
 using System.Runtime.InteropServices.WindowsRuntime;
@@ -157,15 +159,22 @@ namespace WikiViewer.Core.Services
         )
         {
             CheckInitialized();
+
+            var encodedItems = postData.Select(kvp =>
+                System.Net.WebUtility.UrlEncode(kvp.Key) + "=" + System.Net.WebUtility.UrlEncode(kvp.Value)
+            );
+            var encodedContent = string.Join("&", encodedItems);
+
 #if UWP_1507 || UWP_1809
-            using (var content = new HttpFormUrlEncodedContent(postData))
+            using (var content = new Windows.Web.Http.HttpStringContent(encodedContent))
             {
+                content.Headers.ContentType = new Windows.Web.Http.Headers.HttpMediaTypeHeaderValue("application/x-www-form-urlencoded");
                 var response = await _client.PostAsync(new Uri(url), content);
                 response.EnsureSuccessStatusCode();
                 return await response.Content.ReadAsStringAsync();
             }
 #else
-            using (var content = new System.Net.Http.FormUrlEncodedContent(postData))
+            using (var content = new System.Net.Http.StringContent(encodedContent, System.Text.Encoding.UTF8, "application/x-www-form-urlencoded"))
             {
                 var response = await _client.PostAsync(url, content);
                 response.EnsureSuccessStatusCode();

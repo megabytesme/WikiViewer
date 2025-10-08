@@ -160,15 +160,22 @@ namespace _1507_UWP.Services
                 CoreApplication.MainView.CoreWindow.Dispatcher,
                 async () =>
                 {
-                    var formContent = new HttpFormUrlEncodedContent(postData);
-                    var httpRequest = new HttpRequestMessage(HttpMethod.Post, new Uri(url))
+                    var encodedItems = postData.Select(kvp =>
+                        System.Net.WebUtility.UrlEncode(kvp.Key) + "=" + System.Net.WebUtility.UrlEncode(kvp.Value)
+                    );
+                    var encodedContent = string.Join("&", encodedItems);
+
+                    var httpRequest = new Windows.Web.Http.HttpRequestMessage(
+                        Windows.Web.Http.HttpMethod.Post,
+                        new Uri(url)
+                    )
                     {
-                        Content = formContent,
+                        Content = new Windows.Web.Http.HttpStringContent(encodedContent)
                     };
+                    httpRequest.Content.Headers.ContentType = new Windows.Web.Http.Headers.HttpMediaTypeHeaderValue("application/x-www-form-urlencoded");
 
                     var navTcs = new TaskCompletionSource<bool>();
-                    TypedEventHandler<WebView, WebViewNavigationCompletedEventArgs> navHandler =
-                        null;
+                    TypedEventHandler<WebView, WebViewNavigationCompletedEventArgs> navHandler = null;
                     navHandler = (s, e) =>
                     {
                         this.WebView.NavigationCompleted -= navHandler;
@@ -188,10 +195,7 @@ namespace _1507_UWP.Services
                         throw new Exception("POST operation resulted in a blank page.");
 
                     if (CloudflareDetector.IsCloudflareChallenge(fullHtml))
-                        throw new NeedsUserVerificationException(
-                            "Cloudflare challenge detected.",
-                            url
-                        );
+                        throw new NeedsUserVerificationException("Cloudflare challenge detected.", url);
 
                     var doc = new HtmlAgilityPack.HtmlDocument();
                     doc.LoadHtml(fullHtml);
@@ -202,16 +206,10 @@ namespace _1507_UWP.Services
                     if (!string.IsNullOrWhiteSpace(json))
                     {
                         string decodedJson = System.Net.WebUtility.HtmlDecode(json);
-                        if (
-                            decodedJson.Trim().StartsWith("{") || decodedJson.Trim().StartsWith("[")
-                        )
-                        {
+                        if (decodedJson.Trim().StartsWith("{") || decodedJson.Trim().StartsWith("["))
                             return decodedJson.Trim();
-                        }
                     }
-                    throw new Exception(
-                        "Could not extract valid JSON from the POST response page."
-                    );
+                    throw new Exception("Could not extract valid JSON from the POST response page.");
                 }
             );
         }
