@@ -27,6 +27,7 @@ namespace WikiViewer.Shared.Uwp.Pages
         private bool isDragging = false;
         private double initialX;
         private GridLength leftColInitialWidth;
+        private string _lastGeneratedPreviewHtml = null;
         private bool _isPreviewModeActiveInNarrow = false;
         private const double NarrowStateWidthTrigger = 800;
         private class WikitextPair
@@ -596,6 +597,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                 _isUpdatingText = false;
                 return;
             }
+            _lastGeneratedPreviewHtml = null;
             _highlightDebounceTimer.Start();
         }
 
@@ -956,7 +958,7 @@ namespace WikiViewer.Shared.Uwp.Pages
             {
                 if (_isPreviewModeActiveInNarrow)
                 {
-                    HidePreview(string.Empty);
+                    ResetPreviewPaneVisually();
                     WikitextEditorTextBox.Visibility = Visibility.Visible;
                     button.Label = "Preview";
                     button.Icon = new SymbolIcon(Symbol.View);
@@ -969,6 +971,13 @@ namespace WikiViewer.Shared.Uwp.Pages
                     button.Label = "Edit";
                     button.Icon = new SymbolIcon(Symbol.Edit);
                 }
+            }
+
+            if (!string.IsNullOrEmpty(_lastGeneratedPreviewHtml))
+            {
+                await ShowPreview(_lastGeneratedPreviewHtml);
+                if (isNarrow) { _isPreviewModeActiveInNarrow = true; }
+                return;
             }
 
             PreviewAppBarButton.IsEnabled = false;
@@ -995,6 +1004,9 @@ namespace WikiViewer.Shared.Uwp.Pages
                     _pageWikiContext,
                     worker
                 );
+
+                _lastGeneratedPreviewHtml = fullHtml;
+
                 await ShowPreview(fullHtml);
 
                 if (isNarrow)
