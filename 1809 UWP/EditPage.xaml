@@ -193,11 +193,25 @@
                     <VisualState.StateTriggers>
                         <AdaptiveTrigger MinWindowWidth="800"/>
                     </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="SplitGrid.ColumnDefinitions[1].Width" Value="12"/>
+                        <Setter Target="SplitGrid.ColumnDefinitions[2].Width" Value="*"/>
+                        <Setter Target="WikitextEditor.(Grid.ColumnSpan)" Value="1"/>
+                        <Setter Target="PreviewContainerGrid.(Grid.Column)" Value="2"/>
+                        <Setter Target="PreviewContainerGrid.(Grid.ColumnSpan)" Value="1"/>
+                    </VisualState.Setters>
                 </VisualState>
                 <VisualState x:Name="NarrowState">
                     <VisualState.StateTriggers>
                         <AdaptiveTrigger MinWindowWidth="0"/>
                     </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="SplitGrid.ColumnDefinitions[1].Width" Value="0"/>
+                        <Setter Target="SplitGrid.ColumnDefinitions[2].Width" Value="0"/>
+                        <Setter Target="WikitextEditor.(Grid.ColumnSpan)" Value="3"/>
+                        <Setter Target="PreviewContainerGrid.(Grid.Column)" Value="0"/>
+                        <Setter Target="PreviewContainerGrid.(Grid.ColumnSpan)" Value="3"/>
+                    </VisualState.Setters>
                 </VisualState>
             </VisualStateGroup>
         </VisualStateManager.VisualStateGroups>
@@ -220,7 +234,7 @@
             </Grid.ColumnDefinitions>
             <RichEditBox x:Name="WikitextEditor" Grid.Column="0" AcceptsReturn="True" TextWrapping="Wrap" Padding="12" FontFamily="Consolas, Courier New" PlaceholderText="Loading Wikitext..." BorderThickness="0,0,1,0" SelectionFlyout="{StaticResource SharedEditorMenu}" ContextFlyout="{StaticResource SharedEditorMenu}" />
             <Rectangle Grid.Column="1" Fill="{ThemeResource CardBackgroundFillColorDefaultBrush}" PointerPressed="Splitter_PointerPressed" PointerMoved="Splitter_PointerMoved" PointerReleased="Splitter_PointerReleased" PointerEntered="Splitter_PointerEntered" PointerExited="Splitter_PointerExited"/>
-            <Grid Grid.Column="2">
+            <Grid Grid.Column="2" x:Name="PreviewContainerGrid">
                 <muxc:WebView2 x:Name="PreviewWebView" Visibility="Collapsed"/>
                 <TextBlock x:Name="PreviewPlaceholder" Text="Click 'Preview' to see a rendering of your changes." Style="{ThemeResource BodyTextBlockStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
             </Grid>
@@ -238,183 +252,183 @@
                         <AppBarButton x:Name="FormattingButton" Icon="Font" Label="Formatting">
                             <AppBarButton.Flyout>
                                 <MenuFlyout>
-                                        <MenuFlyoutItem Text="Bold" Click="InsertBold_Click" />
-                                        <MenuFlyoutItem Text="Italic" Click="InsertItalic_Click" />
-                                        <MenuFlyoutItem Text="Bold &amp; Italic" Click="InsertBoldItalic_Click" />
-                                        <MenuFlyoutSeparator />
-                                        <MenuFlyoutItem Text="Underline" Click="InsertUnderline_Click" />
-                                        <MenuFlyoutItem Text="Strikethrough (Visual)" Click="InsertStrikethrough_Click" />
-                                        <MenuFlyoutItem Text="Inserted Text (Edit)" Click="InsertInserted_Click" />
-                                        <MenuFlyoutItem Text="Deleted Text (Edit)" Click="InsertDeleted_Click" />
-                                        <MenuFlyoutSeparator />
-                                        <MenuFlyoutItem Text="Superscript" Click="InsertSuperscript_Click" />
-                                        <MenuFlyoutItem Text="Subscript" Click="InsertSubscript_Click" />
-                                        <MenuFlyoutSeparator />
-                                        <MenuFlyoutItem Text="Small Text" Click="InsertSmall_Click" />
-                                        <MenuFlyoutItem Text="Big Text (Discouraged)" Click="InsertBig_Click" />
-                                        <MenuFlyoutItem Text="Small Caps" Click="InsertSmallCaps_Click" />
-                                        <MenuFlyoutSeparator />
-                                        <MenuFlyoutItem Text="Code (Inline)" Click="InsertCodeInline_Click" />
-                                        <MenuFlyoutItem Text="Code Block (Syntax Highlight)" Click="InsertSyntaxHighlight_Click"/>
-                                        <MenuFlyoutItem Text="Preformatted Text (no wiki markup)" Click="InsertPreformatted_Click"/>
-                                        <MenuFlyoutSeparator/>
-                                        <MenuFlyoutSubItem Text="Special Formatting">
-                                            <MenuFlyoutItem Text="Colored Text" Click="InsertColoredText_Click"/>
-                                            <MenuFlyoutItem Text="Highlighted Text" Click="InsertHighlightedText_Click"/>
-                                            <MenuFlyoutItem Text="Non-breaking Space" Click="InsertNBSP_Click"/>
-                                            <MenuFlyoutItem Text="No-wrap Text" Click="InsertNoWrap_Click"/>
-                                        </MenuFlyoutSubItem>
+                                    <MenuFlyoutItem Text="Bold" Click="InsertBold_Click" />
+                                    <MenuFlyoutItem Text="Italic" Click="InsertItalic_Click" />
+                                    <MenuFlyoutItem Text="Bold &amp; Italic" Click="InsertBoldItalic_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="Underline" Click="InsertUnderline_Click" />
+                                    <MenuFlyoutItem Text="Strikethrough (Visual)" Click="InsertStrikethrough_Click" />
+                                    <MenuFlyoutItem Text="Inserted Text (Edit)" Click="InsertInserted_Click" />
+                                    <MenuFlyoutItem Text="Deleted Text (Edit)" Click="InsertDeleted_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="Superscript" Click="InsertSuperscript_Click" />
+                                    <MenuFlyoutItem Text="Subscript" Click="InsertSubscript_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="Small Text" Click="InsertSmall_Click" />
+                                    <MenuFlyoutItem Text="Big Text (Discouraged)" Click="InsertBig_Click" />
+                                    <MenuFlyoutItem Text="Small Caps" Click="InsertSmallCaps_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="Code (Inline)" Click="InsertCodeInline_Click" />
+                                    <MenuFlyoutItem Text="Code Block (Syntax Highlight)" Click="InsertSyntaxHighlight_Click"/>
+                                    <MenuFlyoutItem Text="Preformatted Text (no wiki markup)" Click="InsertPreformatted_Click"/>
+                                    <MenuFlyoutSeparator/>
+                                    <MenuFlyoutSubItem Text="Special Formatting">
+                                        <MenuFlyoutItem Text="Colored Text" Click="InsertColoredText_Click"/>
+                                        <MenuFlyoutItem Text="Highlighted Text" Click="InsertHighlightedText_Click"/>
+                                        <MenuFlyoutItem Text="Non-breaking Space" Click="InsertNBSP_Click"/>
+                                        <MenuFlyoutItem Text="No-wrap Text" Click="InsertNoWrap_Click"/>
+                                    </MenuFlyoutSubItem>
                                 </MenuFlyout>
                             </AppBarButton.Flyout>
                         </AppBarButton>
                         <AppBarButton x:Name="StructureButton" Icon="AlignLeft" Label="Structure">
                             <AppBarButton.Flyout>
                                 <MenuFlyout>
-                                        <MenuFlyoutSubItem Text="Headings">
-                                            <MenuFlyoutItem Text="Level 2" Click="InsertHeading2_Click" />
-                                            <MenuFlyoutItem Text="Level 3" Click="InsertHeading3_Click" />
-                                            <MenuFlyoutItem Text="Level 4" Click="InsertHeading4_Click" />
-                                            <MenuFlyoutItem Text="Level 5" Click="InsertHeading5_Click" />
-                                            <MenuFlyoutItem Text="Level 6" Click="InsertHeading6_Click" />
-                                        </MenuFlyoutSubItem>
-                                        <MenuFlyoutSubItem Text="Lists">
-                                            <MenuFlyoutItem Text="Bulleted Item" Click="InsertBulletedListItem_Click" />
-                                            <MenuFlyoutItem Text="Numbered Item" Click="InsertNumberedListItem_Click" />
-                                            <MenuFlyoutItem Text="Indented Item (Talk Page)" Click="InsertIndentedListItem_Click" />
-                                            <MenuFlyoutSeparator />
-                                            <MenuFlyoutItem Text="Definition Term" Click="InsertDefinitionTerm_Click" />
-                                            <MenuFlyoutItem Text="Definition Data" Click="InsertDefinitionData_Click" />
-                                        </MenuFlyoutSubItem>
-                                        <MenuFlyoutSubItem Text="Table">
-                                            <MenuFlyoutItem Text="Basic Table (2x2)" Click="InsertTableBasic_Click" />
-                                            <MenuFlyoutItem Text="Table with Header" Click="InsertTableWithHeader_Click" />
-                                            <MenuFlyoutItem Text="Sortable Table" Click="InsertTableSortable_Click" />
-                                        </MenuFlyoutSubItem>
+                                    <MenuFlyoutSubItem Text="Headings">
+                                        <MenuFlyoutItem Text="Level 2" Click="InsertHeading2_Click" />
+                                        <MenuFlyoutItem Text="Level 3" Click="InsertHeading3_Click" />
+                                        <MenuFlyoutItem Text="Level 4" Click="InsertHeading4_Click" />
+                                        <MenuFlyoutItem Text="Level 5" Click="InsertHeading5_Click" />
+                                        <MenuFlyoutItem Text="Level 6" Click="InsertHeading6_Click" />
+                                    </MenuFlyoutSubItem>
+                                    <MenuFlyoutSubItem Text="Lists">
+                                        <MenuFlyoutItem Text="Bulleted Item" Click="InsertBulletedListItem_Click" />
+                                        <MenuFlyoutItem Text="Numbered Item" Click="InsertNumberedListItem_Click" />
+                                        <MenuFlyoutItem Text="Indented Item (Talk Page)" Click="InsertIndentedListItem_Click" />
                                         <MenuFlyoutSeparator />
-                                        <MenuFlyoutItem Text="Blockquote" Click="InsertBlockquote_Click" />
-                                        <MenuFlyoutSubItem Text="Alignment">
-                                            <MenuFlyoutItem Text="Center Text" Click="InsertCenter_Click" />
-                                            <MenuFlyoutItem Text="Right-Aligned Text" Click="InsertAlignRight_Click" />
-                                            <MenuFlyoutItem Text="Float Right Block" Click="InsertFloatRight_Click" />
-                                        </MenuFlyoutSubItem>
-                                        <MenuFlyoutSeparator />
-                                        <MenuFlyoutItem Text="Horizontal Rule" Click="InsertHorizontalRule_Click" />
-                                        <MenuFlyoutSubItem Text="Line Break Control">
-                                            <MenuFlyoutItem Text="Line Break" Click="InsertLineBreak_Click" />
-                                            <MenuFlyoutItem Text="Clear Floats" Click="InsertClear_Click" />
-                                        </MenuFlyoutSubItem>
+                                        <MenuFlyoutItem Text="Definition Term" Click="InsertDefinitionTerm_Click" />
+                                        <MenuFlyoutItem Text="Definition Data" Click="InsertDefinitionData_Click" />
+                                    </MenuFlyoutSubItem>
+                                    <MenuFlyoutSubItem Text="Table">
+                                        <MenuFlyoutItem Text="Basic Table (2x2)" Click="InsertTableBasic_Click" />
+                                        <MenuFlyoutItem Text="Table with Header" Click="InsertTableWithHeader_Click" />
+                                        <MenuFlyoutItem Text="Sortable Table" Click="InsertTableSortable_Click" />
+                                    </MenuFlyoutSubItem>
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="Blockquote" Click="InsertBlockquote_Click" />
+                                    <MenuFlyoutSubItem Text="Alignment">
+                                        <MenuFlyoutItem Text="Center Text" Click="InsertCenter_Click" />
+                                        <MenuFlyoutItem Text="Right-Aligned Text" Click="InsertAlignRight_Click" />
+                                        <MenuFlyoutItem Text="Float Right Block" Click="InsertFloatRight_Click" />
+                                    </MenuFlyoutSubItem>
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="Horizontal Rule" Click="InsertHorizontalRule_Click" />
+                                    <MenuFlyoutSubItem Text="Line Break Control">
+                                        <MenuFlyoutItem Text="Line Break" Click="InsertLineBreak_Click" />
+                                        <MenuFlyoutItem Text="Clear Floats" Click="InsertClear_Click" />
+                                    </MenuFlyoutSubItem>
                                 </MenuFlyout>
                             </AppBarButton.Flyout>
                         </AppBarButton>
                         <AppBarButton x:Name="LinksButton" Icon="Link" Label="Links &amp; Images">
                             <AppBarButton.Flyout>
                                 <MenuFlyout>
-                                        <MenuFlyoutSubItem Text="Links">
-                                            <MenuFlyoutItem Text="Internal Link" Click="InsertInternalLink_Click" />
-                                            <MenuFlyoutItem Text="Link to Section" Click="InsertSectionLink_Click" />
-                                            <MenuFlyoutItem Text="External Link" Click="InsertExternalLink_Click" />
-                                            <MenuFlyoutSeparator />
-                                            <MenuFlyoutItem Text="Category" Click="InsertCategory_Click" />
-                                            <MenuFlyoutItem Text="Link to Category" Click="InsertCategoryLink_Click" />
-                                            <MenuFlyoutItem Text="Redirect" Click="InsertRedirect_Click" />
-                                            <MenuFlyoutSeparator />
-                                            <MenuFlyoutItem Text="Interlanguage Link" Click="InsertInterlanguageLink_Click" />
-                                            <MenuFlyoutItem Text="Interwiki Link" Click="InsertInterwikiLink_Click" />
-                                        </MenuFlyoutSubItem>
-                                        <MenuFlyoutSubItem Text="Images &amp; Media">
-                                            <MenuFlyoutItem Text="Basic Image" Click="InsertImageBasic_Click" />
-                                            <MenuFlyoutItem Text="Thumbnail with Caption" Click="InsertImageThumbnail_Click" />
-                                            <MenuFlyoutItem Text="Aligned Thumbnail" Click="InsertImageAlign_Click" />
-                                            <MenuFlyoutItem Text="Resized Image" Click="InsertImageResized_Click" />
-                                            <MenuFlyoutSeparator/>
-                                            <MenuFlyoutItem Text="Image Gallery" Click="InsertGallery_Click" />
-                                            <MenuFlyoutSeparator/>
-                                            <MenuFlyoutItem Text="Direct Link to Media File" Click="InsertMediaLink_Click" />
-                                            <MenuFlyoutItem Text="Link to File Page" Click="InsertFileLink_Click" />
-                                        </MenuFlyoutSubItem>
-                                        <MenuFlyoutSubItem Text="Other Links">
-                                            <MenuFlyoutItem Text="Link to Edit Page" Click="InsertEditLink_Click" />
-                                            <MenuFlyoutItem Text="Link to Revision" Click="InsertRevisionLink_Click" />
-                                            <MenuFlyoutItem Text="Link to Diff" Click="InsertDiffLink_Click" />
-                                            <MenuFlyoutItem Text="Link to 'What Links Here'" Click="InsertWhatLinksHereLink_Click" />
-                                            <MenuFlyoutItem Text="Link to 'User Contributions'" Click="InsertUserContribsLink_Click" />
-                                        </MenuFlyoutSubItem>
+                                    <MenuFlyoutSubItem Text="Links">
+                                        <MenuFlyoutItem Text="Internal Link" Click="InsertInternalLink_Click" />
+                                        <MenuFlyoutItem Text="Link to Section" Click="InsertSectionLink_Click" />
+                                        <MenuFlyoutItem Text="External Link" Click="InsertExternalLink_Click" />
+                                        <MenuFlyoutSeparator />
+                                        <MenuFlyoutItem Text="Category" Click="InsertCategory_Click" />
+                                        <MenuFlyoutItem Text="Link to Category" Click="InsertCategoryLink_Click" />
+                                        <MenuFlyoutItem Text="Redirect" Click="InsertRedirect_Click" />
+                                        <MenuFlyoutSeparator />
+                                        <MenuFlyoutItem Text="Interlanguage Link" Click="InsertInterlanguageLink_Click" />
+                                        <MenuFlyoutItem Text="Interwiki Link" Click="InsertInterwikiLink_Click" />
+                                    </MenuFlyoutSubItem>
+                                    <MenuFlyoutSubItem Text="Images &amp; Media">
+                                        <MenuFlyoutItem Text="Basic Image" Click="InsertImageBasic_Click" />
+                                        <MenuFlyoutItem Text="Thumbnail with Caption" Click="InsertImageThumbnail_Click" />
+                                        <MenuFlyoutItem Text="Aligned Thumbnail" Click="InsertImageAlign_Click" />
+                                        <MenuFlyoutItem Text="Resized Image" Click="InsertImageResized_Click" />
+                                        <MenuFlyoutSeparator/>
+                                        <MenuFlyoutItem Text="Image Gallery" Click="InsertGallery_Click" />
+                                        <MenuFlyoutSeparator/>
+                                        <MenuFlyoutItem Text="Direct Link to Media File" Click="InsertMediaLink_Click" />
+                                        <MenuFlyoutItem Text="Link to File Page" Click="InsertFileLink_Click" />
+                                    </MenuFlyoutSubItem>
+                                    <MenuFlyoutSubItem Text="Other Links">
+                                        <MenuFlyoutItem Text="Link to Edit Page" Click="InsertEditLink_Click" />
+                                        <MenuFlyoutItem Text="Link to Revision" Click="InsertRevisionLink_Click" />
+                                        <MenuFlyoutItem Text="Link to Diff" Click="InsertDiffLink_Click" />
+                                        <MenuFlyoutItem Text="Link to 'What Links Here'" Click="InsertWhatLinksHereLink_Click" />
+                                        <MenuFlyoutItem Text="Link to 'User Contributions'" Click="InsertUserContribsLink_Click" />
+                                    </MenuFlyoutSubItem>
                                 </MenuFlyout>
                             </AppBarButton.Flyout>
                         </AppBarButton>
                         <AppBarButton Icon="Document" Label="Citations">
                             <AppBarButton.Flyout>
                                 <MenuFlyout>
-                                        <MenuFlyoutItem Text="Reference (Footnote)" Click="InsertReference_Click" />
-                                        <MenuFlyoutItem Text="Display References List" Click="InsertReferencesList_Click" />
-                                        <MenuFlyoutSeparator/>
-                                        <MenuFlyoutSubItem Text="Citation Templates">
-                                            <MenuFlyoutItem Text="Cite Web" Click="InsertCiteWeb_Click" />
-                                            <MenuFlyoutItem Text="Cite Book" Click="InsertCiteBook_Click" />
-                                            <MenuFlyoutItem Text="Cite Journal" Click="InsertCiteJournal_Click" />
-                                        </MenuFlyoutSubItem>
-                                        <MenuFlyoutItem Text="Citation Needed" Click="InsertCitationNeeded_Click" />
+                                    <MenuFlyoutItem Text="Reference (Footnote)" Click="InsertReference_Click" />
+                                    <MenuFlyoutItem Text="Display References List" Click="InsertReferencesList_Click" />
+                                    <MenuFlyoutSeparator/>
+                                    <MenuFlyoutSubItem Text="Citation Templates">
+                                        <MenuFlyoutItem Text="Cite Web" Click="InsertCiteWeb_Click" />
+                                        <MenuFlyoutItem Text="Cite Book" Click="InsertCiteBook_Click" />
+                                        <MenuFlyoutItem Text="Cite Journal" Click="InsertCiteJournal_Click" />
+                                    </MenuFlyoutSubItem>
+                                    <MenuFlyoutItem Text="Citation Needed" Click="InsertCitationNeeded_Click" />
                                 </MenuFlyout>
                             </AppBarButton.Flyout>
                         </AppBarButton>
                         <AppBarButton x:Name="AdvancedButton" Icon="Setting" Label="Advanced">
                             <AppBarButton.Flyout>
                                 <MenuFlyout>
-                                        <MenuFlyoutSubItem Text="Templates &amp; Transclusion">
-                                            <MenuFlyoutItem Text="Template" Click="InsertTemplate_Click"/>
-                                            <MenuFlyoutSeparator/>
-                                            <MenuFlyoutItem Text="Template (Substituted)" Click="InsertTemplateSubst_Click"/>
-                                            <MenuFlyoutItem Text="Template (Safely Substituted)" Click="InsertTemplateSafeSubst_Click"/>
-                                            <MenuFlyoutSeparator/>
-                                            <MenuFlyoutItem Text="No Include" Click="InsertNoInclude_Click"/>
-                                            <MenuFlyoutItem Text="Include Only" Click="InsertIncludeOnly_Click"/>
-                                            <MenuFlyoutItem Text="Only Include" Click="InsertOnlyInclude_Click"/>
-                                        </MenuFlyoutSubItem>
-                                        <MenuFlyoutSubItem Text="Specialized Content">
-                                            <MenuFlyoutItem Text="Math Formula" Click="InsertMath_Click" />
-                                            <MenuFlyoutItem Text="Poetry" Click="InsertPoem_Click" />
-                                            <MenuFlyoutItem Text="Musical Score" Click="InsertScore_Click" />
-                                            <MenuFlyoutItem Text="Egyptian Hieroglyphs" Click="InsertHieroglyphs_Click" />
-                                            <MenuFlyoutSeparator/>
-                                            <MenuFlyoutItem Text="Ignore Wikitext (nowiki)" Click="InsertNoWiki_Click"/>
-                                        </MenuFlyoutSubItem>
-                                        <MenuFlyoutSubItem Text="Magic Words &amp; Variables">
-                                            <MenuFlyoutSubItem Text="Table of Contents">
-                                                <MenuFlyoutItem Text="Force Table of Contents" Click="InsertMagicWordFORCETOC_Click"/>
-                                                <MenuFlyoutItem Text="Insert Table of Contents Here" Click="InsertMagicWordTOC_Click"/>
-                                                <MenuFlyoutItem Text="No Table of Contents" Click="InsertMagicWordNOTOC_Click"/>
-                                            </MenuFlyoutSubItem>
-                                            <MenuFlyoutSubItem Text="Page Variables">
-                                                <MenuFlyoutItem Text="Page Name" Click="InsertMagicWordPAGENAME_Click"/>
-                                                <MenuFlyoutItem Text="Namespace" Click="InsertVariableNAMESPACE_Click"/>
-                                                <MenuFlyoutItem Text="Revision ID" Click="InsertVariableREVISIONID_Click"/>
-                                                <MenuFlyoutItem Text="Revision User" Click="InsertVariableREVISIONUSER_Click"/>
-                                            </MenuFlyoutSubItem>
-                                            <MenuFlyoutSubItem Text="Site Variables">
-                                                <MenuFlyoutItem Text="Site Name" Click="InsertVariableSITENAME_Click"/>
-                                                <MenuFlyoutItem Text="Number of Articles" Click="InsertVariableNUMBEROFARTICLES_Click"/>
-                                                <MenuFlyoutItem Text="Number of Users" Click="InsertVariableNUMBEROFUSERS_Click"/>
-                                            </MenuFlyoutSubItem>
-                                            <MenuFlyoutSubItem Text="Date &amp; Time">
-                                                <MenuFlyoutItem Text="Current Year" Click="InsertVariableCURRENTYEAR_Click"/>
-                                                <MenuFlyoutItem Text="Current Month Name" Click="InsertVariableCURRENTMONTHNAME_Click"/>
-                                                <MenuFlyoutItem Text="Current Day" Click="InsertVariableCURRENTDAY_Click"/>
-                                                <MenuFlyoutItem Text="Current Day Name" Click="InsertVariableCURRENTDAYNAME_Click"/>
-                                                <MenuFlyoutItem Text="Current Time (UTC)" Click="InsertVariableCURRENTTIME_Click"/>
-                                            </MenuFlyoutSubItem>
-                                        </MenuFlyoutSubItem>
+                                    <MenuFlyoutSubItem Text="Templates &amp; Transclusion">
+                                        <MenuFlyoutItem Text="Template" Click="InsertTemplate_Click"/>
                                         <MenuFlyoutSeparator/>
-                                        <MenuFlyoutItem Text="Comment (Hidden)" Click="InsertComment_Click"/>
-                                        <MenuFlyoutItem Text="Insert Special Character..." Click="InsertSpecialCharacter_Click"/>
+                                        <MenuFlyoutItem Text="Template (Substituted)" Click="InsertTemplateSubst_Click"/>
+                                        <MenuFlyoutItem Text="Template (Safely Substituted)" Click="InsertTemplateSafeSubst_Click"/>
+                                        <MenuFlyoutSeparator/>
+                                        <MenuFlyoutItem Text="No Include" Click="InsertNoInclude_Click"/>
+                                        <MenuFlyoutItem Text="Include Only" Click="InsertIncludeOnly_Click"/>
+                                        <MenuFlyoutItem Text="Only Include" Click="InsertOnlyInclude_Click"/>
+                                    </MenuFlyoutSubItem>
+                                    <MenuFlyoutSubItem Text="Specialized Content">
+                                        <MenuFlyoutItem Text="Math Formula" Click="InsertMath_Click" />
+                                        <MenuFlyoutItem Text="Poetry" Click="InsertPoem_Click" />
+                                        <MenuFlyoutItem Text="Musical Score" Click="InsertScore_Click" />
+                                        <MenuFlyoutItem Text="Egyptian Hieroglyphs" Click="InsertHieroglyphs_Click" />
+                                        <MenuFlyoutSeparator/>
+                                        <MenuFlyoutItem Text="Ignore Wikitext (nowiki)" Click="InsertNoWiki_Click"/>
+                                    </MenuFlyoutSubItem>
+                                    <MenuFlyoutSubItem Text="Magic Words &amp; Variables">
+                                        <MenuFlyoutSubItem Text="Table of Contents">
+                                            <MenuFlyoutItem Text="Force Table of Contents" Click="InsertMagicWordFORCETOC_Click"/>
+                                            <MenuFlyoutItem Text="Insert Table of Contents Here" Click="InsertMagicWordTOC_Click"/>
+                                            <MenuFlyoutItem Text="No Table of Contents" Click="InsertMagicWordNOTOC_Click"/>
+                                        </MenuFlyoutSubItem>
+                                        <MenuFlyoutSubItem Text="Page Variables">
+                                            <MenuFlyoutItem Text="Page Name" Click="InsertMagicWordPAGENAME_Click"/>
+                                            <MenuFlyoutItem Text="Namespace" Click="InsertVariableNAMESPACE_Click"/>
+                                            <MenuFlyoutItem Text="Revision ID" Click="InsertVariableREVISIONID_Click"/>
+                                            <MenuFlyoutItem Text="Revision User" Click="InsertVariableREVISIONUSER_Click"/>
+                                        </MenuFlyoutSubItem>
+                                        <MenuFlyoutSubItem Text="Site Variables">
+                                            <MenuFlyoutItem Text="Site Name" Click="InsertVariableSITENAME_Click"/>
+                                            <MenuFlyoutItem Text="Number of Articles" Click="InsertVariableNUMBEROFARTICLES_Click"/>
+                                            <MenuFlyoutItem Text="Number of Users" Click="InsertVariableNUMBEROFUSERS_Click"/>
+                                        </MenuFlyoutSubItem>
+                                        <MenuFlyoutSubItem Text="Date &amp; Time">
+                                            <MenuFlyoutItem Text="Current Year" Click="InsertVariableCURRENTYEAR_Click"/>
+                                            <MenuFlyoutItem Text="Current Month Name" Click="InsertVariableCURRENTMONTHNAME_Click"/>
+                                            <MenuFlyoutItem Text="Current Day" Click="InsertVariableCURRENTDAY_Click"/>
+                                            <MenuFlyoutItem Text="Current Day Name" Click="InsertVariableCURRENTDAYNAME_Click"/>
+                                            <MenuFlyoutItem Text="Current Time (UTC)" Click="InsertVariableCURRENTTIME_Click"/>
+                                        </MenuFlyoutSubItem>
+                                    </MenuFlyoutSubItem>
+                                    <MenuFlyoutSeparator/>
+                                    <MenuFlyoutItem Text="Comment (Hidden)" Click="InsertComment_Click"/>
+                                    <MenuFlyoutItem Text="Insert Special Character..." Click="InsertSpecialCharacter_Click"/>
                                 </MenuFlyout>
                             </AppBarButton.Flyout>
                         </AppBarButton>
                         <AppBarButton x:Name="SignatureButton" Icon="Contact" Label="Signature">
                             <AppBarButton.Flyout>
                                 <MenuFlyout>
-                                        <MenuFlyoutItem Text="Username Only (~~~)" Click="InsertSignature3_Click" />
-                                        <MenuFlyoutItem Text="Username &amp; Timestamp (~~~~)" Click="InsertSignature4_Click" />
-                                        <MenuFlyoutItem Text="Timestamp Only (~~~~~)" Click="InsertSignature5_Click" />
+                                    <MenuFlyoutItem Text="Username Only (~~~)" Click="InsertSignature3_Click" />
+                                    <MenuFlyoutItem Text="Username &amp; Timestamp (~~~~)" Click="InsertSignature4_Click" />
+                                    <MenuFlyoutItem Text="Timestamp Only (~~~~~)" Click="InsertSignature5_Click" />
                                 </MenuFlyout>
                             </AppBarButton.Flyout>
                         </AppBarButton>

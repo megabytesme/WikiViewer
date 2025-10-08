@@ -49,6 +49,17 @@ namespace _1507_UWP.Pages
             await Task.CompletedTask;
         }
 
+        protected override void ResetPreviewPaneVisually()
+        {
+            PreviewWebView.Visibility = Visibility.Collapsed;
+
+            if (PreviewPlaceholder != null)
+            {
+                PreviewPlaceholder.Visibility = Visibility.Collapsed;
+                PreviewPlaceholder.Text = "Click 'Preview' to see a rendering of your changes.";
+            }
+        }
+
         protected override void HidePreview(string placeholderText)
         {
             PreviewPlaceholder.Text = placeholderText;

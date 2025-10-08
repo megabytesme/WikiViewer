@@ -49,10 +49,15 @@ namespace _1809_UWP.Pages
             PreviewPlaceholder.Visibility = Visibility.Visible;
         }
 
-        private void CancelButton_Click(object sender, RoutedEventArgs e)
+        protected override void ResetPreviewPaneVisually()
         {
-            if (Frame.CanGoBack)
-                Frame.GoBack();
+            PreviewWebView.Visibility = Visibility.Collapsed;
+
+            if (PreviewPlaceholder != null)
+            {
+                PreviewPlaceholder.Visibility = Visibility.Collapsed;
+                PreviewPlaceholder.Text = "Click 'Preview' to see a rendering of your changes.";
+            }
         }
 
         private void Cut_Click(object sender, RoutedEventArgs e)

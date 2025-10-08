@@ -27,7 +27,8 @@ namespace WikiViewer.Shared.Uwp.Pages
         private bool isDragging = false;
         private double initialX;
         private GridLength leftColInitialWidth;
-
+        private bool _isPreviewModeActiveInNarrow = false;
+        private const double NarrowStateWidthTrigger = 800;
         private class WikitextPair
         {
             public string Name { get; }
@@ -197,6 +198,48 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected abstract Button PreviewAppBarButton { get; }
         protected abstract Task ShowPreview(string htmlContent);
         protected abstract void HidePreview(string placeholderText);
+        protected abstract void ResetPreviewPaneVisually();
+
+        public EditPageBase()
+        {
+            this.SizeChanged += Page_SizeChanged;
+
+            this.Loaded += (s, e) =>
+            {
+                ResetPreviewPaneVisually();
+            };
+        }
+
+        private void Page_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            bool wasNarrow = e.PreviousSize.Width < NarrowStateWidthTrigger;
+            bool isNowWide = e.NewSize.Width >= NarrowStateWidthTrigger;
+
+            if (wasNarrow && isNowWide)
+            {
+                WikitextEditorTextBox.Visibility = Visibility.Visible;
+
+                if (PreviewAppBarButton is AppBarButton appBarButton)
+                {
+                    appBarButton.Label = "Preview";
+                    appBarButton.Icon = new SymbolIcon(Symbol.View);
+                }
+                _isPreviewModeActiveInNarrow = false;
+            }
+            else if (!wasNarrow && !isNowWide)
+            {
+                WikitextEditorTextBox.Visibility = Visibility.Visible;
+
+                ResetPreviewPaneVisually();
+
+                if (PreviewAppBarButton is AppBarButton appBarButton)
+                {
+                    appBarButton.Label = "Preview";
+                    appBarButton.Icon = new SymbolIcon(Symbol.View);
+                }
+                _isPreviewModeActiveInNarrow = false;
+            }
+        }
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
@@ -906,8 +949,31 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         protected async void PreviewButton_Click(object sender, RoutedEventArgs e)
         {
+            bool isNarrow = this.ActualWidth < NarrowStateWidthTrigger;
+            var button = (AppBarButton)PreviewAppBarButton;
+
+            if (isNarrow)
+            {
+                if (_isPreviewModeActiveInNarrow)
+                {
+                    HidePreview(string.Empty);
+                    WikitextEditorTextBox.Visibility = Visibility.Visible;
+                    button.Label = "Preview";
+                    button.Icon = new SymbolIcon(Symbol.View);
+                    _isPreviewModeActiveInNarrow = false;
+                    return;
+                }
+                else
+                {
+                    WikitextEditorTextBox.Visibility = Visibility.Collapsed;
+                    button.Label = "Edit";
+                    button.Icon = new SymbolIcon(Symbol.Edit);
+                }
+            }
+
             PreviewAppBarButton.IsEnabled = false;
             HidePreview("Generating preview...");
+
             try
             {
                 var account = AccountManager
@@ -930,10 +996,22 @@ namespace WikiViewer.Shared.Uwp.Pages
                     worker
                 );
                 await ShowPreview(fullHtml);
+
+                if (isNarrow)
+                {
+                    _isPreviewModeActiveInNarrow = true;
+                }
             }
             catch (Exception ex)
             {
                 HidePreview($"Failed to generate preview: {ex.Message}");
+                if (isNarrow)
+                {
+                    WikitextEditorTextBox.Visibility = Visibility.Visible;
+                    button.Label = "Preview";
+                    button.Icon = new SymbolIcon(Symbol.View);
+                    _isPreviewModeActiveInNarrow = false;
+                }
             }
             finally
             {

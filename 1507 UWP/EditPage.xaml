@@ -190,6 +190,35 @@
     </Page.Resources>
 
     <Grid x:Name="MainGrid">
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup>
+                <VisualState x:Name="WideState">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="800"/>
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="SplitGrid.ColumnDefinitions[1].Width" Value="12"/>
+                        <Setter Target="SplitGrid.ColumnDefinitions[2].Width" Value="*"/>
+                        <Setter Target="WikitextEditor.(Grid.ColumnSpan)" Value="1"/>
+                        <Setter Target="PreviewContainerGrid.(Grid.Column)" Value="2"/>
+                        <Setter Target="PreviewContainerGrid.(Grid.ColumnSpan)" Value="1"/>
+                    </VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="NarrowState">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="0"/>
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="SplitGrid.ColumnDefinitions[1].Width" Value="0"/>
+                        <Setter Target="SplitGrid.ColumnDefinitions[2].Width" Value="0"/>
+                        <Setter Target="WikitextEditor.(Grid.ColumnSpan)" Value="3"/>
+                        <Setter Target="PreviewContainerGrid.(Grid.Column)" Value="0"/>
+                        <Setter Target="PreviewContainerGrid.(Grid.ColumnSpan)" Value="3"/>
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
+
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -204,7 +233,7 @@
             </Grid.ColumnDefinitions>
             <RichEditBox x:Name="WikitextEditor" Grid.Column="0" AcceptsReturn="True" TextWrapping="Wrap" Padding="12" FontFamily="Consolas, Courier New" PlaceholderText="Loading Wikitext..." BorderThickness="0,0,1,0" RightTapped="WikitextEditor_ContextMenu" Holding="WikitextEditor_ContextMenu" FlyoutBase.AttachedFlyout="{StaticResource SharedEditorMenu}" />
             <Rectangle Grid.Column="1" Fill="{ThemeResource SystemControlForegroundBaseLowBrush}" PointerPressed="Splitter_PointerPressed" PointerMoved="Splitter_PointerMoved" PointerReleased="Splitter_PointerReleased" PointerEntered="Splitter_PointerEntered" PointerExited="Splitter_PointerExited"/>
-            <Grid Grid.Column="2">
+            <Grid Grid.Column="2" x:Name="PreviewContainerGrid">
                 <WebView x:Name="PreviewWebView" Visibility="Collapsed"/>
                 <TextBlock x:Name="PreviewPlaceholder" Text="Click 'Preview' to see a rendering of your changes." Style="{ThemeResource BodyTextBlockStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
             </Grid>
