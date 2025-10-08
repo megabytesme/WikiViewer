@@ -1,6 +1,6 @@
 # WikiViewer
 
-<img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/01570b60-d75d-45c0-87bb-6c69fa414550" />
+<img width="2366" height="1383" alt="Desktop - Home Page" src="https://github.com/user-attachments/assets/6f8ea6f7-e705-4044-a132-2cbfa1eb2495" />
 
 **WikiViewer** is an unofficial, third-party client for browsing any MediaWiki-powered site - from Wikipedia to Fandom and beyond, without your web browser. It provides a clean, native, and performance-tuned experience for Windows, designed to be fast and responsive.
 
