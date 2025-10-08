@@ -116,7 +116,7 @@ namespace WikiViewer.Core
                 (ConnectionMethod)
                     SettingsProvider.GetValue(
                         DefaultConnectionMethodKey,
-                        (int)ConnectionMethod.HttpClientProxy
+                        (int)ConnectionMethod.HttpClient
                     );
             set => SettingsProvider.SetValue(DefaultConnectionMethodKey, (int)value);
         }

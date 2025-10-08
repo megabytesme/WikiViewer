@@ -298,26 +298,12 @@ namespace WikiViewer.Shared.Uwp.Pages
             }
             catch (Exception)
             {
-                if (!AppSettings.HasShownDisclaimer)
-                {
-                    var dialog = new ContentDialog
-                    {
-                        Title = "Connection Required",
-                        Content = "An internet connection is required for the first launch.",
-                        PrimaryButtonText = "Close App",
-                    };
-                    await dialog.ShowAsync();
-                    Application.Current.Exit();
-                }
-                else
-                {
-                    await ShowConnectionInfoBarAsync(
-                        "Offline Mode",
-                        $"Could not connect to {firstWiki.Host}. Only cached articles are available.",
-                        false,
-                        true
-                    );
-                }
+                await ShowConnectionInfoBarAsync(
+                    "Offline Mode",
+                    $"Could not connect to {firstWiki.Host}. Only cached articles are available.",
+                    false,
+                    true
+                );
             }
         }
 
