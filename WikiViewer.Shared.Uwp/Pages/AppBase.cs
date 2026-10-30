@@ -33,8 +33,20 @@ namespace WikiViewer.Shared.Uwp
 
         public App()
         {
+            this.UnhandledException += OnUnhandledException;
             this.InitializeComponent();
             this.Suspending += OnSuspending;
+        }
+
+        private void OnUnhandledException(object sender, Windows.UI.Xaml.UnhandledExceptionEventArgs e)
+        {
+            // Preserve diagnostics locally without hiding the original failure from Windows.
+            try
+            {
+                var path = System.IO.Path.Combine(Windows.Storage.ApplicationData.Current.LocalFolder.Path, "unhandled-error.log");
+                System.IO.File.WriteAllText(path, DateTime.UtcNow.ToString("O") + Environment.NewLine + e.Message + Environment.NewLine + e.Exception);
+            }
+            catch (Exception) { }
         }
 
         public static void ResetRootFrame()

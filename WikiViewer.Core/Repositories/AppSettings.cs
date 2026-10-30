@@ -27,6 +27,7 @@ namespace WikiViewer.Core
         private const string IsCustomThemingEnabledKey = "IsCustomThemingEnabled";
         private const string ShowCssRefreshButtonKey = "ShowCssRefreshButton";
         private const string DefaultConnectionMethodKey = "DefaultConnectionMethodForNewWikis";
+        private const string NativeReaderDefaultKey = "UseNativeReaderByDefault";
 
         private const string DefaultMainPageName = "Main Page";
 
@@ -84,6 +85,12 @@ namespace WikiViewer.Core
         {
             get => SettingsProvider.GetValue(ShowCssRefreshButtonKey, false);
             set => SettingsProvider.SetValue(ShowCssRefreshButtonKey, value);
+        }
+
+        public static bool UseNativeReaderByDefault
+        {
+            get => SettingsProvider.GetValue(NativeReaderDefaultKey, false);
+            set => SettingsProvider.SetValue(NativeReaderDefaultKey, value);
         }
 
         public static int MaxConcurrentDownloads

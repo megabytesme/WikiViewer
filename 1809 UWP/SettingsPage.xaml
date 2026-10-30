@@ -28,15 +28,25 @@
                             <ListView.ItemTemplate>
                                 <DataTemplate x:DataType="models:WikiInstance">
                                     <StackPanel Orientation="Horizontal" Spacing="12" Padding="8,4">
-                                        <BitmapIcon UriSource="{x:Bind IconUrl, Mode=OneWay}"
-                                                    Width="24" Height="24"
-                                                    ShowAsMonochrome="False"/>
+                                        <Image Source="{x:Bind IconUrl, Converter={StaticResource StringToBitmapImageConverter}, Mode=OneWay}"
+                                               Width="24" Height="24"/>
                                         <TextBlock Text="{x:Bind Name}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </DataTemplate>
                             </ListView.ItemTemplate>
                         </ListView>
                         <Button Content="Add a New Wiki" HorizontalAlignment="Stretch" Click="AddWikiButton_Click"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="Reading" Style="{ThemeResource SubtitleTextBlockStyle}"/>
+                        <ToggleSwitch x:Name="NativeReaderDefaultToggle"
+                                      Header="Use native wikitext reader by default"
+                                      Toggled="NativeReaderDefaultToggle_Toggled"/>
+                        <TextBlock Text="Preview: open articles using native Windows controls. You can switch views with the reader button on each article."
+                                   TextWrapping="Wrap" Opacity="0.7"/>
                     </StackPanel>
                 </Border>
 

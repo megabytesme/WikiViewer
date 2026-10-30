@@ -38,6 +38,17 @@
 
                 <Border BorderThickness="1" BorderBrush="{ThemeResource SystemControlForegroundBaseLowBrush}" Padding="16" Margin="0,0,0,16">
                     <StackPanel>
+                        <TextBlock Text="Reading" Style="{ThemeResource SubtitleTextBlockStyle}" Margin="0,0,0,12"/>
+                        <ToggleSwitch x:Name="NativeReaderDefaultToggle"
+                                      Header="Use native wikitext reader by default"
+                                      Toggled="NativeReaderDefaultToggle_Toggled"/>
+                        <TextBlock Text="Preview: open articles using native Windows controls. You can switch views with the reader button on each article."
+                                   TextWrapping="Wrap" Opacity="0.7"/>
+                    </StackPanel>
+                </Border>
+
+                <Border BorderThickness="1" BorderBrush="{ThemeResource SystemControlForegroundBaseLowBrush}" Padding="16" Margin="0,0,0,16">
+                    <StackPanel>
                         <TextBlock Text="Connection" Style="{ThemeResource SubtitleTextBlockStyle}" Margin="0,0,0,12"/>
                         <ComboBox x:Name="DefaultConnectionMethodComboBox"
                                   Header="Default connection method for new wikis"

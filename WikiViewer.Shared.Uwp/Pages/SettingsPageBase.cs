@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Linq;
@@ -30,6 +30,8 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected abstract TextBlock ConcurrencyDescriptionTextControl { get; }
         protected abstract ToggleSwitch EnableCustomThemingToggleControl { get; }
         protected abstract ToggleSwitch ShowCssRefreshButtonToggleControl { get; }
+        protected abstract ToggleSwitch NativeReaderDefaultToggleControl { get; }
+        private bool _isLoaded;
 
         public SettingsPageBase()
         {
@@ -39,6 +41,8 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         private async void OnLoaded(object sender, RoutedEventArgs e)
         {
+            if (_isLoaded) return;
+            _isLoaded = true;
             PopulateConcurrencyComboBox();
             PopulateDefaultConnectionMethodComboBox();
 
@@ -46,7 +50,7 @@ namespace WikiViewer.Shared.Uwp.Pages
 
             var match = ConcurrencyComboBoxControl
                 .Items.OfType<ComboBoxItem>()
-                .FirstOrDefault(i => Equals(i.Tag, savedLevel));
+                .FirstOrDefault(i => Equals(i.Tag, (int)savedLevel));
 
             if (match != null)
             {
@@ -57,16 +61,20 @@ namespace WikiViewer.Shared.Uwp.Pages
             var savedMethod = AppSettings.DefaultConnectionMethod;
             var methodMatch = DefaultConnectionMethodComboBoxControl
                 .Items.OfType<ComboBoxItem>()
-                .FirstOrDefault(i => Equals(i.Tag, savedMethod));
+                .FirstOrDefault(i => Equals(i.Tag, (int)savedMethod));
             if (methodMatch != null)
             {
                 DefaultConnectionMethodComboBoxControl.SelectedItem = methodMatch;
             }
 
-            DefaultConnectionMethodComboBoxControl.SelectionChanged +=
-                DefaultConnectionMethodComboBox_SelectionChanged;
-
             CachingToggleControl.IsOn = AppSettings.IsCachingEnabled;
+            NativeReaderDefaultToggleControl.IsOn = AppSettings.UseNativeReaderByDefault;
+            EnableCustomThemingToggleControl.IsOn = AppSettings.IsCustomThemingEnabled;
+            ShowCssRefreshButtonToggleControl.IsOn = AppSettings.ShowCssRefreshButton;
+
+            LoadWikis();
+            WikiListViewControl.ItemsSource = Wikis;
+            WikiManager.WikisChanged += OnWikisChanged;
 
             try
             {
@@ -78,22 +86,17 @@ namespace WikiViewer.Shared.Uwp.Pages
                 Debug.WriteLine($"Failed to update cache size: {ex.Message}");
                 CacheSizeTextControl.Text = "Error";
             }
-
-            LoadWikis();
-            WikiListViewControl.ItemsSource = Wikis;
-            WikiManager.WikisChanged += OnWikisChanged;
-
-            EnableCustomThemingToggleControl.IsOn = AppSettings.IsCustomThemingEnabled;
-            EnableCustomThemingToggleControl.Toggled += EnableCustomThemingToggle_Toggled;
-
-            ShowCssRefreshButtonToggleControl.IsOn = AppSettings.ShowCssRefreshButton;
-            ShowCssRefreshButtonToggleControl.Toggled += ShowCssRefreshButtonToggle_Toggled;
         }
 
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
+            _isLoaded = false;
             WikiManager.WikisChanged -= OnWikisChanged;
-            ShowCssRefreshButtonToggleControl.Toggled -= ShowCssRefreshButtonToggle_Toggled;
+        }
+
+        protected void NativeReaderDefaultToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            AppSettings.UseNativeReaderByDefault = ((ToggleSwitch)sender).IsOn;
         }
 
         protected void EnableCustomThemingToggle_Toggled(object sender, RoutedEventArgs e)
@@ -110,60 +113,60 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         private void PopulateConcurrencyComboBox()
         {
+            // Store primitive option values so selection does not depend on boxed-enum projection.
             var mediumCores = Math.Max(2, Environment.ProcessorCount / 2);
             var highCores = Math.Max(2, Environment.ProcessorCount);
             var doubleCores = highCores * 2;
 
             ConcurrencyComboBoxControl.Items.Clear();
             ConcurrencyComboBoxControl.Items.Add(
-                new ComboBoxItem { Content = $"Low (2 downloads)", Tag = ConcurrencyLevel.Low }
+                new ComboBoxItem { Content = $"Low (2 downloads)", Tag = (int)ConcurrencyLevel.Low }
             );
             ConcurrencyComboBoxControl.Items.Add(
                 new ComboBoxItem
                 {
                     Content = $"Medium ({mediumCores} downloads)",
-                    Tag = ConcurrencyLevel.Medium,
+                    Tag = (int)ConcurrencyLevel.Medium,
                 }
             );
             ConcurrencyComboBoxControl.Items.Add(
                 new ComboBoxItem
                 {
                     Content = $"High ({highCores} downloads)",
-                    Tag = ConcurrencyLevel.High,
+                    Tag = (int)ConcurrencyLevel.High,
                 }
             );
             ConcurrencyComboBoxControl.Items.Add(
                 new ComboBoxItem
                 {
                     Content = $"Double ({doubleCores} downloads)",
-                    Tag = ConcurrencyLevel.Double,
+                    Tag = (int)ConcurrencyLevel.Double,
                 }
             );
             ConcurrencyComboBoxControl.Items.Add(
                 new ComboBoxItem
                 {
                     Content = $"Extreme (256 downloads)",
-                    Tag = ConcurrencyLevel.Extreme,
+                    Tag = (int)ConcurrencyLevel.Extreme,
                 }
             );
             ConcurrencyComboBoxControl.Items.Add(
-                new ComboBoxItem { Content = "Unlimited", Tag = ConcurrencyLevel.Unlimited }
+                new ComboBoxItem { Content = "Unlimited", Tag = (int)ConcurrencyLevel.Unlimited }
             );
 
-            ConcurrencyComboBoxControl.SelectedValuePath = "Tag";
         }
 
         private void PopulateDefaultConnectionMethodComboBox()
         {
             DefaultConnectionMethodComboBoxControl.Items.Clear();
             DefaultConnectionMethodComboBoxControl.Items.Add(
-                new ComboBoxItem { Content = "Auto (Recommended)", Tag = ConnectionMethod.Auto }
+                new ComboBoxItem { Content = "Auto (Recommended)", Tag = (int)ConnectionMethod.Auto }
             );
             DefaultConnectionMethodComboBoxControl.Items.Add(
                 new ComboBoxItem
                 {
                     Content = "HttpClient (Recommended - Fastest)",
-                    Tag = ConnectionMethod.HttpClient,
+                    Tag = (int)ConnectionMethod.HttpClient,
                 }
             );
             DefaultConnectionMethodComboBoxControl.Items.Add(
@@ -174,17 +177,16 @@ namespace WikiViewer.Shared.Uwp.Pages
 #else
                     Content = "WebView (Backup - Compatibility)",
 #endif
-                    Tag = ConnectionMethod.WebView,
+                    Tag = (int)ConnectionMethod.WebView,
                 }
             );
             DefaultConnectionMethodComboBoxControl.Items.Add(
                 new ComboBoxItem
                 {
                     Content = "Proxy (Last Resort)",
-                    Tag = ConnectionMethod.HttpClientProxy,
+                    Tag = (int)ConnectionMethod.HttpClientProxy,
                 }
             );
-            DefaultConnectionMethodComboBoxControl.SelectedValuePath = "Tag";
         }
 
         protected void DefaultConnectionMethodComboBox_SelectionChanged(
@@ -194,10 +196,10 @@ namespace WikiViewer.Shared.Uwp.Pages
         {
             if (
                 DefaultConnectionMethodComboBoxControl.SelectedItem is ComboBoxItem selectedItem
-                && selectedItem.Tag is ConnectionMethod method
+                && selectedItem.Tag is int method
             )
             {
-                AppSettings.DefaultConnectionMethod = method;
+                AppSettings.DefaultConnectionMethod = (ConnectionMethod)method;
             }
         }
 
@@ -235,7 +237,7 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         private async Task OnWikisChanged()
         {
-            _ = Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, LoadWikis);
+            _ = Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () => { if (_isLoaded) LoadWikis(); });
         }
 
         private void LoadWikis()
@@ -265,8 +267,9 @@ namespace WikiViewer.Shared.Uwp.Pages
             SelectionChangedEventArgs e
         )
         {
-            if (ConcurrencyComboBoxControl.SelectedValue is ConcurrencyLevel level)
+            if (ConcurrencyComboBoxControl.SelectedItem is ComboBoxItem item && item.Tag is int value)
             {
+                var level = (ConcurrencyLevel)value;
                 AppSettings.DownloadConcurrencyLevel = level;
                 UpdateConcurrencyDescription(level);
             }
@@ -301,7 +304,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                             new LineBreak(),
                             new Run() { Text = $"Version {GetAppVersion()} ({GetAppName()})" },
                             new LineBreak(),
-                            new Run() { Text = "Copyright � 2025 MegaBytesMe" },
+                            new Run() { Text = "Copyright © 2025 MegaBytesMe" },
                             new LineBreak(),
                             new LineBreak(),
                             new Run() { Text = "Source code available on " },

@@ -12,6 +12,7 @@ namespace _1809_UWP.Pages
         }
 
         protected override ToggleSwitch CachingToggleControl => this.CachingToggle;
+        protected override ToggleSwitch NativeReaderDefaultToggleControl => this.NativeReaderDefaultToggle;
         protected override ComboBox ConcurrencyComboBoxControl => this.ConcurrencyComboBox;
         protected override TextBlock CacheSizeTextControl => this.CacheSizeText;
         protected override Button ClearCacheButtonControl => this.ClearCacheButton;

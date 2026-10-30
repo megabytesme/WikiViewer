@@ -18,12 +18,22 @@ namespace _1507_UWP.Pages
     {
         private readonly UISettings _uiSettings = new UISettings();
 
-        public ArticleViewerPage() => this.InitializeComponent();
+        public ArticleViewerPage()
+        {
+            this.InitializeComponent();
+            NativeReaderButton.IsChecked = AppSettings.UseNativeReaderByDefault;
+            UpdateReaderVisibility();
+        }
 
-        private void NativeReaderButton_Click(object sender, RoutedEventArgs e)
+        private void UpdateReaderVisibility()
         {
             NativeReader.Visibility = NativeReaderButton.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
             ArticleDisplayWebView.Visibility = NativeReaderButton.IsChecked == true ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        private void NativeReaderButton_Click(object sender, RoutedEventArgs e)
+        {
+            UpdateReaderVisibility();
             ArticleDisplayWebView.Stop();
             NativeReader.ClearArticle();
             StartArticleFetch();

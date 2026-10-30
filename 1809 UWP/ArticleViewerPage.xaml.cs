@@ -17,12 +17,22 @@ namespace _1809_UWP.Pages
     {
         private bool _isVirtualHostMappingSet = false;
 
-        public ArticleViewerPage() => this.InitializeComponent();
+        public ArticleViewerPage()
+        {
+            this.InitializeComponent();
+            NativeReaderButton.IsChecked = AppSettings.UseNativeReaderByDefault;
+            UpdateReaderVisibility();
+        }
 
-        private void NativeReaderButton_Click(object sender, Windows.UI.Xaml.RoutedEventArgs e)
+        private void UpdateReaderVisibility()
         {
             NativeReader.Visibility = NativeReaderButton.IsChecked == true ? Windows.UI.Xaml.Visibility.Visible : Windows.UI.Xaml.Visibility.Collapsed;
             ArticleDisplayWebView.Visibility = NativeReaderButton.IsChecked == true ? Windows.UI.Xaml.Visibility.Collapsed : Windows.UI.Xaml.Visibility.Visible;
+        }
+
+        private void NativeReaderButton_Click(object sender, Windows.UI.Xaml.RoutedEventArgs e)
+        {
+            UpdateReaderVisibility();
             ArticleDisplayWebView.CoreWebView2?.Stop();
             NativeReader.ClearArticle();
             StartArticleFetch();
