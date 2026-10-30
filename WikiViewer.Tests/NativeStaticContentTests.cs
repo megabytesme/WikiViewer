@@ -6,6 +6,34 @@ namespace WikiViewer.Tests;
 
 public class NativeStaticContentTests
 {
+    [Fact]
+    public void DirectionInheritsFromTheWikiPageAndCssCanOverrideIt()
+    {
+        var content = new ArticleContent { HeadHtml = "<html dir='rtl'><head></head><body>", HtmlContent = "<div class='mw-parser-output'><p>Arabic text</p><p style='direction:ltr'>Formula</p></div>" };
+        var nodes = NativeArticleDocumentService.Parse(content, new Uri("https://example.org/Page")).Nodes;
+        Assert.True(nodes[0].RightToLeft);
+        Assert.False(nodes[1].RightToLeft);
+    }
+    [Fact]
+    public void ServerHeadStylesPreserveTheCanvasForInheritedTextColours()
+    {
+        var content = new ArticleContent { HeadHtml = "<!doctype html><html><head></head><body class='skin-example'>", HtmlContent = "<div class='mw-parser-output'><p>Text</p></div>",
+            ResolvedStyleSheets = new() { "body.skin-example{background:#ffffff;color:#202122}" } };
+        var document = NativeArticleDocumentService.Parse(content, new Uri("https://example.org/Page"));
+        Assert.Equal("#ffffff", document.Background);
+        Assert.Equal("#202122", document.Foreground);
+        Assert.Equal("#202122", document.Nodes.Single().Style.Foreground);
+    }
+    [Fact]
+    public void PresentationMathKeepsFractionsRootsScriptsAndSkipsSourceAnnotations()
+    {
+        var math = NativeArticleDocumentService.Parse("<math display='block'><semantics><mfrac><msup><mi>x</mi><mn>2</mn></msup><msqrt><mn>3</mn></msqrt></mfrac><annotation encoding='application/x-tex'>Duplicate TeX</annotation></semantics></math>", new Uri("https://example.org/Page")).Nodes.Single();
+        Assert.Equal(NativeArticleNodeKind.Math, math.Kind);
+        Assert.True(math.IsBlock);
+        var fraction = math.Children.Single().Children.Single();
+        Assert.Equal("mfrac", fraction.TagName);
+        Assert.Equal(new[] { "msup", "msqrt" }, fraction.Children.Select(n => n.TagName));
+    }
     private static readonly Uri Page = new("https://example.org/wiki/Page");
 
     [Fact]

@@ -6,7 +6,7 @@ namespace WikiViewer.Core.Models
     public enum NativeArticleNodeKind
     {
         Container, Text, Paragraph, Heading, Strong, Emphasis, Underline, Strike, Code,
-        Preformatted, Link, Image, Media, LineBreak, Rule, List, ListItem, Table, TableRow, TableCell, Quote, Unsupported
+        Preformatted, Link, Image, Media, Math, LineBreak, Rule, List, ListItem, Table, TableRow, TableCell, Quote, Unsupported
     }
 
     public sealed class NativeArticleNode
@@ -50,6 +50,9 @@ namespace WikiViewer.Core.Models
     {
         public string RawWikitext { get; set; }
         public long RevisionId { get; set; }
+        public WikiSyntaxConfiguration Syntax { get; set; }
+        public string Background { get; set; }
+        public string Foreground { get; set; }
         public List<SourceImageLayout> SourceImages { get; } = new List<SourceImageLayout>();
         public List<string> EmbeddedStyleSheets { get; } = new List<string>();
         public List<ArticleCssRule> StyleRules { get; } = new List<ArticleCssRule>();

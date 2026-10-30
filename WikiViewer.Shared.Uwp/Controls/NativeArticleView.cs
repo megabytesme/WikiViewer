@@ -15,6 +15,7 @@ using Windows.UI.Xaml.Controls.Primitives;
 using Windows.UI.Xaml.Documents;
 using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Media.Imaging;
+using Windows.UI.Xaml.Markup;
 
 namespace WikiViewer.Shared.Uwp.Controls
 {
@@ -25,6 +26,17 @@ namespace WikiViewer.Shared.Uwp.Controls
         private readonly Dictionary<string, FrameworkElement> _anchors = new Dictionary<string, FrameworkElement>(StringComparer.Ordinal);
         private readonly List<Image> _images = new List<Image>();
         private readonly List<MediaElement> _media = new List<MediaElement>();
+        private readonly Dictionary<string, NativeArticleSection> _anchorSections = new Dictionary<string, NativeArticleSection>(StringComparer.Ordinal);
+        private readonly List<RenderScope> _scopes = new List<RenderScope>();
+        private RenderScope _scope;
+        private ListView _sections;
+        private sealed class RenderScope
+        {
+            public bool Active = true;
+            public readonly List<Image> Images = new List<Image>();
+            public readonly List<MediaElement> Media = new List<MediaElement>();
+            public readonly Dictionary<string, FrameworkElement> Anchors = new Dictionary<string, FrameworkElement>();
+        }
         private Func<Uri, Task> _navigate;
         private Func<string, Task<string>> _resolveImage;
         private int _version;
@@ -39,6 +51,7 @@ namespace WikiViewer.Shared.Uwp.Controls
             Content = _scroll;
             Unloaded += (s, e) => ClearArticle();
             _root.SizeChanged += (s, e) => { foreach (var image in _images.ToArray()) LimitImageWidth(image); };
+            SizeChanged += (s, e) => { foreach (var image in _images.ToArray()) LimitImageWidth(image); };
         }
 
         public void ShowArticle(ArticleContent content, Uri pageUri, Func<Uri, Task> navigate, Func<string, Task<string>> resolveImage)
@@ -76,11 +89,85 @@ namespace WikiViewer.Shared.Uwp.Controls
             _navigate = navigate;
             _resolveImage = resolveImage;
             _pageUri = pageUri;
+            _scroll.Background = ArticleVisualStyle.Brush(document.Background);
+            var foreground = ArticleVisualStyle.Brush(document.Foreground);
+            if (foreground != null) { Foreground = foreground; _scroll.Foreground = foreground; }
+            else { ClearValue(Control.ForegroundProperty); _scroll.ClearValue(Control.ForegroundProperty); }
+            var sections = ArticleSectionService.Split(document.Nodes);
+            if (document.Nodes.Count >= 100 && sections.Count >= 4)
+            {
+                ShowSections(sections, document.UnsupportedFeatures.Count > 0);
+                _sections.Background = ArticleVisualStyle.Brush(document.Background);
+                if (foreground != null) _sections.Foreground = foreground;
+                return;
+            }
             if (document.UnsupportedFeatures.Count > 0)
                 _root.Children.Add(new TextBlock { Text = UnsupportedContentMessage, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12), Opacity = 0.75 });
             AppendBlocks(_root, document.Nodes);
             _root.UpdateLayout();
             _scroll.ChangeView(null, 0, null, true);
+        }
+
+        private void ShowSections(List<NativeArticleSection> sections, bool unsupported)
+        {
+            foreach (var section in sections) foreach (string id in section.Anchors) if (!_anchorSections.ContainsKey(id)) _anchorSections[id] = section;
+            _sections = new ListView { SelectionMode = ListViewSelectionMode.None, IsItemClickEnabled = false,
+                HorizontalContentAlignment = HorizontalAlignment.Stretch, IsTabStop = false };
+            Windows.UI.Xaml.Automation.AutomationProperties.SetAutomationId(_sections, "ArticleSections");
+            Windows.UI.Xaml.Automation.AutomationProperties.SetName(_sections, "Article sections");
+            _sections.ItemsPanel = (ItemsPanelTemplate)XamlReader.Load("<ItemsPanelTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'><ItemsStackPanel/></ItemsPanelTemplate>");
+            _sections.ItemTemplate = (DataTemplate)XamlReader.Load("<DataTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'><ContentControl HorizontalContentAlignment='Stretch'/></DataTemplate>");
+            var style = new Style(typeof(ListViewItem));
+            style.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch));
+            style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(0)));
+            style.Setters.Add(new Setter(FrameworkElement.MinHeightProperty, 0d));
+            _sections.ItemContainerStyle = style;
+            if (unsupported) _sections.Header = new TextBlock { Text = UnsupportedContentMessage, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(20, 56, 20, 8) };
+            _sections.ContainerContentChanging += (sender, args) =>
+            {
+                if (args.Phase == 0 && args.ItemContainer.ContentTemplateRoot == null && !args.InRecycleQueue)
+                    args.RegisterUpdateCallback((list, next) => RenderSection(next, sections.Count));
+                else RenderSection(args, sections.Count);
+            };
+            _sections.ItemsSource = sections;
+            Content = _sections;
+        }
+
+        private void RenderSection(ContainerContentChangingEventArgs args, int count)
+        {
+            var host = args.ItemContainer.ContentTemplateRoot as ContentControl;
+            if (host == null) return;
+            var previous = host.Tag as RenderScope;
+            if (previous != null) ReleaseScope(previous);
+            host.Content = null; host.Tag = null;
+            args.Handled = true;
+            if (args.InRecycleQueue) return;
+            var section = args.Item as NativeArticleSection;
+            if (section == null) return;
+            Windows.UI.Xaml.Automation.AutomationProperties.SetName(args.ItemContainer, section.Title);
+            var scope = new RenderScope(); _scopes.Add(scope); _scope = scope; host.Tag = scope;
+            try
+            {
+                var margin = ContentMargin;
+                var panel = new ArticleFlowPanel { MaxWidth = 1100, HorizontalAlignment = HorizontalAlignment.Stretch,
+                    Margin = new Thickness(margin.Left, section.Index == 0 ? margin.Top : 0, margin.Right, section.Index == count - 1 ? margin.Bottom : 0) };
+                AppendBlocks(panel, section.Nodes); host.Content = panel;
+            }
+            catch (Exception ex)
+            {
+                ReleaseScope(scope); _ = LogFailureAsync(ex);
+                host.Content = new TextBlock { Text = UnsupportedContentMessage, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(20) };
+            }
+            finally { _scope = null; }
+        }
+
+        private void ReleaseScope(RenderScope scope)
+        {
+            scope.Active = false;
+            foreach (var image in scope.Images) { _images.Remove(image); image.Source = null; }
+            foreach (var media in scope.Media) { _media.Remove(media); media.Stop(); media.Source = null; }
+            foreach (var anchor in scope.Anchors) { FrameworkElement current; if (_anchors.TryGetValue(anchor.Key, out current) && current == anchor.Value) _anchors.Remove(anchor.Key); }
+            _scopes.Remove(scope);
         }
 
         private static async Task LogFailureAsync(Exception exception)
@@ -96,6 +183,9 @@ namespace WikiViewer.Shared.Uwp.Controls
         public void ClearArticle()
         {
             _version++;
+            foreach (var scope in _scopes.ToArray()) ReleaseScope(scope);
+            _scope = null; _anchorSections.Clear();
+            if (_sections != null) { _sections.ItemsSource = null; _sections = null; Content = _scroll; }
             foreach (var media in _media) { media.Stop(); media.Source = null; }
             _media.Clear();
             _root.Children.Clear();
@@ -144,10 +234,16 @@ namespace WikiViewer.Shared.Uwp.Controls
                 .Take(1).Select(n => PlainText(n)));
             if (string.IsNullOrWhiteSpace(title)) title = node.Kind == NativeArticleNodeKind.Table ? "Table" : "Section";
             var toggle = new ToggleButton { Content = title, IsChecked = !node.Style.InitiallyCollapsed, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left };
+            var scope = _scope;
             Action update = () =>
             {
                 bool open = toggle.IsChecked == true;
-                if (open && body.Content == null) body.Content = RenderBlockCore(node);
+                if (open && body.Content == null)
+                {
+                    var previous = _scope; _scope = scope;
+                    try { body.Content = RenderBlockCore(node); }
+                    finally { _scope = previous; }
+                }
                 body.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
             };
             toggle.Click += (s, e) =>
@@ -168,6 +264,7 @@ namespace WikiViewer.Shared.Uwp.Controls
         {
             if (node.Kind == NativeArticleNodeKind.Image) return Image(node);
             if (node.Kind == NativeArticleNodeKind.Media) return Media(node);
+            if (node.Kind == NativeArticleNodeKind.Math) return new ScrollViewer { Content = MathView(node), HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled };
             if (node.Kind == NativeArticleNodeKind.Rule) return new Border { Height = 1, Background = new SolidColorBrush(Colors.Gray), Margin = new Thickness(0, 12, 0, 12) };
             if (node.Kind == NativeArticleNodeKind.Table) return Table(node);
             if (node.Kind == NativeArticleNodeKind.List)
@@ -192,7 +289,11 @@ namespace WikiViewer.Shared.Uwp.Controls
             }
             if (node.Kind == NativeArticleNodeKind.Container || node.Kind == NativeArticleNodeKind.Quote)
             {
-                if (node.Style.Display == "grid" || node.Style.Display == "gallery" || node.Style.Display == "flex" && node.Style.Declarations.ContainsKey("flex-direction") == false)
+                if (node.Style.Position == "relative" && node.Children.Any(n => n.Style.Position == "absolute"))
+                {
+                    var overlay = new ArticlePositionPanel { PositionStyle = node.Style }; AppendBlocks(overlay, node.Children, node); return overlay;
+                }
+                if (node.Style.Display == "grid" || node.Style.Display == "gallery" || node.Style.Display == "flex" && (!node.Style.Declarations.ContainsKey("flex-direction") || node.Style.Declarations["flex-direction"] == "row"))
                 {
                     var tiles = new ArticleTilePanel { Columns = node.Style.GridColumns > 0 ? node.Style.GridColumns : node.Style.Display == "flex" && !node.Style.Wrap ? node.Children.Count(IsBlock) : 0,
                         Gap = node.Style.Gap?.Resolve(800) ?? 8 };
@@ -216,6 +317,9 @@ namespace WikiViewer.Shared.Uwp.Controls
             ArticleVisualStyle.Text(text, node);
             if (node.Kind == NativeArticleNodeKind.Preformatted)
             { text.FontFamily = new FontFamily("Consolas"); text.TextWrapping = TextWrapping.NoWrap; return new ScrollViewer { Content = text, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled }; }
+            if (node.Kind == NativeArticleNodeKind.Paragraph && node.Style.Width == null && node.Style.Background == null && node.Style.BorderWidth == null &&
+                node.Style.Padding.Left == null && node.Style.Padding.Right == null && node.Style.Padding.Top == null && node.Style.Padding.Bottom == null)
+                return new ArticleTextFlowPanel(text);
             return text;
         }
 
@@ -237,6 +341,7 @@ namespace WikiViewer.Shared.Uwp.Controls
             if (node.Kind == NativeArticleNodeKind.LineBreak) { inlines.Add(new LineBreak()); return; }
             if (node.Kind == NativeArticleNodeKind.Image) { inlines.Add(new InlineUIContainer { Child = Image(node) }); return; }
             if (node.Kind == NativeArticleNodeKind.Media) { inlines.Add(new InlineUIContainer { Child = Media(node) }); return; }
+            if (node.Kind == NativeArticleNodeKind.Math) { inlines.Add(new InlineUIContainer { Child = MathView(node) }); return; }
             if (node.Kind == NativeArticleNodeKind.Unsupported)
             {
                 inlines.Add(new Run { Text = string.IsNullOrWhiteSpace(node.Text) ? "[Content available in Web view]" : node.Text });
@@ -286,12 +391,13 @@ namespace WikiViewer.Shared.Uwp.Controls
             image.ImageFailed += (s, e) => failed();
             Windows.UI.Xaml.Automation.AutomationProperties.SetName(image, node.Text ?? "");
             _images.Add(image);
+            var scope = _scope; scope?.Images.Add(image);
             int version = _version;
             var resolveImage = _resolveImage;
             image.Loaded += async (s, e) =>
             {
                 LimitImageWidth(image);
-                if (image.Source != null || version != _version) return;
+                if (image.Source != null || version != _version || scope?.Active == false) return;
                 try
                 {
 #if UWP_1809
@@ -308,7 +414,7 @@ namespace WikiViewer.Shared.Uwp.Controls
                     }
 #endif
                     string resolved = resolveImage == null ? null : await resolveImage(node.Uri.AbsoluteUri);
-                    if (version != _version) return;
+                    if (version != _version || scope?.Active == false) return;
                     Uri uri;
                     uri = Uri.TryCreate(resolved, UriKind.Absolute, out uri) ? uri : node.Uri;
 #if UWP_1809
@@ -325,6 +431,14 @@ namespace WikiViewer.Shared.Uwp.Controls
             return host;
         }
 
+        private FrameworkElement MathView(NativeArticleNode node)
+        {
+            var host = new ContentControl { Content = ArticleMathView.Create(node), IsTabStop = false, FlowDirection = FlowDirection.LeftToRight };
+            var color = ArticleVisualStyle.Brush(node.Style.Foreground);
+            if (color != null) host.Foreground = color;
+            return host;
+        }
+
         private FrameworkElement Media(NativeArticleNode node)
         {
             var panel = new StackPanel { Margin = new Thickness(0, 8, 0, 8) };
@@ -338,10 +452,11 @@ namespace WikiViewer.Shared.Uwp.Controls
                 var load = new Button { Content = node.TagName == "audio" ? "Play audio" : "Play video" };
                 var status = new TextBlock { TextWrapping = TextWrapping.Wrap };
                 int version = _version;
+                var scope = _scope;
                 media.MediaFailed += (s, e) => { if (version == _version) status.Text = "Windows could not play this format. Choose another source or use Web view."; };
-                load.Click += (s, e) => { if (version != _version) return; status.Text = ""; media.Source = ((NativeMediaSource)choices.SelectedItem).Uri; media.Play(); };
+                load.Click += (s, e) => { if (version != _version || scope?.Active == false) return; status.Text = ""; media.Source = ((NativeMediaSource)choices.SelectedItem).Uri; media.Play(); };
                 choices.SelectionChanged += (s, e) => { media.Stop(); media.Source = null; };
-                _media.Add(media); panel.Children.Add(media); panel.Children.Add(load); panel.Children.Add(status);
+                _media.Add(media); _scope?.Media.Add(media); panel.Children.Add(media); panel.Children.Add(load); panel.Children.Add(status);
                 var open = new HyperlinkButton { Content = "Open media file", NavigateUri = sources[0].Uri };
                 panel.Children.Add(open);
             }
@@ -355,7 +470,7 @@ namespace WikiViewer.Shared.Uwp.Controls
 
         private void LimitImageWidth(Image image)
         {
-            double width = _root.ActualWidth > 0 ? _root.ActualWidth : 320;
+            double width = ActualWidth > 0 ? Math.Min(1100, ActualWidth) : 320;
             for (var parent = VisualTreeHelper.GetParent(image); parent != null; parent = VisualTreeHelper.GetParent(parent))
             {
                 var element = parent as FrameworkElement;
@@ -441,20 +556,44 @@ namespace WikiViewer.Shared.Uwp.Controls
         }
 
         private void Register(string id, FrameworkElement element)
-        { if (!string.IsNullOrEmpty(id) && !_anchors.ContainsKey(id)) _anchors.Add(id, element); }
+        {
+            if (string.IsNullOrEmpty(id)) return;
+            if (!_anchors.ContainsKey(id)) _anchors.Add(id, element);
+            if (_scope != null && !_scope.Anchors.ContainsKey(id)) _scope.Anchors[id] = element;
+        }
 
         private async Task Navigate(Uri uri)
         {
+            int version = _version;
             try
             {
                 FrameworkElement anchor;
-                if (_pageUri != null && uri.Scheme == _pageUri.Scheme && uri.Host == _pageUri.Host && uri.Port == _pageUri.Port &&
-                    uri.AbsolutePath == _pageUri.AbsolutePath && uri.Query == _pageUri.Query &&
-                    !string.IsNullOrEmpty(uri.Fragment) && _anchors.TryGetValue(Uri.UnescapeDataString(uri.Fragment.TrimStart('#')), out anchor))
-                { _scroll.ChangeView(null, anchor.TransformToVisual(_root).TransformPoint(new Point()).Y, null); return; }
+                if (NativeArticleDocumentService.IsSamePage(_pageUri, uri) && !string.IsNullOrEmpty(uri.Fragment))
+                {
+                    string id = Uri.UnescapeDataString(uri.Fragment.TrimStart('#'));
+                    NativeArticleSection section;
+                    if (_sections != null && _anchorSections.TryGetValue(id, out section))
+                    {
+                        _sections.ScrollIntoView(section, ScrollIntoViewAlignment.Leading); _sections.UpdateLayout();
+                        await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Low, () => { });
+                        if (version != _version || _sections == null) return;
+                        var viewer = FindScrollViewer(_sections);
+                        if (viewer != null && _anchors.TryGetValue(id, out anchor)) viewer.ChangeView(null, viewer.VerticalOffset + anchor.TransformToVisual(viewer).TransformPoint(new Point()).Y, null, true);
+                        return;
+                    }
+                    if (_anchors.TryGetValue(id, out anchor)) { _scroll.ChangeView(null, anchor.TransformToVisual(_root).TransformPoint(new Point()).Y, null); return; }
+                }
                 if (_navigate != null) await _navigate(uri);
             }
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine("Native reader navigation: " + ex.Message); }
+        }
+
+        private static ScrollViewer FindScrollViewer(DependencyObject root)
+        {
+            if (root is ScrollViewer viewer) return viewer;
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+            { var found = FindScrollViewer(VisualTreeHelper.GetChild(root, i)); if (found != null) return found; }
+            return null;
         }
     }
 }

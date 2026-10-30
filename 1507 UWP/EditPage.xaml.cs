@@ -55,11 +55,7 @@ namespace _1507_UWP.Pages
             await Task.CompletedTask;
         }
 
-        private void CancelButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (Frame.CanGoBack)
-                Frame.GoBack();
-        }
+        private new void CancelButton_Click(object sender, RoutedEventArgs e) => base.CancelButton_Click(sender, e);
 
         private void WikitextEditor_ContextMenu(object sender, RightTappedRoutedEventArgs e)
         {

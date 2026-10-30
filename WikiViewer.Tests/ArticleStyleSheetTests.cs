@@ -5,6 +5,14 @@ namespace WikiViewer.Tests;
 
 public class ArticleStyleSheetTests
 {
+    [Fact]
+    public void InheritedVariablesKeepTheirComputedScopeAndShareUnchangedMaps()
+    {
+        var node = NativeArticleDocumentService.Parse("<div style='--a:#123456;--b:var(--a)'><p style='--a:#abcdef;color:var(--b)'>First</p><p>Second</p></div>", new Uri("https://example.org/Page")).Nodes.Single();
+        Assert.Equal("#123456", node.Children[0].Style.Foreground);
+        Assert.Same(node.Style.Variables, node.Children[1].Style.Variables);
+        Assert.NotSame(node.Style.Variables, node.Children[0].Style.Variables);
+    }
     [Theory]
     [InlineData(".box > p[data-kind='lead']", true)]
     [InlineData(".box > div > p", false)]

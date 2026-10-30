@@ -91,7 +91,7 @@
                                                 HorizontalAlignment="Stretch"
                                                 HorizontalContentAlignment="Left">
                                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                <Image Source="{x:Bind IconUrl, Mode=OneWay}"
+                                                <Image Source="{x:Bind IconUrl, Converter={StaticResource StringToBitmapImageConverter}, Mode=OneWay}"
                                                        Width="18" Height="18"
                                                        VerticalAlignment="Center"
                                                        Margin="13,0,13,0"/>

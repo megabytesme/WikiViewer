@@ -6,6 +6,15 @@ namespace WikiViewer.Tests;
 
 public class NativeArticleDocumentTests
 {
+    [Fact]
+    public void CitationsMatchCanonicalUnderscoreUrlsWithoutRefetchingTheArticle()
+    {
+        var page = new Uri("https://en.wikipedia.org/wiki/John%20Adams");
+        Assert.True(NativeArticleDocumentService.IsSamePage(page, new Uri(page, "./John_Adams#cite_note-1")));
+        Assert.True(NativeArticleDocumentService.IsSamePage(page, new Uri(page, "#cite_note-1")));
+        Assert.False(NativeArticleDocumentService.IsSamePage(page, new Uri("https://other.org/wiki/John_Adams#cite_note-1")));
+        Assert.False(NativeArticleDocumentService.IsSamePage(page, new Uri("https://en.wikipedia.org/wiki/John_Adams?action=edit#cite_note-1")));
+    }
     private static readonly Uri Page = new("https://example.org/wiki/Article");
     private static NativeArticleDocument Parse(string html) => NativeArticleDocumentService.Parse(html, Page);
     private static IEnumerable<NativeArticleNode> All(IEnumerable<NativeArticleNode> nodes)
@@ -71,7 +80,7 @@ public class NativeArticleDocumentTests
     {
         var document = Parse("<p>before</p><video>Video caption</video><math>x+y</math>");
         Assert.Contains("video", document.UnsupportedFeatures);
-        Assert.Contains("math", document.UnsupportedFeatures);
+        Assert.Contains(All(document.Nodes), n => n.Kind == NativeArticleNodeKind.Math);
         Assert.Contains(All(document.Nodes), n => n.Kind == NativeArticleNodeKind.Unsupported && n.Text == "Video caption");
     }
 

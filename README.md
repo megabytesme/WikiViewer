@@ -27,7 +27,13 @@ Raw source, expanded markup, attributes and resolved styles remain available in 
 
 The modern head renders static SVG, including the wiki's SVG math fallback images. Inline SVG retains static shapes and removes active elements/external references. The legacy head provides a readable Web fallback for vectors. Audio/video preserve source choices, posters and captions, and play through Windows media controls when requested. Codec availability depends on Windows; another source, the media-file link or Web view remains available. Interactive maps, charts and JavaScript widgets keep using Web view.
 
-Unsupported containers retain their readable children, and unsupported content receives a Web view notice. Float wrapping still operates between paragraphs. Arbitrary absolute positioning, complex flex/grid, live responsive CSS, raw MathML without an image fallback and exact browser layout can differ. Rendering failures fall back to Web view, and failures in lazily expanded sections show a readable fallback. Large articles are not yet virtualized.
+Both heads render common presentation MathML constructs: fractions, roots, scripts, limits, fences and matrices. Native math font metrics approximate browser typesetting. Relative image containers can place absolute markers/labels using offsets, percentages, translations and stacking order. Ordinary paragraphs flow through native text-overflow regions beside floats and return to full width below them.
+
+Large pages with section headings use a virtualized section list, releasing controls and media when sections are recycled; individual large tables/sections still render as a unit. Article and draft model parsing runs off the UI thread, and obsolete results are discarded. Links to unrealized anchors bring their section into view.
+
+Wiki `siteinfo` supplies localized file/category/redirect aliases, image-option aliases and safely convertible link trails. This configuration is cached with each article. Unsupported PCRE link-trail syntax uses an explicit English fallback. Parser 0.2.0 also supports balanced inclusion controls while retaining original source. Templates, Lua, signatures, substitution and extension semantics still use server expansion.
+
+Unsupported containers retain their readable children, and unsupported content receives a Web view notice. Arbitrary browser positioning, complex flex/grid, live responsive CSS, uncommon MathML, malformed/ambiguous wikitext recovery and exact browser typography remain limits. Rendering failures fall back to Web view, and failures in lazily expanded or virtualized sections show a readable fallback. The compatibility suite and live parser comparison tool establish targeted coverage, not complete MediaWiki conformance.
 
 The portable article-model tests run with `dotnet test WikiViewer.Tests/WikiViewer.Tests.csproj -c Release`. Validate XAML and the native control using the UWP heads on Windows too.
 
@@ -39,10 +45,10 @@ The parser fork is maintained at [megabytesme/WikitextParser](https://github.com
 
 ```powershell
 dotnet pack C:\path\to\WikitextParser\WikitextParser\WikitextParser.csproj -c Release -o C:\path\to\parser-feed
-MSBuild "1809 UWP\1809 UWP.csproj" /restore /p:Configuration=Release /p:Platform=ARM64 /p:WikitextParserVersion=0.1.0 /p:RestoreAdditionalProjectSources=C:\path\to\parser-feed
+MSBuild "1809 UWP\1809 UWP.csproj" /restore /p:Configuration=Release /p:Platform=ARM64 /p:WikitextParserVersion=0.2.0 /p:RestoreAdditionalProjectSources=C:\path\to\parser-feed
 ```
 
-Use MSBuild from Visual Studio with UWP targets installed. The version property defaults to the existing published `0.0.1` package until `0.1.0` is published. Selecting the expanded fork enables its document traversal for raw-source layout hints; the published version retains a compatible traversal path. The expanded parser adds local syntax coverage and compatibility diagnostics; it does not implement the entire MediaWiki runtime. Server expansion remains necessary for full wiki-specific content.
+Use MSBuild from Visual Studio with UWP targets installed. The version property defaults to the existing published `0.0.1` package until the expanded package is published. Selecting 0.2.0 enables localized raw-source parsing; 0.1.0 retains the earlier traversal path; the published version retains a compatible traversal path. The expanded parser adds local syntax coverage and compatibility diagnostics; it does not implement the entire MediaWiki runtime. Server expansion remains necessary for full wiki-specific content.
 
 ## Download
 

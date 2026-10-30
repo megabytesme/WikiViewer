@@ -22,6 +22,7 @@ namespace WikiViewer.Core.Services
             if (html == null) throw new InvalidOperationException("The wiki response did not contain article HTML.");
             return new ArticleContent
             {
+                NativeFormatVersion = ArticleContent.CurrentNativeFormatVersion,
                 Title = (string)parsed["title"] ?? requestedTitle,
                 RevisionId = (long?)parsed["revid"] ?? 0,
                 HtmlContent = html,

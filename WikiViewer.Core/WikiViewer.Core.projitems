@@ -11,8 +11,11 @@
   <ItemGroup>
     <Compile Include="$(MSBuildThisFileDirectory)Services\ArticleStyleSheet.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\ArticleStyleResourceService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Services\WikiSyntaxService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Models\WikiSyntaxConfiguration.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\ArticleColor.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\NativeFlowLayout.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Services\ArticleSectionService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\NativeArticleStyle.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\NativeArticleStyleService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\WikitextLayoutService.cs" />

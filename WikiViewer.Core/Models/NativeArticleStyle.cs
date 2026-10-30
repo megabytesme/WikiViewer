@@ -57,11 +57,20 @@ namespace WikiViewer.Core.Models
     {
         public NativeArticleStyle Copy() => (NativeArticleStyle)MemberwiseClone();
         public string Alignment { get; set; }
+        public string Direction { get; set; }
         public string VerticalAlignment { get; set; }
         public string Float { get; set; }
         public bool PositionExplicit { get; set; }
         public string Clear { get; set; }
         public string Display { get; set; }
+        public string Position { get; set; }
+        public ArticleLength Left { get; set; }
+        public ArticleLength Top { get; set; }
+        public ArticleLength Right { get; set; }
+        public ArticleLength Bottom { get; set; }
+        public ArticleLength TranslateX { get; set; }
+        public ArticleLength TranslateY { get; set; }
+        public int ZIndex { get; set; }
         public bool Wrap { get; set; }
         public int GridColumns { get; set; }
         public ArticleLength Gap { get; set; }
@@ -88,6 +97,6 @@ namespace WikiViewer.Core.Models
         public bool IsThumbnail { get; set; }
         public bool PreserveWhitespace { get; set; }
         public Dictionary<string, string> Declarations { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        public Dictionary<string, string> Variables { get; } = new Dictionary<string, string>(StringComparer.Ordinal);
+        public Dictionary<string, string> Variables { get; internal set; } = new Dictionary<string, string>(StringComparer.Ordinal);
     }
 }

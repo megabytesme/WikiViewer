@@ -24,11 +24,13 @@ namespace WikiViewer.Shared.Uwp.Controls
             {
                 var style = child.GetValue(LayoutStyleProperty) as NativeArticleStyle;
                 return new ArticleFlowItem { Float = style?.Float, Clear = style?.Clear,
-                    PreferredWidth = style?.Width?.Resolve(width) ?? 300 };
+                    PreferredWidth = style?.Width?.Resolve(width) ?? 300, WrapText = child is ArticleTextFlowPanel };
             }).ToList();
             _rectangles = NativeFlowLayout.Arrange(width, items, (index, constraint) =>
             {
                 var element = Children[index] as FrameworkElement;
+                var flowText = element as ArticleTextFlowPanel;
+                if (flowText != null) flowText.Regions = null;
                 if (element != null)
                 {
                     var style = element.GetValue(LayoutStyleProperty) as NativeArticleStyle;
@@ -37,7 +39,11 @@ namespace WikiViewer.Shared.Uwp.Controls
                 }
                 Children[index].Measure(new Size(Math.Max(1, constraint), double.PositiveInfinity));
                 return Children[index].DesiredSize.Height;
-            }, ColumnCount);
+            }, ColumnCount, (index, regions) =>
+            {
+                var flow = (ArticleTextFlowPanel)Children[index]; flow.Regions = regions; flow.MaxWidth = width;
+                flow.Measure(new Size(width, double.PositiveInfinity)); return flow.DesiredSize.Height;
+            });
             return new Size(Math.Max(0, width), _rectangles.Select(r => r.Bottom).DefaultIfEmpty(0).Max());
         }
 

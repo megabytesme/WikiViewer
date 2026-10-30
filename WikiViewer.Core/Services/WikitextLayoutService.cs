@@ -10,11 +10,16 @@ namespace WikiViewer.Core.Services
 {
     public static class WikitextLayoutService
     {
-        public static List<SourceImageLayout> ReadImages(string source)
+        public static List<SourceImageLayout> ReadImages(string source, WikiSyntaxConfiguration syntax = null)
         {
             if (string.IsNullOrEmpty(source)) return new List<SourceImageLayout>();
-#if WIKITEXT_EXTENDED
-            var nodes = ElementTraversal.DescendantsAndSelf(Parser.ParseDocument(source).Elements);
+#if WIKITEXT_CONFIGURABLE
+            var nodes = ElementTraversal.DescendantsAndSelf(Parser.Parse(source, new ParserOptions {
+                FileNamespaces = syntax?.FileNamespaces, CategoryNamespaces = syntax?.CategoryNamespaces, RedirectAliases = syntax?.RedirectAliases,
+                ImageOptionAliases = syntax?.ImageOptions, LinkTrailPattern = syntax?.LinkTrailPattern ?? "[a-z]+"
+            }));
+#elif WIKITEXT_EXTENDED
+            var nodes = ElementTraversal.DescendantsAndSelf(Parser.Parse(source));
 #else
             var nodes = WalkLegacy(Parser.Parse(source));
 #endif
@@ -28,11 +33,19 @@ namespace WikiViewer.Core.Services
             }).ToList();
         }
 
-        public static string NormalizeFileName(string name)
+        public static string NormalizeFileName(string name, WikiSyntaxConfiguration syntax = null)
         {
             string result = Uri.UnescapeDataString((name ?? "").Replace('_', ' ')).Trim();
+            if (result.StartsWith("./", StringComparison.Ordinal)) result = result.Substring(2);
+            foreach (string alias in (syntax?.FileNamespaces ?? new List<string>()).Concat(new[] { "File", "Image" }))
+            {
+                int marker = result.IndexOf("/" + alias + ":", StringComparison.OrdinalIgnoreCase);
+                if (marker >= 0) { result = result.Substring(marker + alias.Length + 2); break; }
+            }
             if (result.StartsWith("File:", StringComparison.OrdinalIgnoreCase)) result = result.Substring(5);
             if (result.StartsWith("Image:", StringComparison.OrdinalIgnoreCase)) result = result.Substring(6);
+            int colon = result.IndexOf(':');
+            if (colon > 0 && syntax?.FileNamespaces?.Any(alias => alias.Equals(result.Substring(0, colon), StringComparison.OrdinalIgnoreCase)) == true) result = result.Substring(colon + 1);
             return result;
         }
 

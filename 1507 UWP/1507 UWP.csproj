@@ -276,6 +276,9 @@
   <PropertyGroup Condition="'$(WikitextParserVersion)' != '0.0.1'">
     <DefineConstants>$(DefineConstants);WIKITEXT_EXTENDED</DefineConstants>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(WikitextParserVersion)' != '0.0.1' And '$(WikitextParserVersion)' != '0.1.0'">
+    <DefineConstants>$(DefineConstants);WIKITEXT_CONFIGURABLE</DefineConstants>
+  </PropertyGroup>
   <Import Project="..\WikiViewer.Shared.Uwp\WikiViewer.Shared.Uwp.projitems" Label="Shared" />
   <PropertyGroup Condition=" '$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '14.0' ">
     <VisualStudioVersion>14.0</VisualStudioVersion>

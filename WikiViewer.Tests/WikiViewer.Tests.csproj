@@ -3,11 +3,11 @@
     <TargetFramework>net10.0</TargetFramework>
     <IsPackable>false</IsPackable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <DefineConstants>$(DefineConstants);WIKITEXT_EXTENDED</DefineConstants>
+    <DefineConstants>$(DefineConstants);WIKITEXT_EXTENDED;WIKITEXT_CONFIGURABLE</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="WikitextParser" Version="0.1.0" />
+    <PackageReference Include="WikitextParser" Version="0.2.0" />
     <PackageReference Include="HtmlAgilityPack" Version="1.12.2" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
     <PackageReference Include="xunit" Version="2.9.2" />
@@ -16,9 +16,12 @@
   <ItemGroup>
     <Compile Include="..\WikiViewer.Core\Models\NativeArticleDocument.cs" Link="Models\NativeArticleDocument.cs" />
     <Compile Include="..\WikiViewer.Core\Services\NativeFlowLayout.cs" Link="Services\NativeFlowLayout.cs" />
+    <Compile Include="..\WikiViewer.Core\Services\ArticleSectionService.cs" Link="Services\ArticleSectionService.cs" />
     <Compile Include="..\WikiViewer.Core\Services\ArticleColor.cs" Link="Services\ArticleColor.cs" />
     <Compile Include="..\WikiViewer.Core\Services\ArticleStyleSheet.cs" Link="Services\ArticleStyleSheet.cs" />
     <Compile Include="..\WikiViewer.Core\Services\ArticleStyleResourceService.cs" Link="Services\ArticleStyleResourceService.cs" />
+    <Compile Include="..\WikiViewer.Core\Services\WikiSyntaxService.cs" Link="Services\WikiSyntaxService.cs" />
+    <Compile Include="..\WikiViewer.Core\Models\WikiSyntaxConfiguration.cs" Link="Models\WikiSyntaxConfiguration.cs" />
     <Compile Include="..\WikiViewer.Core\Models\NativeArticleStyle.cs" Link="Models\NativeArticleStyle.cs" />
     <Compile Include="..\WikiViewer.Core\Services\NativeArticleStyleService.cs" Link="Services\NativeArticleStyleService.cs" />
     <Compile Include="..\WikiViewer.Core\Services\WikitextLayoutService.cs" Link="Services\WikitextLayoutService.cs" />

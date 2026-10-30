@@ -38,6 +38,8 @@ namespace _1809_UWP.Pages
             if (IsPreviewRenderCurrent(version)) PreviewWebView.NavigateToString(htmlContent);
         }
 
+        private new void CancelButton_Click(object sender, RoutedEventArgs e) => base.CancelButton_Click(sender, e);
+
         private void Cut_Click(object sender, RoutedEventArgs e)
         {
             WikitextEditor.Document.Selection.Cut();

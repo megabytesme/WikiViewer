@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using WikiViewer.Core.Models;
 
 namespace WikiViewer.Core.Services
 {
@@ -9,6 +10,7 @@ namespace WikiViewer.Core.Services
         public string Float { get; set; }
         public string Clear { get; set; }
         public double PreferredWidth { get; set; }
+        public bool WrapText { get; set; }
     }
 
     public sealed class ArticleFlowRect
@@ -23,6 +25,12 @@ namespace WikiViewer.Core.Services
     /// <summary>Paragraph-level float/column layout, shared by the UWP panel and portable regression tests.</summary>
     public static class NativeFlowLayout
     {
+        public static ArticleFlowRect Position(double width, double height, double childWidth, double childHeight, NativeArticleStyle style)
+        {
+            double x = style.Left?.Resolve(width) ?? (style.Right != null ? width - style.Right.Resolve(width) - childWidth : 0);
+            double y = style.Top?.Resolve(height) ?? (style.Bottom != null ? height - style.Bottom.Resolve(height) - childHeight : 0);
+            return new ArticleFlowRect { X = x + (style.TranslateX?.Resolve(childWidth) ?? 0), Y = y + (style.TranslateY?.Resolve(childHeight) ?? 0), Width = childWidth, Height = childHeight };
+        }
         public static List<ArticleFlowRect> Tiles(double width, int itemCount, int columns, double gap, Func<int, double, double> measureHeight)
         {
             width = Math.Max(1, width); gap = Math.Max(0, Math.Min(100, gap));
@@ -41,7 +49,8 @@ namespace WikiViewer.Core.Services
             }
             return result;
         }
-        public static List<ArticleFlowRect> Arrange(double width, IList<ArticleFlowItem> items, Func<int, double, double> measureHeight, int columns = 1)
+        public static List<ArticleFlowRect> Arrange(double width, IList<ArticleFlowItem> items, Func<int, double, double> measureHeight, int columns = 1,
+            Func<int, List<ArticleFlowRect>, double> measureTextFlow = null)
         {
             width = Math.Max(1, width);
             int count = Math.Max(1, Math.Min(columns, (int)(width / 300)));
@@ -86,9 +95,31 @@ namespace WikiViewer.Core.Services
                     floats.RemoveAll(f => f.Item2.Bottom <= y);
                 }
                 double available = Math.Max(1, right - left);
+                if (item.WrapText && measureTextFlow != null && floats.Any(f => f.Item2.Bottom > y))
+                {
+                    var flow = new ArticleFlowRect { X = 0, Y = y, Width = width, Height = Math.Max(0, measureTextFlow(i, FlowRegions(width, y, floats))) };
+                    result.Add(flow); y = flow.Bottom; continue;
+                }
                 var block = new ArticleFlowRect { X = left, Y = y, Width = available, Height = Math.Max(0, measureHeight(i, available)) };
                 result.Add(block);
                 y = block.Bottom;
+            }
+            return result;
+        }
+
+        public static List<ArticleFlowRect> FlowRegions(double width, double start, IEnumerable<Tuple<string, ArticleFlowRect>> placements)
+        {
+            var floats = placements.Where(f => f.Item2.Bottom > start).ToList();
+            var boundaries = new[] { start }.Concat(floats.SelectMany(f => new[] { f.Item2.Y, f.Item2.Bottom }).Where(y => y > start)).Distinct().OrderBy(y => y).ToList();
+            var result = new List<ArticleFlowRect>();
+            for (int i = 0; i < boundaries.Count; i++)
+            {
+                double top = boundaries[i], end = i + 1 < boundaries.Count ? boundaries[i + 1] : double.PositiveInfinity;
+                var active = floats.Where(f => f.Item2.Y < end && f.Item2.Bottom > top).ToList();
+                double left = active.Where(f => f.Item1 == "left").Select(f => f.Item2.Width + 12).DefaultIfEmpty(0).Max();
+                double right = active.Where(f => f.Item1 == "right").Select(f => f.Item2.X - 12).DefaultIfEmpty(width).Min();
+                if (right - left < Math.Min(160, width)) continue;
+                result.Add(new ArticleFlowRect { X = left, Y = top - start, Width = Math.Max(1, right - left), Height = end - top });
             }
             return result;
         }

@@ -6,6 +6,30 @@ namespace WikiViewer.Tests;
 public class NativeFlowLayoutTests
 {
     [Fact]
+    public void ParagraphBandsReturnToFullWidthBelowFloatsAndKeepFutureFloatStarts()
+    {
+        var placements = new[] { Tuple.Create("right", new ArticleFlowRect { X = 600, Y = 0, Width = 200, Height = 100 }),
+            Tuple.Create("left", new ArticleFlowRect { X = 0, Y = 40, Width = 180, Height = 100 }) };
+        var bands = NativeFlowLayout.FlowRegions(800, 20, placements);
+        Assert.Equal(new[] { 0d, 20d, 80d, 120d }, bands.Select(b => b.Y));
+        Assert.Equal(588, bands[0].Width);
+        Assert.Equal(396, bands[1].Width);
+        Assert.Equal(800, bands.Last().Width);
+        Assert.True(double.IsPositiveInfinity(bands.Last().Height));
+    }
+    [Fact]
+    public void StaticAnnotationsResolvePercentOffsetsAndCenteredMarkers()
+    {
+        var style = new WikiViewer.Core.Models.NativeArticleStyle { Left = WikiViewer.Core.Models.ArticleLength.Parse("50%"), Top = WikiViewer.Core.Models.ArticleLength.Parse("25%"),
+            TranslateX = WikiViewer.Core.Models.ArticleLength.Parse("-50%", true), TranslateY = WikiViewer.Core.Models.ArticleLength.Parse("-50%", true) };
+        var marker = NativeFlowLayout.Position(1000, 500, 20, 10, style);
+        Assert.Equal(490, marker.X); Assert.Equal(120, marker.Y);
+        style.Left = null; style.Top = null; style.Right = WikiViewer.Core.Models.ArticleLength.Parse("10px"); style.Bottom = WikiViewer.Core.Models.ArticleLength.Parse("20px");
+        style.TranslateX = null; style.TranslateY = null;
+        marker = NativeFlowLayout.Position(400, 200, 30, 15, style);
+        Assert.Equal(360, marker.X); Assert.Equal(165, marker.Y);
+    }
+    [Fact]
     public void TextFlowsBesideAnInfoboxAndReturnsToFullWidth()
     {
         var items = new[] { new ArticleFlowItem { Float = "right", PreferredWidth = 300 }, new ArticleFlowItem(), new ArticleFlowItem(), new ArticleFlowItem() };

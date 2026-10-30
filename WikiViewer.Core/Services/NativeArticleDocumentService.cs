@@ -10,6 +10,13 @@ namespace WikiViewer.Core.Services
     /// <summary>Convert server-expanded HTML to a restricted native reading model. Does not execute page code.</summary>
     public static class NativeArticleDocumentService
     {
+        public static bool IsSamePage(Uri page, Uri target)
+        {
+            if (page == null || target == null || !page.IsAbsoluteUri || !target.IsAbsoluteUri) return false;
+            // MediaWiki treats spaces and underscores in article titles as equivalent.
+            Func<Uri, string> path = uri => Regex.Replace(Uri.UnescapeDataString(uri.AbsolutePath).Replace('_', ' '), " +", " ");
+            return page.Scheme == target.Scheme && page.Host == target.Host && page.Port == target.Port && page.Query == target.Query && path(page) == path(target);
+        }
         public static NativeArticleDocument Parse(string html, Uri pageUri)
             => Parse(new ArticleContent { HtmlContent = html }, pageUri);
 
@@ -20,18 +27,24 @@ namespace WikiViewer.Core.Services
             htmlDocument.LoadHtml(string.IsNullOrEmpty(content.HeadHtml) ? content.HtmlContent ?? "" : content.HeadHtml + (content.HtmlContent ?? "") + "</body></html>");
             var root = htmlDocument.DocumentNode.SelectSingleNode("//*[contains(concat(' ', normalize-space(@class), ' '), ' mw-parser-output ')]")
                 ?? htmlDocument.DocumentNode.SelectSingleNode("//body") ?? htmlDocument.DocumentNode;
-            var result = new NativeArticleDocument { RawWikitext = content.RawWikitext, RevisionId = content.RevisionId };
+            var result = new NativeArticleDocument { RawWikitext = content.RawWikitext, RevisionId = content.RevisionId, Syntax = content.Syntax };
             foreach (var sheet in content.ResolvedStyleSheets ?? Enumerable.Empty<string>()) result.StyleRules.AddRange(ArticleStyleSheet.Parse(sheet, viewportWidth));
             foreach (var sheet in htmlDocument.DocumentNode.SelectNodes("//style") ?? Enumerable.Empty<HtmlNode>())
             {
                 result.EmbeddedStyleSheets.Add(sheet.InnerText);
                 result.StyleRules.AddRange(ArticleStyleSheet.Parse(sheet.InnerText, viewportWidth));
             }
-            try { result.SourceImages.AddRange(WikitextLayoutService.ReadImages(content.RawWikitext)); }
+            try { result.SourceImages.AddRange(WikitextLayoutService.ReadImages(content.RawWikitext, content.Syntax)); }
             catch (Exception) { result.UnsupportedFeatures.Add("raw source layout"); }
             NativeArticleStyle rootStyle = null;
             foreach (var ancestor in root.AncestorsAndSelf().Reverse().Where(a => a.NodeType == HtmlNodeType.Element))
-                rootStyle = NativeArticleStyleService.Read(ancestor, result.StyleRules, rootStyle);
+            {
+                var inherited = rootStyle;
+                rootStyle = NativeArticleStyleService.Read(ancestor, result.StyleRules, inherited);
+                Inherit(rootStyle, inherited);
+                result.Background = rootStyle.Background ?? result.Background;
+            }
+            result.Foreground = rootStyle?.Foreground;
             foreach (var child in root.ChildNodes)
             {
                 var node = Convert(child, pageUri, result, false, false, false, rootStyle, 0);
@@ -58,8 +71,8 @@ namespace WikiViewer.Core.Services
             Inherit(style, parentStyle);
             var node = new NativeArticleNode { Kind = NativeArticleNodeKind.Container, Id = source.GetAttributeValue("id", null),
                 TagName = tag, Classes = source.GetAttributeValue("class", ""), Style = style,
-                IsBlock = tag == "div" || tag == "section" || tag == "article" || tag == "figure" || tag == "figcaption" || tag == "caption",
-                PreserveWhitespace = preserveWhitespace || tag == "pre" || style.PreserveWhitespace, RightToLeft = string.Equals(source.GetAttributeValue("dir", rtl ? "rtl" : "ltr"), "rtl", StringComparison.OrdinalIgnoreCase) };
+                IsBlock = style.Position == "absolute" || style.Display == "block" || tag == "div" || tag == "section" || tag == "article" || tag == "figure" || tag == "figcaption" || tag == "caption",
+                PreserveWhitespace = preserveWhitespace || tag == "pre" || style.PreserveWhitespace, RightToLeft = style.Direction != null ? style.Direction == "rtl" : rtl };
             foreach (var attribute in source.Attributes) node.Attributes[attribute.Name] = attribute.Value;
             switch (tag)
             {
@@ -135,7 +148,10 @@ namespace WikiViewer.Core.Services
                     }
                     break;
                 case "source": case "track": return null;
-                case "iframe": case "object": case "embed": case "math":
+                case "math":
+                    var math = ReadMath(source, document, 0); math.Style = style; math.Id = node.Id;
+                    math.IsBlock = source.GetAttributeValue("display", "") == "block"; return math;
+                case "iframe": case "object": case "embed":
                     node.OriginalHtml = source.OuterHtml;
                     document.UnsupportedFeatures.Add(tag);
                     node.Kind = NativeArticleNodeKind.Unsupported;
@@ -167,6 +183,27 @@ namespace WikiViewer.Core.Services
             return node;
         }
 
+        private static NativeArticleNode ReadMath(HtmlNode source, NativeArticleDocument document, int depth)
+        {
+            string tag = source.Name.ToLowerInvariant();
+            var node = new NativeArticleNode { Kind = NativeArticleNodeKind.Math, TagName = tag, OriginalHtml = depth == 0 ? source.OuterHtml : null };
+            foreach (var attribute in source.Attributes) node.Attributes[attribute.Name] = attribute.Value;
+            string[] supported = { "math", "semantics", "mrow", "mstyle", "mi", "mn", "mo", "mtext", "ms", "mspace", "mfrac", "msqrt", "mroot", "msub", "msup", "msubsup", "munder", "mover", "munderover", "mfenced", "mtable", "mtr", "mtd" };
+            if (depth > 64 || !supported.Contains(tag))
+            {
+                document.UnsupportedFeatures.Add("math layout"); node.Kind = NativeArticleNodeKind.Unsupported;
+                node.Text = WebUtility.HtmlDecode(source.InnerText); return node;
+            }
+            foreach (var child in source.ChildNodes)
+            {
+                if (child.NodeType == HtmlNodeType.Comment || child.Name == "annotation" || child.Name == "annotation-xml") continue;
+                if (child.NodeType == HtmlNodeType.Text)
+                { if (!string.IsNullOrWhiteSpace(child.InnerText)) node.Children.Add(new NativeArticleNode { Kind = NativeArticleNodeKind.Math, TagName = "token", Text = WebUtility.HtmlDecode(child.InnerText) }); }
+                else if (child.NodeType == HtmlNodeType.Element) node.Children.Add(ReadMath(child, document, depth + 1));
+            }
+            return node;
+        }
+
         private static void Inherit(NativeArticleStyle style, NativeArticleStyle parent)
         {
             double font = parent?.FontSize?.Resolve(18) ?? 18;
@@ -174,6 +211,7 @@ namespace WikiViewer.Core.Services
             else style.FontSize = parent?.FontSize;
             style.Foreground = style.Foreground ?? parent?.Foreground;
             style.Alignment = style.Alignment ?? parent?.Alignment;
+            style.Direction = style.Direction ?? parent?.Direction;
             style.FontFamily = style.FontFamily ?? parent?.FontFamily;
             style.FontWeight = style.FontWeight ?? parent?.FontWeight;
             style.FontStyle = style.FontStyle ?? parent?.FontStyle;
@@ -242,7 +280,7 @@ namespace WikiViewer.Core.Services
             }
             int start = file.IndexOf("File:", StringComparison.OrdinalIgnoreCase);
             if (start >= 0) file = file.Substring(start);
-            node.SourceFileName = WikitextLayoutService.NormalizeFileName(file);
+            node.SourceFileName = WikitextLayoutService.NormalizeFileName(file, document.Syntax);
             var matches = document.SourceImages.Where(h => string.Equals(h.FileName, node.SourceFileName, StringComparison.Ordinal)).ToList();
             // Never guess which occurrence is intended when a file has conflicting source options.
             if (matches.Count == 0 || matches.Any(h => h.Alignment != matches[0].Alignment || h.Width != matches[0].Width)) return;

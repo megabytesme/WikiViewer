@@ -13,7 +13,8 @@ namespace WikiViewer.Core.Services
         internal static NativeArticleStyle Read(HtmlNode element, IEnumerable<ArticleCssRule> rules = null, NativeArticleStyle parent = null)
         {
             var style = new NativeArticleStyle();
-            if (parent != null) foreach (var variable in parent.Variables) style.Variables[variable.Key] = variable.Value;
+            // Most nodes add no custom properties. Share their already-computed inherited map.
+            if (parent != null) style.Variables = parent.Variables;
             var classes = (element.GetAttributeValue("class", "") ?? "").Split(new[] { ' ', '\t', '\n' }, StringSplitOptions.RemoveEmptyEntries);
             Func<string, bool> has = name => classes.Contains(name, StringComparer.OrdinalIgnoreCase);
             style.IsInfobox = has("infobox");
@@ -44,6 +45,8 @@ namespace WikiViewer.Core.Services
             if (element.Name == "th") { style.Background = "#eaecf0"; style.Foreground = "#202122"; }
             if (element.Name == "s" || element.Name == "strike" || element.Name == "del") style.TextDecoration = "line-through";
             style.Alignment = element.GetAttributeValue("align", style.Alignment);
+            string direction = element.GetAttributeValue("dir", "").ToLowerInvariant();
+            if (direction == "rtl" || direction == "ltr") style.Direction = direction;
             style.VerticalAlignment = element.GetAttributeValue("valign", style.VerticalAlignment);
             style.Width = ArticleLength.Parse(element.GetAttributeValue("width", "")) ?? style.Width;
             style.Height = ArticleLength.Parse(element.GetAttributeValue("height", ""));
@@ -52,7 +55,18 @@ namespace WikiViewer.Core.Services
             var declarations = (rules ?? new ArticleCssRule[0]).Where(rule => ArticleStyleSheet.Matches(rule, element))
                 .OrderBy(rule => rule.Specificity).SelectMany(rule => rule.Values ?? ArticleStyleSheet.ReadDeclarations(rule.Declarations))
                 .Concat(ArticleStyleSheet.ReadDeclarations(element.GetAttributeValue("style", ""))).OrderBy(d => d.Important).ToList();
-            foreach (var declaration in declarations.Where(d => d.Name.StartsWith("--"))) style.Variables[declaration.Name] = declaration.Value;
+            var custom = declarations.Where(d => d.Name.StartsWith("--")).ToList();
+            if (custom.Count > 0)
+            {
+                var variables = new Dictionary<string, string>(style.Variables, StringComparer.Ordinal);
+                foreach (var declaration in custom) variables[declaration.Name] = declaration.Value;
+                style.Variables = new Dictionary<string, string>(StringComparer.Ordinal);
+                foreach (var variable in variables)
+                {
+                    var value = ResolveVariables(variable.Value, variables);
+                    if (value != null) style.Variables[variable.Key] = value;
+                }
+            }
             foreach (var declaration in declarations.Where(d => !d.Name.StartsWith("--")))
             {
                 string key = declaration.Name;
@@ -65,6 +79,7 @@ namespace WikiViewer.Core.Services
                     case "height": style.Height = ArticleLength.Parse(value); break;
                     case "max-width": style.MaxWidth = ArticleLength.Parse(value); break;
                     case "text-align": style.Alignment = value.ToLowerInvariant(); break;
+                    case "direction": if (value == "rtl" || value == "ltr") style.Direction = value; break;
                     case "vertical-align": style.VerticalAlignment = value.ToLowerInvariant(); if (value == "super" || value == "sub") style.VerticalText = value == "super" ? "sup" : "sub"; break;
                     case "float": style.Float = value == "left" || value == "right" ? value : null; style.PositionExplicit = true; break;
                     case "clear": style.Clear = value; break;
@@ -89,6 +104,16 @@ namespace WikiViewer.Core.Services
                     case "column-count": case "-moz-column-count": case "-webkit-column-count":
                         int columns; if (int.TryParse(value, out columns)) style.ColumnCount = Math.Max(1, Math.Min(4, columns)); break;
                     case "display": style.Display = value; style.Hidden = value == "none"; break;
+                    case "position": style.Position = value; break;
+                    case "left": style.Left = ArticleLength.Parse(value, true); break;
+                    case "top": style.Top = ArticleLength.Parse(value, true); break;
+                    case "right": style.Right = ArticleLength.Parse(value, true); break;
+                    case "bottom": style.Bottom = ArticleLength.Parse(value, true); break;
+                    case "z-index": int z; if (int.TryParse(value, out z)) style.ZIndex = Math.Max(-10000, Math.Min(10000, z)); break;
+                    case "transform":
+                        var translate = Regex.Match(value, @"^translate\(\s*([^,]+),\s*([^\)]+)\)$");
+                        if (translate.Success) { style.TranslateX = ArticleLength.Parse(translate.Groups[1].Value, true); style.TranslateY = ArticleLength.Parse(translate.Groups[2].Value, true); }
+                        break;
                     case "flex-wrap": style.Wrap = value == "wrap" || value == "wrap-reverse"; break;
                     case "gap": case "grid-gap": style.Gap = ArticleLength.Parse(value); break;
                     case "grid-template-columns":
