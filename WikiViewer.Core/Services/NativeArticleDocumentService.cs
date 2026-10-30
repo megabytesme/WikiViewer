@@ -21,11 +21,17 @@ namespace WikiViewer.Core.Services
             var root = htmlDocument.DocumentNode.SelectSingleNode("//*[contains(concat(' ', normalize-space(@class), ' '), ' mw-parser-output ')]")
                 ?? htmlDocument.DocumentNode.SelectSingleNode("//body") ?? htmlDocument.DocumentNode;
             var result = new NativeArticleDocument { RawWikitext = content.RawWikitext, RevisionId = content.RevisionId };
+            foreach (var sheet in htmlDocument.DocumentNode.SelectNodes("//style") ?? Enumerable.Empty<HtmlNode>())
+            {
+                result.EmbeddedStyleSheets.Add(sheet.InnerText);
+                result.StyleRules.AddRange(ArticleStyleSheet.Parse(sheet.InnerText));
+            }
             try { result.SourceImages.AddRange(WikitextLayoutService.ReadImages(content.RawWikitext)); }
             catch (Exception) { result.UnsupportedFeatures.Add("raw source layout"); }
             foreach (var child in root.ChildNodes)
             {
-                var node = Convert(child, pageUri, result, false, false, false, null, 0);
+                var node = Convert(child, pageUri, result, false, false, false, NativeArticleStyleService.Read(root, result.StyleRules), 0);
+                if (node != null) NormalizeFlow(node);
                 if (node != null) result.Nodes.Add(node);
             }
             return result;
@@ -44,7 +50,7 @@ namespace WikiViewer.Core.Services
                 document.UnsupportedFeatures.Add("deeply nested content");
                 return new NativeArticleNode { Kind = NativeArticleNodeKind.Unsupported, Text = "This section is available in Web view." };
             }
-            var style = NativeArticleStyleService.Read(source);
+            var style = NativeArticleStyleService.Read(source, document.StyleRules);
             Inherit(style, parentStyle);
             var node = new NativeArticleNode { Kind = NativeArticleNodeKind.Container, Id = source.GetAttributeValue("id", null),
                 TagName = tag, Classes = source.GetAttributeValue("class", ""), Style = style,
@@ -113,6 +119,8 @@ namespace WikiViewer.Core.Services
             // LineBreak or embedded block controls. Preserve their readable content.
             if (insideLink)
             {
+                if (node.Kind != NativeArticleNodeKind.Image) style.Float = null;
+                style.Collapsible = false;
                 if (node.Kind == NativeArticleNodeKind.LineBreak) { node.Kind = NativeArticleNodeKind.Text; node.Text = " "; }
                 if (node.Kind == NativeArticleNodeKind.Link || node.IsBlock || node.Kind == NativeArticleNodeKind.Paragraph || node.Kind == NativeArticleNodeKind.Heading ||
                     node.Kind == NativeArticleNodeKind.Quote || node.Kind == NativeArticleNodeKind.Preformatted || node.Kind == NativeArticleNodeKind.List || node.Kind == NativeArticleNodeKind.Table)
@@ -136,6 +144,52 @@ namespace WikiViewer.Core.Services
             style.FontFamily = style.FontFamily ?? parent?.FontFamily;
             style.FontWeight = style.FontWeight ?? parent?.FontWeight;
             style.FontStyle = style.FontStyle ?? parent?.FontStyle;
+        }
+
+        private static void NormalizeFlow(NativeArticleNode node)
+        {
+            foreach (var child in node.Children) NormalizeFlow(child);
+            if (node.Kind != NativeArticleNodeKind.Paragraph || node.Style.Float != null) return;
+            bool floating = node.Children.Any(child => child.Style.Float != null ||
+                (child.Kind == NativeArticleNodeKind.Image || child.Kind == NativeArticleNodeKind.Link) && Images(child).Any(image => image.HasSourceLayout && image.Style.Float != null));
+            if (!floating) return;
+            var children = node.Children.ToList();
+            node.Children.Clear();
+            node.Kind = NativeArticleNodeKind.Container;
+            node.IsBlock = true;
+            NativeArticleNode paragraph = null;
+            foreach (var child in children)
+            {
+                var sourceImage = Images(child).FirstOrDefault(image => image.HasSourceLayout && image.Style.Float != null);
+                string side = child.Style.Float ?? sourceImage?.Style.Float;
+                if (side == null)
+                {
+                    if (paragraph == null)
+                    {
+                        paragraph = new NativeArticleNode { Kind = NativeArticleNodeKind.Paragraph, RightToLeft = node.RightToLeft,
+                            Style = new NativeArticleStyle { Foreground = node.Style.Foreground, FontFamily = node.Style.FontFamily, FontSize = node.Style.FontSize,
+                                FontWeight = node.Style.FontWeight, FontStyle = node.Style.FontStyle, Alignment = node.Style.Alignment } };
+                        node.Children.Add(paragraph);
+                    }
+                    paragraph.Children.Add(child);
+                    continue;
+                }
+                paragraph = null;
+                var style = child.Style.Copy();
+                style.Float = side;
+                style.Width = style.Width ?? sourceImage?.Style.Width;
+                var wrapper = new NativeArticleNode { Kind = NativeArticleNodeKind.Container, IsBlock = true, Style = style };
+                child.Style = child.Style.Copy(); child.Style.Float = null;
+                if (sourceImage != null) sourceImage.Style.Float = null;
+                wrapper.Children.Add(child);
+                node.Children.Add(wrapper);
+            }
+        }
+
+        private static System.Collections.Generic.IEnumerable<NativeArticleNode> Images(NativeArticleNode node)
+        {
+            if (node.Kind == NativeArticleNodeKind.Image) yield return node;
+            foreach (var child in node.Children) foreach (var image in Images(child)) yield return image;
         }
 
         private static void ApplySourceImage(HtmlNode source, NativeArticleNode node, NativeArticleDocument document)

@@ -5,6 +5,13 @@ using System.Text.RegularExpressions;
 
 namespace WikiViewer.Core.Models
 {
+    public sealed class ArticleCssRule
+    {
+        public string Selector { get; set; }
+        public string Declarations { get; set; }
+        public int Specificity { get; set; }
+    }
+
     public sealed class SourceImageLayout
     {
         public string FileName { get; set; }
@@ -39,9 +46,11 @@ namespace WikiViewer.Core.Models
 
     public sealed class NativeArticleStyle
     {
+        public NativeArticleStyle Copy() => (NativeArticleStyle)MemberwiseClone();
         public string Alignment { get; set; }
         public string VerticalAlignment { get; set; }
         public string Float { get; set; }
+        public bool PositionExplicit { get; set; }
         public string Clear { get; set; }
         public string Foreground { get; set; }
         public string Background { get; set; }

@@ -37,16 +37,27 @@ namespace WikiViewer.Core.Services
                 if (item.Clear == "both" || item.Clear == "left" || item.Clear == "right")
                     y = Math.Max(y, floats.Where(f => item.Clear == "both" || f.Item1 == item.Clear).Select(f => f.Item2.Bottom).DefaultIfEmpty(y).Max());
                 floats.RemoveAll(f => f.Item2.Bottom <= y);
-                if (width >= 640 && (item.Float == "left" || item.Float == "right"))
+                bool positioned = item.Float == "left" || item.Float == "right";
+                double requestedWidth = item.PreferredWidth > 0 ? item.PreferredWidth : 300;
+                if (width >= 640 && positioned && requestedWidth <= width - 160)
                 {
-                    double floatWidth = Math.Min(width * 0.48, item.PreferredWidth > 0 ? item.PreferredWidth : 300);
+                    double floatWidth = requestedWidth;
                     double top = Math.Max(y, floats.Where(f => f.Item1 == item.Float).Select(f => f.Item2.Bottom).DefaultIfEmpty(y).Max());
+                    double height = Math.Max(0, measureHeight(i, floatWidth));
+                    while (true)
+                    {
+                        var conflicts = floats.Where(f => f.Item1 != item.Float && f.Item2.Y < top + height && f.Item2.Bottom > top && f.Item2.Width + floatWidth > width).ToList();
+                        if (conflicts.Count == 0) break;
+                        top = conflicts.Max(f => f.Item2.Bottom);
+                    }
                     var rect = new ArticleFlowRect { X = item.Float == "right" ? width - floatWidth : 0, Y = top,
-                        Width = floatWidth, Height = Math.Max(0, measureHeight(i, floatWidth)) };
+                        Width = floatWidth, Height = height };
                     result.Add(rect);
                     floats.Add(Tuple.Create(item.Float, rect));
                     continue;
                 }
+                if (positioned && requestedWidth > width - 160)
+                { y = Math.Max(y, floats.Select(f => f.Item2.Bottom).DefaultIfEmpty(y).Max()); floats.Clear(); }
                 double left, right;
                 while (true)
                 {

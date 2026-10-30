@@ -29,7 +29,12 @@ namespace WikiViewer.Shared.Uwp.Controls
             _rectangles = NativeFlowLayout.Arrange(width, items, (index, constraint) =>
             {
                 var element = Children[index] as FrameworkElement;
-                if (element != null) element.MaxWidth = Math.Min(960, Math.Max(1, constraint));
+                if (element != null)
+                {
+                    var style = element.GetValue(LayoutStyleProperty) as NativeArticleStyle;
+                    element.MaxWidth = Math.Min(style?.MaxWidth?.Resolve(width) ?? 960, Math.Max(1, constraint));
+                    if (style?.Width != null) element.Width = Math.Min(element.MaxWidth, Math.Max(1, style.Width.Resolve(width)));
+                }
                 Children[index].Measure(new Size(Math.Max(1, constraint), double.PositiveInfinity));
                 return Children[index].DesiredSize.Height;
             }, ColumnCount);

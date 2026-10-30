@@ -14,6 +14,7 @@
     <!-- Controls with XAML -->
     <Compile Include="$(MSBuildThisFileDirectory)Controls\NativeArticleView.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Controls\ArticleFlowPanel.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Controls\ArticleVisualStyle.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Controls\SaveDialog.xaml.cs">
       <DependentUpon>SaveDialog.xaml</DependentUpon>
     </Compile>

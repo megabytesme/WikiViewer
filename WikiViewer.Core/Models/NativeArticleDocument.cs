@@ -41,6 +41,8 @@ namespace WikiViewer.Core.Models
         public string RawWikitext { get; set; }
         public long RevisionId { get; set; }
         public List<SourceImageLayout> SourceImages { get; } = new List<SourceImageLayout>();
+        public List<string> EmbeddedStyleSheets { get; } = new List<string>();
+        public List<ArticleCssRule> StyleRules { get; } = new List<ArticleCssRule>();
         public List<NativeArticleNode> Nodes { get; } = new List<NativeArticleNode>();
         public HashSet<string> UnsupportedFeatures { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     }

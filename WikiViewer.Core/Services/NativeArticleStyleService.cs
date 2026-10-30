@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using HtmlAgilityPack;
@@ -9,19 +10,26 @@ namespace WikiViewer.Core.Services
     /// <summary>Retains inline declarations and maps a bounded CSS/MediaWiki class subset to native properties.</summary>
     public static class NativeArticleStyleService
     {
-        internal static NativeArticleStyle Read(HtmlNode element)
+        internal static NativeArticleStyle Read(HtmlNode element, IEnumerable<ArticleCssRule> rules = null)
         {
             var style = new NativeArticleStyle();
             var classes = (element.GetAttributeValue("class", "") ?? "").Split(new[] { ' ', '\t', '\n' }, StringSplitOptions.RemoveEmptyEntries);
             Func<string, bool> has = name => classes.Contains(name, StringComparer.OrdinalIgnoreCase);
             style.IsInfobox = has("infobox");
             style.IsThumbnail = has("thumb") || has("thumbinner") || element.Name == "figure";
+            bool thumbnailFrame = has("thumb") || element.GetAttributeValue("typeof", "").Contains("mw:File/Thumb");
+            if (thumbnailFrame)
+            {
+                style.Background = "#f8f9fa"; style.Foreground = "#202122"; style.BorderColor = "#a2a9b1"; style.BorderWidth = ArticleLength.Parse("1px");
+                SetEdges(style.Padding, "4px"); SetEdges(style.Margin, "0 0 1em 1em");
+                style.Float = "right";
+            }
             if (style.IsInfobox) { style.Float = "right"; style.Width = ArticleLength.Parse("22em"); style.Background = "#f8f9fa"; style.Foreground = "#202122"; style.BorderColor = "#a2a9b1"; style.BorderWidth = ArticleLength.Parse("1px"); SetEdges(style.Margin, "0 0 1em 1em"); }
             if (has("wikitable")) { style.Background = "#f8f9fa"; style.Foreground = "#202122"; style.BorderColor = "#a2a9b1"; style.BorderWidth = ArticleLength.Parse("1px"); }
-            if (has("tright") || has("floatright") || has("mw-halign-right")) style.Float = "right";
-            if (has("tleft") || has("floatleft") || has("mw-halign-left")) style.Float = "left";
-            if (has("center") || has("tcenter") || has("mw-halign-center")) style.Alignment = "center";
-            if (has("mw-halign-none")) style.Float = null;
+            if (has("tright") || has("floatright") || has("mw-halign-right")) { style.Float = "right"; style.PositionExplicit = true; }
+            if (has("tleft") || has("floatleft") || has("mw-halign-left")) { style.Float = "left"; style.PositionExplicit = true; }
+            if (has("center") || has("tcenter") || has("mw-halign-center")) { style.Alignment = "center"; style.Float = null; style.PositionExplicit = true; }
+            if (has("mw-halign-none")) { style.Float = null; style.PositionExplicit = true; }
             if (has("mw-collapsible") || has("collapsible")) style.Collapsible = true;
             style.InitiallyCollapsed = has("mw-collapsed") || has("collapsed");
             style.Hidden = has("noprint") && has("mw-editsection") || has("mw-editsection") || has("shortdescription");
@@ -30,6 +38,8 @@ namespace WikiViewer.Core.Services
             if (element.Name == "big") style.FontSize = ArticleLength.Parse("120%");
             if (element.Name == "sup" || element.Name == "sub") style.VerticalText = element.Name;
             if (element.Name == "dt" || element.Name == "th") style.FontWeight = "bold";
+            if (element.Name == "b" || element.Name == "strong") style.FontWeight = "bold";
+            if (element.Name == "i" || element.Name == "em" || element.Name == "cite") style.FontStyle = "italic";
             if (element.Name == "th") { style.Background = "#eaecf0"; style.Foreground = "#202122"; }
             if (element.Name == "s" || element.Name == "strike" || element.Name == "del") style.TextDecoration = "line-through";
             style.Alignment = element.GetAttributeValue("align", style.Alignment);
@@ -38,7 +48,9 @@ namespace WikiViewer.Core.Services
             style.Height = ArticleLength.Parse(element.GetAttributeValue("height", ""));
             style.Background = element.GetAttributeValue("bgcolor", style.Background);
             style.Foreground = element.GetAttributeValue("color", style.Foreground);
-            foreach (string declaration in (element.GetAttributeValue("style", "") ?? "").Split(';'))
+            string declarations = string.Join(";", (rules ?? new ArticleCssRule[0]).Where(rule => ArticleStyleSheet.Matches(rule, element))
+                .OrderBy(rule => rule.Specificity).Select(rule => rule.Declarations)) + ";" + element.GetAttributeValue("style", "");
+            foreach (string declaration in declarations.Split(';'))
             {
                 int colon = declaration.IndexOf(':');
                 if (colon < 0) continue;
@@ -51,8 +63,8 @@ namespace WikiViewer.Core.Services
                     case "height": style.Height = ArticleLength.Parse(value); break;
                     case "max-width": style.MaxWidth = ArticleLength.Parse(value); break;
                     case "text-align": style.Alignment = value.ToLowerInvariant(); break;
-                    case "vertical-align": style.VerticalAlignment = value.ToLowerInvariant(); break;
-                    case "float": style.Float = value == "left" || value == "right" ? value : null; break;
+                    case "vertical-align": style.VerticalAlignment = value.ToLowerInvariant(); if (value == "super" || value == "sub") style.VerticalText = value == "super" ? "sup" : "sub"; break;
+                    case "float": style.Float = value == "left" || value == "right" ? value : null; style.PositionExplicit = true; break;
                     case "clear": style.Clear = value; break;
                     case "color": style.Foreground = value; break;
                     case "background-color": style.Background = value; break;
@@ -80,6 +92,16 @@ namespace WikiViewer.Core.Services
                         if (key.StartsWith("padding-")) SetEdge(style.Padding, key.Substring(8), value);
                         if (key.StartsWith("margin-")) SetEdge(style.Margin, key.Substring(7), value);
                         break;
+                }
+            }
+            if (style.Background != null && style.Foreground == null)
+            {
+                uint? color = ArticleColor.Parse(style.Background);
+                if (color.HasValue && (color.Value >> 24) > 127)
+                {
+                    uint c = color.Value;
+                    double light = ((c >> 16) & 255) * 0.299 + ((c >> 8) & 255) * 0.587 + (c & 255) * 0.114;
+                    style.Foreground = light > 140 ? "#202122" : "#ffffff";
                 }
             }
             return style;

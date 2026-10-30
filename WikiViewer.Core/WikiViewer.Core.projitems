@@ -9,6 +9,8 @@
     <Import_RootNamespace>WikiViewer.Core</Import_RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)Services\ArticleStyleSheet.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Services\ArticleColor.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\NativeFlowLayout.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\NativeArticleStyle.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\NativeArticleStyleService.cs" />

@@ -19,9 +19,11 @@
 
 ## Native reader preview
 
-Open an article and select **Native reader (Preview)** in its command bar to switch between native UWP controls and Web view. The default remains Web view. The preview is available in both UWP heads and uses the wiki's existing `action=parse` result, including server-expanded templates and Lua modules, with the existing article and image caches.
+Open an article and select **Native reader (Preview)** in its command bar to switch between native UWP controls and Web view. The default remains Web view. Both UWP heads fetch raw wikitext, server-expanded HTML and the revision ID in one `action=parse` response, and cache them together. Templates, parser functions, Lua modules and wiki extensions are expanded by the wiki's server. Native controls render the expanded content, supplemented by placement and sizing hints parsed from the raw source. This is a combined source pipeline; it does not evaluate templates locally.
 
-The reader supports paragraphs, headings, text formatting, internal/external links, citation anchors, images, nested lists and scrollable tables with spans. CSS-dependent layouts and interactive content may differ; use the reader button to return to Web view. If native rendering fails, the article opens in Web view automatically. It does not run page scripts. Large articles are not yet virtualized, and it is not a complete replacement for browser rendering.
+The reader supports paragraphs, headings, text formatting, internal/external links, citation anchors, images, nested lists and scrollable tables with spans. It preserves source order, captions, infoboxes, thumbnail placement, declared dimensions, alignment, colours, borders, spacing, columns and collapsible sections where native controls can express them. Expanded HTML's explicit placement takes precedence over source hints. Conflicting source hints for repeated images are left unresolved instead of guessing. Wide windows place floats beside article blocks; narrow windows stack them in reading order.
+
+Raw source, expanded markup, attributes and embedded styles remain available in the article cache. The renderer applies supported inline styles and simple tag/class/id descendant rules from embedded style sheets. Unsupported containers retain their readable children; unsupported media and widgets receive a Web view notice. It does not run scripts, fetch site-wide stylesheets or implement browser CSS layout. Float wrapping operates between paragraphs rather than individual text lines. Conditional/dynamic CSS, absolute positioning, flex/grid and interactive widgets can differ; use the reader button to return to Web view. Rendering failures fall back to Web view, and failures in lazily expanded sections show a readable fallback. Large articles are not yet virtualized.
 
 The portable article-model tests run with `dotnet test WikiViewer.Tests/WikiViewer.Tests.csproj -c Release`. Validate XAML and the native control using the UWP heads on Windows too.
 
@@ -34,7 +36,7 @@ dotnet pack C:\path\to\WikitextParser\WikitextParser\WikitextParser.csproj -c Re
 MSBuild "1809 UWP\1809 UWP.csproj" /restore /p:Configuration=Release /p:Platform=ARM64 /p:WikitextParserVersion=0.1.0 /p:RestoreAdditionalProjectSources=C:\path\to\parser-feed
 ```
 
-Use MSBuild from Visual Studio with UWP targets installed. The version property defaults to the existing published `0.0.1` package until `0.1.0` is published. Native article rendering consumes server HTML directly, so it does not depend on a local parser for template evaluation. The expanded parser adds local syntax coverage and compatibility diagnostics; it does not implement the entire MediaWiki runtime.
+Use MSBuild from Visual Studio with UWP targets installed. The version property defaults to the existing published `0.0.1` package until `0.1.0` is published. Selecting the expanded fork enables its document traversal for raw-source layout hints; the published version retains a compatible traversal path. The expanded parser adds local syntax coverage and compatibility diagnostics; it does not implement the entire MediaWiki runtime. Server expansion remains necessary for full wiki-specific content.
 
 ## Download
 

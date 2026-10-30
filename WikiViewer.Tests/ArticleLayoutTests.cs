@@ -41,6 +41,20 @@ public class ArticleLayoutTests
     }
 
     [Fact]
+    public void ParagraphImageFloatsBecomeFlowBlocksWithoutLosingSurroundingText()
+    {
+        var document = Parse("<p>Before <a href='/wiki/File:A.png'><img resource='./File:A.png' src='/A.png'></a> after.</p>", "[[File:A.png|left|200px]]");
+        var root = Assert.Single(document.Nodes);
+        Assert.Equal(NativeArticleNodeKind.Container, root.Kind);
+        var children = root.Children;
+        Assert.Equal(3, children.Count);
+        Assert.Equal("left", children[1].Style.Float);
+        Assert.Equal("Before  after.", string.Concat(All(document.Nodes).Where(n => n.Kind == NativeArticleNodeKind.Text).Select(n => n.Text)));
+        Assert.Single(All(document.Nodes).Where(n => n.Kind == NativeArticleNodeKind.Image));
+        Assert.Single(All(document.Nodes).Where(n => n.Kind == NativeArticleNodeKind.Link));
+    }
+
+    [Fact]
     public void DoesNotGuessConflictingSourceOccurrencesOrOverrideExpandedStyles()
     {
         var ambiguous = Parse("<img resource='./File:A.png' src='/A.png'>", "[[File:A.png|left]]\n[[File:A.png|right]]");
