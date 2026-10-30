@@ -49,6 +49,7 @@ namespace WikiViewer.Core.Services
                 result.Background = rootStyle.Background ?? result.Background;
             }
             result.Foreground = rootStyle?.Foreground;
+            result.ColorContext = rootStyle?.ColorContext;
             foreach (var child in root.ChildNodes)
             {
                 var node = Convert(child, pageUri, result, false, false, false, rootStyle, 0);
@@ -210,6 +211,9 @@ namespace WikiViewer.Core.Services
 
         private static void Inherit(NativeArticleStyle style, NativeArticleStyle parent)
         {
+            var background = ArticleColor.Parse(style.Background);
+            style.ColorContext = background.HasValue && (background.Value >> 24) != 0
+                ? new ArticleBackground(background.Value, parent?.ColorContext) : parent?.ColorContext;
             double font = parent?.FontSize?.Resolve(18) ?? 18;
             if (style.FontSize != null) style.FontSize = new ArticleLength { Value = style.FontSize.Resolve(font, font), Unit = "px" };
             else style.FontSize = parent?.FontSize;
@@ -224,6 +228,17 @@ namespace WikiViewer.Core.Services
         private static void NormalizeFlow(NativeArticleNode node)
         {
             foreach (var child in node.Children) NormalizeFlow(child);
+            if (node.Kind == NativeArticleNodeKind.Link && node.Uri != null && (node.IsBlock || node.Style.Float != null))
+            {
+                // Keep block placement outside the inline hyperlink, whose input handler would otherwise be lost.
+                var link = new NativeArticleNode { Kind = NativeArticleNodeKind.Link, Uri = node.Uri, TagName = "a", Classes = node.Classes,
+                    RightToLeft = node.RightToLeft, Style = node.Style.Copy() };
+                link.Style.Float = null;
+                foreach (var attribute in node.Attributes) link.Attributes[attribute.Key] = attribute.Value;
+                link.Children.AddRange(node.Children);
+                node.Kind = NativeArticleNodeKind.Container; node.IsBlock = true; node.Uri = null;
+                node.Children.Clear(); node.Children.Add(link);
+            }
             if (node.Kind != NativeArticleNodeKind.Paragraph || node.Style.Float != null) return;
             bool floating = node.Children.Any(child => child.Style.Float != null ||
                 (child.Kind == NativeArticleNodeKind.Image || child.Kind == NativeArticleNodeKind.Link) && Images(child).Any(image => image.HasSourceLayout && image.Style.Float != null));
@@ -242,7 +257,7 @@ namespace WikiViewer.Core.Services
                     if (paragraph == null)
                     {
                         paragraph = new NativeArticleNode { Kind = NativeArticleNodeKind.Paragraph, RightToLeft = node.RightToLeft,
-                            Style = new NativeArticleStyle { Foreground = node.Style.Foreground, FontFamily = node.Style.FontFamily, FontSize = node.Style.FontSize,
+                            Style = new NativeArticleStyle { Foreground = node.Style.Foreground, ColorContext = node.Style.ColorContext, FontFamily = node.Style.FontFamily, FontSize = node.Style.FontSize,
                                 FontWeight = node.Style.FontWeight, FontStyle = node.Style.FontStyle, Alignment = node.Style.Alignment } };
                         node.Children.Add(paragraph);
                     }

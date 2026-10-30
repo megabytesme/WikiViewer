@@ -27,6 +27,7 @@ namespace _1507_UWP.Pages
 
         private void UpdateReaderVisibility()
         {
+            WikiViewer.Shared.Uwp.Controls.ReaderModeControl.Update(NativeReaderButton);
             NativeReader.Visibility = NativeReaderButton.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
             ArticleDisplayWebView.Visibility = NativeReaderButton.IsChecked == true ? Visibility.Collapsed : Visibility.Visible;
         }
@@ -68,8 +69,7 @@ namespace _1507_UWP.Pages
                 System.Diagnostics.Debug.WriteLine("Native reader fallback: " + ex.Message);
                 NativeReader.ClearArticle();
                 NativeReaderButton.IsChecked = false;
-                NativeReader.Visibility = Visibility.Collapsed;
-                ArticleDisplayWebView.Visibility = Visibility.Visible;
+                UpdateReaderVisibility();
                 return false;
             }
         }

@@ -18,6 +18,7 @@
     <Compile Include="..\WikiViewer.Core\Services\NativeFlowLayout.cs" Link="Services\NativeFlowLayout.cs" />
     <Compile Include="..\WikiViewer.Core\Services\ArticleSectionService.cs" Link="Services\ArticleSectionService.cs" />
     <Compile Include="..\WikiViewer.Core\Services\ArticleColor.cs" Link="Services\ArticleColor.cs" />
+    <Compile Include="..\WikiViewer.Core\Services\ArticleThemeService.cs" Link="Services\ArticleThemeService.cs" />
     <Compile Include="..\WikiViewer.Core\Services\ArticleStyleSheet.cs" Link="Services\ArticleStyleSheet.cs" />
     <Compile Include="..\WikiViewer.Core\Services\ArticleStyleResourceService.cs" Link="Services\ArticleStyleResourceService.cs" />
     <Compile Include="..\WikiViewer.Core\Services\FaviconDiscoveryService.cs" Link="Services\FaviconDiscoveryService.cs" />

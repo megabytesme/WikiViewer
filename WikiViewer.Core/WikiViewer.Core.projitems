@@ -14,6 +14,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Services\WikiSyntaxService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\WikiSyntaxConfiguration.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\ArticleColor.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Services\ArticleThemeService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\NativeFlowLayout.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\ArticleSectionService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\NativeArticleStyle.cs" />

@@ -123,7 +123,7 @@ namespace WikiViewer.Core
                 (ConnectionMethod)
                     SettingsProvider.GetValue(
                         DefaultConnectionMethodKey,
-                        (int)ConnectionMethod.HttpClient
+                        (int)ConnectionMethod.Auto
                     );
             set => SettingsProvider.SetValue(DefaultConnectionMethodKey, (int)value);
         }

@@ -26,17 +26,17 @@ namespace WikiViewer.Shared.Uwp.Controls
                 edges.Right?.Resolve(800) ?? defaults.Right, edges.Bottom?.Resolve(800) ?? defaults.Bottom);
         }
 
-        internal static FrameworkElement Block(FrameworkElement content, NativeArticleNode node)
+        internal static FrameworkElement Block(FrameworkElement content, NativeArticleNode node, ArticleThemePalette palette)
         {
             var style = node.Style;
             var padding = Edges(style.Padding, new Thickness(0));
             double border = style.BorderWidth?.Resolve(800) ?? 0;
-            bool decorated = border > 0 || Brush(style.Background) != null || padding.Left + padding.Right + padding.Top + padding.Bottom > 0;
+            bool decorated = border > 0 || ArticleColor.Parse(style.Background).HasValue || padding.Left + padding.Right + padding.Top + padding.Bottom > 0;
             FrameworkElement result = content;
             if (decorated)
             {
-                result = new Border { Child = content, Padding = padding, Background = Brush(style.Background),
-                    BorderThickness = new Thickness(Math.Min(12, border)), BorderBrush = Brush(style.BorderColor) ?? new SolidColorBrush(Colors.Gray) };
+                result = new Border { Child = content, Padding = padding, Background = palette.Get(style.Background, ArticleColorRole.Background),
+                    BorderThickness = new Thickness(Math.Min(12, border)), BorderBrush = palette.Get(style.BorderColor, ArticleColorRole.Border, style.ColorContext) };
                 if (content is RichTextBlock) { result.Margin = content.Margin; content.Margin = new Thickness(0); }
             }
             result.Margin = Edges(style.Margin, result.Margin);
@@ -62,12 +62,11 @@ namespace WikiViewer.Shared.Uwp.Controls
             }
         }
 
-        internal static void Text(RichTextBlock text, NativeArticleNode node)
+        internal static void Text(RichTextBlock text, NativeArticleNode node, ArticleThemePalette palette)
         {
             var style = node.Style;
             text.TextAlignment = Alignment(style.Alignment, node.RightToLeft);
-            var foreground = Brush(style.Foreground);
-            if (foreground != null) text.Foreground = foreground;
+            text.Foreground = palette.Get(style.Foreground, ArticleColorRole.Text, style.ColorContext);
             if (style.FontSize != null) text.FontSize = Math.Max(6, Math.Min(120, style.FontSize.Resolve(18)));
             if (style.FontFamily != null) text.FontFamily = new FontFamily(style.FontFamily);
             if (style.FontWeight == "bold" || style.FontWeight == "600" || style.FontWeight == "700") text.FontWeight = FontWeights.Bold;
@@ -75,11 +74,12 @@ namespace WikiViewer.Shared.Uwp.Controls
             if (style.FontStyle == "italic") text.FontStyle = FontStyle.Italic;
         }
 
-        internal static void Inline(Span span, NativeArticleNode node)
+        internal static void Inline(Span span, NativeArticleNode node, ArticleThemePalette palette, bool insideLink)
         {
             var style = node.Style;
-            var foreground = Brush(style.Foreground);
-            if (foreground != null) span.Foreground = foreground;
+            bool ownColor = style.Declarations.ContainsKey("color") || node.Attributes.ContainsKey("color");
+            if (span is Hyperlink) span.Foreground = palette.Get(ownColor ? style.Foreground : null, ArticleColorRole.Link, style.ColorContext);
+            else if (!insideLink || ownColor) span.Foreground = palette.Get(style.Foreground, ArticleColorRole.Text, style.ColorContext);
             if (style.FontSize != null) span.FontSize = Math.Max(6, Math.Min(120, style.FontSize.Resolve(18)));
             if (style.FontWeight == "bold" || style.FontWeight == "600" || style.FontWeight == "700") span.FontWeight = FontWeights.Bold;
             if (style.FontWeight == "normal" || style.FontWeight == "400") span.FontWeight = FontWeights.Normal;

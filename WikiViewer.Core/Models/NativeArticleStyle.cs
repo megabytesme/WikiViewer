@@ -5,6 +5,13 @@ using System.Text.RegularExpressions;
 
 namespace WikiViewer.Core.Models
 {
+    public sealed class ArticleBackground
+    {
+        public uint Color { get; }
+        public ArticleBackground Parent { get; }
+        public ArticleBackground(uint color, ArticleBackground parent) { Color = color; Parent = parent; }
+    }
+
     public sealed class ArticleCssRule
     {
         public string Selector { get; set; }
@@ -76,6 +83,7 @@ namespace WikiViewer.Core.Models
         public ArticleLength Gap { get; set; }
         public string Foreground { get; set; }
         public string Background { get; set; }
+        public ArticleBackground ColorContext { get; set; }
         public string BorderColor { get; set; }
         public string FontFamily { get; set; }
         public string FontWeight { get; set; }

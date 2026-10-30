@@ -52,6 +52,7 @@ namespace WikiViewer.Core.Models
         public long RevisionId { get; set; }
         public WikiSyntaxConfiguration Syntax { get; set; }
         public string Background { get; set; }
+        public ArticleBackground ColorContext { get; set; }
         public string Foreground { get; set; }
         public List<SourceImageLayout> SourceImages { get; } = new List<SourceImageLayout>();
         public List<string> EmbeddedStyleSheets { get; } = new List<string>();

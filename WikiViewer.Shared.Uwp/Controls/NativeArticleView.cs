@@ -16,6 +16,7 @@ using Windows.UI.Xaml.Documents;
 using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Media.Imaging;
 using Windows.UI.Xaml.Markup;
+using Windows.UI.ViewManagement;
 
 namespace WikiViewer.Shared.Uwp.Controls
 {
@@ -23,6 +24,10 @@ namespace WikiViewer.Shared.Uwp.Controls
     public sealed class NativeArticleView : UserControl
     {
         private readonly ArticleFlowPanel _root = new ArticleFlowPanel { MaxWidth = 1100, Margin = new Thickness(20, 56, 20, 80), HorizontalAlignment = HorizontalAlignment.Stretch };
+        private readonly ArticleThemePalette _palette = new ArticleThemePalette();
+        private readonly AccessibilitySettings _accessibility = new AccessibilitySettings();
+        private readonly UISettings _uiSettings = new UISettings();
+        private bool _themeSubscribed;
         private readonly Dictionary<string, FrameworkElement> _anchors = new Dictionary<string, FrameworkElement>(StringComparer.Ordinal);
         private readonly List<Image> _images = new List<Image>();
         private readonly List<MediaElement> _media = new List<MediaElement>();
@@ -49,9 +54,36 @@ namespace WikiViewer.Shared.Uwp.Controls
         {
             _scroll.Content = _root;
             Content = _scroll;
-            Unloaded += (s, e) => ClearArticle();
+            Loaded += (s, e) =>
+            {
+                UpdatePalette();
+                if (_themeSubscribed) return;
+                _themeSubscribed = true;
+                _accessibility.HighContrastChanged += OnHighContrastChanged;
+                _uiSettings.ColorValuesChanged += OnSystemColorsChanged;
+            };
+            Unloaded += (s, e) =>
+            {
+                _themeSubscribed = false;
+                _accessibility.HighContrastChanged -= OnHighContrastChanged;
+                _uiSettings.ColorValuesChanged -= OnSystemColorsChanged;
+                ClearArticle();
+            };
+#if UWP_1809
+            ActualThemeChanged += (s, e) => UpdatePalette();
+#endif
             _root.SizeChanged += (s, e) => { foreach (var image in _images.ToArray()) LimitImageWidth(image); };
             SizeChanged += (s, e) => { foreach (var image in _images.ToArray()) LimitImageWidth(image); };
+        }
+
+        private void UpdatePalette() => _palette.Update(this, _accessibility.HighContrast, _uiSettings);
+        private async void OnHighContrastChanged(AccessibilitySettings sender, object args) => await RefreshPaletteAsync();
+        private async void OnSystemColorsChanged(UISettings sender, object args) => await RefreshPaletteAsync();
+        private async Task RefreshPaletteAsync()
+        {
+            if (!_themeSubscribed) return;
+            try { await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () => { if (_themeSubscribed) UpdatePalette(); }); }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine("Native theme update: " + ex.GetType().Name); }
         }
 
         public void ShowArticle(ArticleContent content, Uri pageUri, Func<Uri, Task> navigate, Func<string, Task<string>> resolveImage)
@@ -89,15 +121,16 @@ namespace WikiViewer.Shared.Uwp.Controls
             _navigate = navigate;
             _resolveImage = resolveImage;
             _pageUri = pageUri;
-            _scroll.Background = ArticleVisualStyle.Brush(document.Background);
-            var foreground = ArticleVisualStyle.Brush(document.Foreground);
+            UpdatePalette();
+            _scroll.Background = _palette.Get(document.Background, ArticleColorRole.Background);
+            var foreground = _palette.Get(document.Foreground, ArticleColorRole.Text, document.ColorContext);
             if (foreground != null) { Foreground = foreground; _scroll.Foreground = foreground; }
             else { ClearValue(Control.ForegroundProperty); _scroll.ClearValue(Control.ForegroundProperty); }
             var sections = ArticleSectionService.Split(document.Nodes);
             if (document.Nodes.Count >= 100 && sections.Count >= 4)
             {
                 ShowSections(sections, document.UnsupportedFeatures.Count > 0);
-                _sections.Background = ArticleVisualStyle.Brush(document.Background);
+                _sections.Background = _palette.Get(document.Background, ArticleColorRole.Background);
                 if (foreground != null) _sections.Foreground = foreground;
                 return;
             }
@@ -191,6 +224,7 @@ namespace WikiViewer.Shared.Uwp.Controls
             _root.Children.Clear();
             _anchors.Clear();
             _images.Clear();
+            _palette.Clear();
         }
 
         private static bool IsBlock(NativeArticleNode node) => node.IsBlock || node.Style.Float != null ||
@@ -223,7 +257,7 @@ namespace WikiViewer.Shared.Uwp.Controls
         private FrameworkElement RenderBlock(NativeArticleNode node)
         {
             var content = node.Style.Collapsible ? Collapsible(node) : RenderBlockCore(node);
-            return ArticleVisualStyle.Block(content, node);
+            return ArticleVisualStyle.Block(content, node, _palette);
         }
 
         private FrameworkElement Collapsible(NativeArticleNode node)
@@ -314,7 +348,7 @@ namespace WikiViewer.Shared.Uwp.Controls
             text.FlowDirection = node.RightToLeft ? FlowDirection.RightToLeft : FlowDirection.LeftToRight;
             if (node.Kind == NativeArticleNodeKind.Heading)
             { text.FontSize = Math.Max(18, 34 - node.Level * 3); text.FontWeight = FontWeights.SemiBold; text.Margin = new Thickness(0, 20, 0, 8); }
-            ArticleVisualStyle.Text(text, node);
+            ArticleVisualStyle.Text(text, node, _palette);
             if (node.Kind == NativeArticleNodeKind.Preformatted)
             { text.FontFamily = new FontFamily("Consolas"); text.TextWrapping = TextWrapping.NoWrap; return new ScrollViewer { Content = text, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled }; }
             if (node.Kind == NativeArticleNodeKind.Paragraph && node.Style.Width == null && node.Style.Background == null && node.Style.BorderWidth == null &&
@@ -326,14 +360,15 @@ namespace WikiViewer.Shared.Uwp.Controls
         private RichTextBlock Text(IEnumerable<NativeArticleNode> nodes, NativeArticleNode owner = null)
         {
             var text = new RichTextBlock { IsTextSelectionEnabled = true, FontSize = 18, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 8) };
+            var interaction = new ArticleLinkInteraction(text);
             var paragraph = new Paragraph();
-            foreach (var node in nodes) AppendInline(paragraph.Inlines, node, text);
+            foreach (var node in nodes) AppendInline(paragraph.Inlines, node, text, interaction);
             text.Blocks.Add(paragraph);
-            if (owner != null) ArticleVisualStyle.Text(text, owner);
+            if (owner != null) ArticleVisualStyle.Text(text, owner, _palette);
             return text;
         }
 
-        private void AppendInline(InlineCollection inlines, NativeArticleNode node, FrameworkElement anchor)
+        private void AppendInline(InlineCollection inlines, NativeArticleNode node, FrameworkElement anchor, ArticleLinkInteraction interaction, bool insideLink = false)
         {
             if (node.Style.Hidden) return;
             Register(node.Id, anchor);
@@ -363,7 +398,8 @@ namespace WikiViewer.Shared.Uwp.Controls
                     inlines.Add(new InlineUIContainer { Child = button }); return;
                 }
                 var link = new Hyperlink();
-                link.Click += async (s, e) => await Navigate(node.Uri);
+                int version = _version; var scope = _scope;
+                interaction.Add(link, async () => { if (version == _version && scope?.Active != false) await Navigate(node.Uri); });
                 span = link;
             }
             else if (node.Kind == NativeArticleNodeKind.Strong) span = new Bold();
@@ -371,8 +407,8 @@ namespace WikiViewer.Shared.Uwp.Controls
             else if (node.Kind == NativeArticleNodeKind.Underline || node.Style.TextDecoration != null && node.Style.TextDecoration.Contains("underline")) span = new Underline();
             else span = new Span();
             if (node.Kind == NativeArticleNodeKind.Code) span.FontFamily = new FontFamily("Consolas");
-            ArticleVisualStyle.Inline(span, node);
-            foreach (var child in node.Children) AppendInline(span.Inlines, child, anchor);
+            ArticleVisualStyle.Inline(span, node, _palette, insideLink);
+            foreach (var child in node.Children) AppendInline(span.Inlines, child, anchor, interaction, insideLink || span is Hyperlink);
             inlines.Add(span);
         }
 
@@ -435,8 +471,8 @@ namespace WikiViewer.Shared.Uwp.Controls
 
         private FrameworkElement MathView(NativeArticleNode node)
         {
-            var host = new ContentControl { Content = ArticleMathView.Create(node), IsTabStop = false, FlowDirection = FlowDirection.LeftToRight };
-            var color = ArticleVisualStyle.Brush(node.Style.Foreground);
+            var host = new ContentControl { Content = ArticleMathView.Create(node, _palette), IsTabStop = false, FlowDirection = FlowDirection.LeftToRight };
+            var color = _palette.Get(node.Style.Foreground, ArticleColorRole.Text, node.Style.ColorContext);
             if (color != null) host.Foreground = color;
             return host;
         }
@@ -507,8 +543,8 @@ namespace WikiViewer.Shared.Uwp.Controls
                     for (int r = row; r < row + rowSpan; r++) for (int c = column; c < column + columns; c++) occupied.Add(r + ":" + c);
                     var panel = new StackPanel { MinWidth = 80, MaxWidth = 360 };
                     AppendBlocks(panel, cell.Children, cell);
-                    var border = new Border { Child = panel, BorderThickness = new Thickness(0.5), BorderBrush = ArticleVisualStyle.Brush(cell.Style.BorderColor ?? node.Style.BorderColor) ?? new SolidColorBrush(Colors.Gray),
-                        Background = ArticleVisualStyle.Brush(cell.Style.Background ?? rows[row].Style.Background ?? node.Style.Background),
+                    var border = new Border { Child = panel, BorderThickness = new Thickness(0.5), BorderBrush = _palette.Get(cell.Style.BorderColor ?? node.Style.BorderColor, ArticleColorRole.Border, cell.Style.ColorContext),
+                        Background = _palette.Get(cell.Style.Background ?? rows[row].Style.Background ?? node.Style.Background, ArticleColorRole.Background),
                         Padding = ArticleVisualStyle.Edges(cell.Style.Padding, new Thickness(8)) };
                     if (cell.Style.VerticalAlignment == "top") panel.VerticalAlignment = VerticalAlignment.Top;
                     else if (cell.Style.VerticalAlignment == "bottom") panel.VerticalAlignment = VerticalAlignment.Bottom;

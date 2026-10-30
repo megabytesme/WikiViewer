@@ -32,7 +32,12 @@ namespace WikiViewer.Shared.Uwp.Controls
         {
             double width = double.IsInfinity(availableSize.Width) ? 960 : Math.Max(1, availableSize.Width);
             var regions = Regions ?? new List<ArticleFlowRect> { new ArticleFlowRect { Width = width, Height = double.PositiveInfinity } };
-            while (Children.Count < regions.Count) Children.Add(new RichTextBlockOverflow());
+            while (Children.Count < regions.Count)
+            {
+                var overflow = new RichTextBlockOverflow();
+                ArticleLinkInteraction.AttachOverflow(overflow, _text);
+                Children.Add(overflow);
+            }
             var first = regions.Count > 1 ? (RichTextBlockOverflow)Children[1] : null;
             // Reassigning the same overflow target still invalidates native text layout.
             // Doing so during Measure keeps the entire page in a layout loop.

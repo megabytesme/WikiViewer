@@ -19,6 +19,9 @@
     <Compile Include="$(MSBuildThisFileDirectory)Controls\ArticleMathView.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Controls\ArticleTextFlowPanel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Controls\ArticleVisualStyle.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Controls\ArticleThemePalette.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Controls\ReaderModeControl.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Controls\ArticleLinkInteraction.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Controls\SaveDialog.xaml.cs">
       <DependentUpon>SaveDialog.xaml</DependentUpon>
     </Compile>

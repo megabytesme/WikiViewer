@@ -85,7 +85,7 @@ namespace WikiViewer.Core.Services
                     case "clear": style.Clear = value; break;
                     case "color": style.Foreground = value; break;
                     case "background-color": style.Background = value; break;
-                    case "background": if (!value.Contains("(") && !value.Contains(" ")) style.Background = value; break;
+                    case "background": if (ArticleColor.Parse(value).HasValue) style.Background = value; break;
                     case "font-size": style.FontSize = ArticleLength.Parse(value); break;
                     case "font-weight": style.FontWeight = value; break;
                     case "font-style": style.FontStyle = value; break;
