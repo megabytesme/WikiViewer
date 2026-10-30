@@ -39,7 +39,7 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected abstract void ShowLoadingOverlay();
         protected abstract void HideLoadingOverlay();
         protected abstract Task DisplayProcessedHtmlAsync(string html);
-        protected virtual bool TryDisplayNativeArticle(string html) => false;
+        protected virtual bool TryDisplayNativeArticle(ArticleContent content) => false;
         protected abstract void ShowVerificationPanel(string url);
         protected abstract void InitializePlatformControls();
         protected abstract void UninitializePlatformControls();
@@ -372,14 +372,16 @@ namespace WikiViewer.Shared.Uwp.Pages
                 {
                     await worker.InitializeAsync(_pageWikiContext.BaseUrl);
 
-                    var (htmlContent, resolvedTitle) =
-                        await ArticleProcessingService.FetchAndProcessArticleAsync(
+                    var articleContent =
+                        await ArticleProcessingService.FetchArticleContentAsync(
                             _pageTitleToFetch,
                             fetchStopwatch,
                             worker,
                             _pageWikiContext
                         );
                     if (requestVersion != _articleRequestVersion) return;
+                    string htmlContent = articleContent.HtmlContent;
+                    string resolvedTitle = articleContent.Title;
 
                     var doc = new HtmlDocument();
                     doc.LoadHtml(htmlContent);
@@ -416,7 +418,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                         mainPage?.SetPageTitle(resolvedTitle);
                     }
 
-                    if (!TryDisplayNativeArticle(htmlContent))
+                    if (!TryDisplayNativeArticle(articleContent))
                     {
                         var processedHtml = await ArticleProcessingService.BuildArticleHtmlAsync(
                             htmlContent,

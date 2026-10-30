@@ -35,7 +35,7 @@ namespace WikiViewer.Shared.Uwp.Controls
             _root.SizeChanged += (s, e) => { foreach (var image in _images) image.MaxWidth = Math.Max(80, e.NewSize.Width - 40); };
         }
 
-        public void ShowArticle(string html, Uri pageUri, Func<Uri, Task> navigate, Func<string, Task<string>> resolveImage)
+        public void ShowArticle(ArticleContent content, Uri pageUri, Func<Uri, Task> navigate, Func<string, Task<string>> resolveImage)
         {
             try
             {
@@ -43,7 +43,7 @@ namespace WikiViewer.Shared.Uwp.Controls
             _navigate = navigate;
             _resolveImage = resolveImage;
             _pageUri = pageUri;
-            var document = NativeArticleDocumentService.Parse(html, pageUri);
+            var document = NativeArticleDocumentService.Parse(content.HtmlContent, pageUri);
             if (document.UnsupportedFeatures.Count > 0)
                 _root.Children.Add(new TextBlock { Text = "Some content is available in Web view. Use the reader button to switch views.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12), Opacity = 0.75 });
             AppendBlocks(_root, document.Nodes);

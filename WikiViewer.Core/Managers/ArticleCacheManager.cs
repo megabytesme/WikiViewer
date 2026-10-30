@@ -113,12 +113,46 @@ namespace WikiViewer.Core.Managers
             return await StorageProvider.ReadTextAsync(filePath);
         }
 
+        public static async Task<ArticleContent> GetCachedArticleContentAsync(string pageTitle, Guid wikiId)
+        {
+            string name = GetHashedFileName(pageTitle, wikiId);
+            string pairedPath = Path.Combine(ArticleCacheFolderName, name + ".article.json");
+            if (await StorageProvider.FileExistsAsync(pairedPath))
+            {
+                try
+                {
+                    var content = JsonConvert.DeserializeObject<ArticleContent>(await StorageProvider.ReadTextAsync(pairedPath));
+                    if (content?.HtmlContent != null) return content;
+                }
+                catch (Exception) { }
+            }
+            // Old caches remain readable, without inventing source/revision information.
+            if (!await StorageProvider.FileExistsAsync(Path.Combine(ArticleCacheFolderName, name + ".html"))) return null;
+            return new ArticleContent { Title = pageTitle, HtmlContent = await GetCachedArticleHtmlAsync(pageTitle, wikiId) };
+        }
+
+        public static async Task SaveArticleContentAsync(string pageTitle, Guid wikiId, ArticleContent content, DateTime lastUpdated)
+        {
+            if (content == null || content.HtmlContent == null) throw new ArgumentException("Article content is required.", nameof(content));
+            // The complete pair is a single record; legacy HTML remains available to existing cache consumers.
+            string name = GetHashedFileName(pageTitle, wikiId);
+            await StorageProvider.WriteTextAsync(Path.Combine(ArticleCacheFolderName, name + ".article.json"), JsonConvert.SerializeObject(content));
+            await WriteLegacyCacheAsync(pageTitle, wikiId, content.HtmlContent, lastUpdated);
+        }
+
         public static async Task SaveArticleHtmlAsync(
             string pageTitle,
             Guid wikiId,
             string htmlContent,
             DateTime lastUpdated
         )
+        {
+            string pairedPath = Path.Combine(ArticleCacheFolderName, GetHashedFileName(pageTitle, wikiId) + ".article.json");
+            if (await StorageProvider.FileExistsAsync(pairedPath)) await StorageProvider.DeleteFileAsync(pairedPath);
+            await WriteLegacyCacheAsync(pageTitle, wikiId, htmlContent, lastUpdated);
+        }
+
+        private static async Task WriteLegacyCacheAsync(string pageTitle, Guid wikiId, string htmlContent, DateTime lastUpdated)
         {
             if (StorageProvider == null)
                 throw new InvalidOperationException("StorageProvider not set.");
@@ -144,6 +178,8 @@ namespace WikiViewer.Core.Managers
             string baseFileName = GetHashedFileName(pageTitle, wikiId);
             try
             {
+                string pairedPath = Path.Combine(ArticleCacheFolderName, baseFileName + ".article.json");
+                if (await StorageProvider.FileExistsAsync(pairedPath)) await StorageProvider.DeleteFileAsync(pairedPath);
                 await StorageProvider.DeleteFileAsync(
                     Path.Combine(ArticleCacheFolderName, baseFileName + ".json")
                 );

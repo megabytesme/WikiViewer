@@ -28,13 +28,13 @@ namespace _1507_UWP.Pages
             StartArticleFetch();
         }
 
-        protected override bool TryDisplayNativeArticle(string html)
+        protected override bool TryDisplayNativeArticle(ArticleContent content)
         {
             if (NativeReaderButton.IsChecked != true) return false;
             try
             {
             var wiki = _pageWikiContext;
-            NativeReader.ShowArticle(html, new Uri(wiki.GetWikiPageUrl(_pageTitleToFetch)), async uri =>
+            NativeReader.ShowArticle(content, new Uri(wiki.GetWikiPageUrl(_pageTitleToFetch)), async uri =>
             {
                 var target = WikiManager.GetWikiByHost(uri.Host);
                 string prefix = "/" + (target?.ArticlePath ?? "").Trim('/');

@@ -9,6 +9,8 @@
     <Import_RootNamespace>WikiViewer.Core</Import_RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)Models\ArticleContent.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Services\ArticleContentResponse.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\NativeArticleDocument.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\NativeArticleDocumentService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Enums\ConnectionMethod.cs" />

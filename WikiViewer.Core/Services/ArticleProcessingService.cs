@@ -17,10 +17,15 @@ namespace WikiViewer.Core.Services
 {
     public static class ArticleProcessingService
     {
-        public static async Task<(
-            string HtmlContent,
-            string ResolvedTitle
-        )> FetchAndProcessArticleAsync(
+        public static async Task<(string HtmlContent, string ResolvedTitle)> FetchAndProcessArticleAsync(
+            string pageTitle, Stopwatch stopwatch, IApiWorker worker, WikiInstance wiki,
+            bool forceRefresh = false, SemaphoreSlim semaphore = null)
+        {
+            var content = await FetchArticleContentAsync(pageTitle, stopwatch, worker, wiki, forceRefresh, semaphore);
+            return (content.HtmlContent, content.Title);
+        }
+
+        public static async Task<ArticleContent> FetchArticleContentAsync(
             string pageTitle,
             Stopwatch stopwatch,
             IApiWorker worker,
@@ -68,13 +73,13 @@ namespace WikiViewer.Core.Services
                         )
                     )
                     {
-                        string cachedHtml = await ArticleCacheManager.GetCachedArticleHtmlAsync(
+                        var cached = await ArticleCacheManager.GetCachedArticleContentAsync(
                             resolvedTitle,
                             wiki.Id
                         );
-                        if (!string.IsNullOrEmpty(cachedHtml))
+                        if (cached?.HtmlContent != null && (!isConnected || cached.HasRawSource))
                         {
-                            return (cachedHtml, resolvedTitle);
+                            return cached;
                         }
                     }
                 }
@@ -87,53 +92,28 @@ namespace WikiViewer.Core.Services
 
             try
             {
-                string freshHtmlContent = await FetchParsedHtmlFromApiAsync(
-                    resolvedTitle,
-                    worker,
-                    wiki
-                );
-                await ArticleCacheManager.SaveArticleHtmlAsync(
+                string json = await worker.GetJsonFromApiAsync(ArticleContentResponse.BuildUrl(wiki.ApiEndpoint, resolvedTitle));
+                var content = ArticleContentResponse.Parse(json, resolvedTitle);
+                await ArticleCacheManager.SaveArticleContentAsync(
                     resolvedTitle,
                     wiki.Id,
-                    freshHtmlContent,
+                    content,
                     DateTime.UtcNow
                 );
-                return (freshHtmlContent, resolvedTitle);
+                return content;
             }
             catch (Exception ex)
             {
-                string finalFallbackHtml = await ArticleCacheManager.GetCachedArticleHtmlAsync(
+                var fallback = await ArticleCacheManager.GetCachedArticleContentAsync(
                     resolvedTitle,
                     wiki.Id
                 );
-                if (!string.IsNullOrEmpty(finalFallbackHtml))
+                if (fallback?.HtmlContent != null)
                 {
-                    return (finalFallbackHtml, resolvedTitle);
+                    return fallback;
                 }
                 throw;
             }
-        }
-
-        private static async Task<string> FetchParsedHtmlFromApiAsync(
-            string title,
-            IApiWorker worker,
-            WikiInstance wiki
-        )
-        {
-            var url =
-                $"{wiki.ApiEndpoint}?action=parse&page={Uri.EscapeDataString(title)}&prop=text&format=json&disableeditsection=true";
-            var json = await worker.GetJsonFromApiAsync(url);
-            if (string.IsNullOrEmpty(json))
-                throw new Exception("API returned an empty response for parsed HTML.");
-            var response = JObject.Parse(json);
-            if (response["error"] != null)
-                throw new Exception(
-                    response["error"]["info"]?.ToString() ?? "Unknown API error during page parse."
-                );
-            var htmlContent = response["parse"]?["text"]?["*"]?.ToString();
-            if (string.IsNullOrEmpty(htmlContent))
-                throw new Exception("API response did not contain page HTML.");
-            return htmlContent;
         }
 
         public static async Task<string> BuildArticleHtmlAsync(

@@ -363,16 +363,6 @@ namespace WikiViewer.Core.Models
         }
     }
 
-    public class ArticleCachedEventArgs : EventArgs
-    {
-        public string PageTitle { get; }
-
-        public ArticleCachedEventArgs(string pageTitle)
-        {
-            PageTitle = pageTitle;
-        }
-    }
-
     public class AuthUiRequiredException : Exception
     {
         public ClientLoginResult LoginResult { get; }
