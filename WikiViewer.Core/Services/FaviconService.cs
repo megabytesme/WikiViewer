@@ -39,8 +39,11 @@ namespace WikiViewer.Core.Services
                 string hash = CryptographicBuffer.EncodeToHexString(provider.HashData(CryptographicBuffer.CreateFromByteArray(result.Bytes))).Substring(0, 16);
                 string fileName = wiki.Id + "-" + hash + "." + result.Format;
                 string uri = "ms-appdata:///local/favicons/" + fileName;
-                var file = await folder.CreateFileAsync(fileName, CreationCollisionOption.ReplaceExisting);
-                await FileIO.WriteBytesAsync(file, result.Bytes);
+                // A displayed BitmapImage can hold this file open. Do not replace unchanged content.
+                var file = await folder.CreateFileAsync(fileName, CreationCollisionOption.OpenIfExists);
+                bool unchanged = (await file.GetBasicPropertiesAsync()).Size == (ulong)result.Bytes.Length &&
+                    CryptographicBuffer.Compare(await FileIO.ReadBufferAsync(file), CryptographicBuffer.CreateFromByteArray(result.Bytes));
+                if (!unchanged) await FileIO.WriteBytesAsync(file, result.Bytes);
                 wiki.IconUrl = uri;
                 // Only auto-generated icons for this wiki are obsolete. Preserve user-imported files.
                 foreach (var prior in (await folder.GetFilesAsync()).Where(f => f.Name != fileName && (f.Name == wiki.Id.ToString() || f.Name.StartsWith(wiki.Id + "-", StringComparison.Ordinal))))

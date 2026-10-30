@@ -579,8 +579,16 @@ namespace WikiViewer.Shared.Uwp.Controls
                         _sections.ScrollIntoView(section, ScrollIntoViewAlignment.Leading); _sections.UpdateLayout();
                         await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Low, () => { });
                         if (version != _version || _sections == null) return;
-                        var viewer = FindScrollViewer(_sections);
-                        if (viewer != null && _anchors.TryGetValue(id, out anchor)) viewer.ChangeView(null, viewer.VerticalOffset + anchor.TransformToVisual(viewer).TransformPoint(new Point()).Y, null, true);
+                        if (_anchors.TryGetValue(id, out anchor))
+                        {
+#if UWP_1809
+                            // Let the virtualizing list resolve its content coordinates after realization.
+                            anchor.StartBringIntoView(new BringIntoViewOptions { AnimationDesired = false, VerticalAlignmentRatio = 0 });
+#else
+                            var viewer = FindScrollViewer(_sections);
+                            if (viewer != null) viewer.ChangeView(null, viewer.VerticalOffset + anchor.TransformToVisual(viewer).TransformPoint(new Point()).Y, null, true);
+#endif
+                        }
                         return;
                     }
                     if (_anchors.TryGetValue(id, out anchor)) { _scroll.ChangeView(null, anchor.TransformToVisual(_root).TransformPoint(new Point()).Y, null); return; }
