@@ -26,11 +26,21 @@ namespace WikiViewer.Core.Models
         public bool PreserveWhitespace { get; set; }
         public bool RightToLeft { get; set; }
         public bool IsBlock { get; set; }
+        public string TagName { get; set; }
+        public string Classes { get; set; }
+        public string SourceFileName { get; set; }
+        public string OriginalHtml { get; set; }
+        public Dictionary<string, string> Attributes { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        public bool HasSourceLayout { get; set; }
+        public NativeArticleStyle Style { get; set; } = new NativeArticleStyle();
         public List<NativeArticleNode> Children { get; } = new List<NativeArticleNode>();
     }
 
     public sealed class NativeArticleDocument
     {
+        public string RawWikitext { get; set; }
+        public long RevisionId { get; set; }
+        public List<SourceImageLayout> SourceImages { get; } = new List<SourceImageLayout>();
         public List<NativeArticleNode> Nodes { get; } = new List<NativeArticleNode>();
         public HashSet<string> UnsupportedFeatures { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     }

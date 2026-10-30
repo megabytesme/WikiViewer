@@ -43,7 +43,7 @@ namespace WikiViewer.Shared.Uwp.Controls
             _navigate = navigate;
             _resolveImage = resolveImage;
             _pageUri = pageUri;
-            var document = NativeArticleDocumentService.Parse(content.HtmlContent, pageUri);
+            var document = NativeArticleDocumentService.Parse(content, pageUri);
             if (document.UnsupportedFeatures.Count > 0)
                 _root.Children.Add(new TextBlock { Text = "Some content is available in Web view. Use the reader button to switch views.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12), Opacity = 0.75 });
             AppendBlocks(_root, document.Nodes);

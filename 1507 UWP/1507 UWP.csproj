@@ -273,6 +273,9 @@
   </ItemGroup>
   <ItemGroup />
   <Import Project="..\WikiViewer.Core\WikiViewer.Core.projitems" Label="Shared" />
+  <PropertyGroup Condition="'$(WikitextParserVersion)' != '0.0.1'">
+    <DefineConstants>$(DefineConstants);WIKITEXT_EXTENDED</DefineConstants>
+  </PropertyGroup>
   <Import Project="..\WikiViewer.Shared.Uwp\WikiViewer.Shared.Uwp.projitems" Label="Shared" />
   <PropertyGroup Condition=" '$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '14.0' ">
     <VisualStudioVersion>14.0</VisualStudioVersion>

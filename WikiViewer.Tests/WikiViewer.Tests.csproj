@@ -3,9 +3,11 @@
     <TargetFramework>net10.0</TargetFramework>
     <IsPackable>false</IsPackable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <DefineConstants>$(DefineConstants);WIKITEXT_EXTENDED</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="WikitextParser" Version="0.1.0" />
     <PackageReference Include="HtmlAgilityPack" Version="1.12.2" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
     <PackageReference Include="xunit" Version="2.9.2" />
@@ -13,6 +15,10 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\WikiViewer.Core\Models\NativeArticleDocument.cs" Link="Models\NativeArticleDocument.cs" />
+    <Compile Include="..\WikiViewer.Core\Services\NativeFlowLayout.cs" Link="Services\NativeFlowLayout.cs" />
+    <Compile Include="..\WikiViewer.Core\Models\NativeArticleStyle.cs" Link="Models\NativeArticleStyle.cs" />
+    <Compile Include="..\WikiViewer.Core\Services\NativeArticleStyleService.cs" Link="Services\NativeArticleStyleService.cs" />
+    <Compile Include="..\WikiViewer.Core\Services\WikitextLayoutService.cs" Link="Services\WikitextLayoutService.cs" />
     <Compile Include="..\WikiViewer.Core\Models\ArticleContent.cs" Link="Models\ArticleContent.cs" />
     <Compile Include="..\WikiViewer.Core\Services\ArticleContentResponse.cs" Link="Services\ArticleContentResponse.cs" />
     <Compile Include="..\WikiViewer.Core\Managers\ArticleCacheManager.cs" Link="Managers\ArticleCacheManager.cs" />
