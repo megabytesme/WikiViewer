@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using WikiViewer.Core;
 using WikiViewer.Shared.Uwp.Controls;
@@ -16,6 +16,7 @@ namespace _1507_UWP.Pages
         {
             this.InitializeComponent();
             AttachEditorFunctionality();
+            InitializePreviewControls();
             LoadEditorThemePreference();
             WikitextEditor.IsRightTapEnabled = true;
             WikitextEditor.ContextMenuOpening += (s, e) => e.Handled = true;
@@ -41,30 +42,17 @@ namespace _1507_UWP.Pages
         protected override Button SaveAppBarButton => (AppBarButton)SaveButton;
         protected override Button PreviewAppBarButton => (AppBarButton)PreviewButton;
 
-        protected override async Task ShowPreview(string htmlContent)
+        protected override FrameworkElement WebPreviewHost => PreviewWebView;
+        protected override FrameworkElement PreviewPaneHost => PreviewContainerGrid;
+        protected override NativeArticleView NativePreviewHost => NativePreview;
+        protected override ToggleSwitch PreviewModeControl => NativePreviewToggle;
+        protected override TextBlock PreviewPlaceholderControl => PreviewPlaceholder;
+        protected override TextBlock PreviewStatusControl => PreviewStatus;
+
+        protected override async Task ShowWebPreviewAsync(string htmlContent, int version)
         {
-            PreviewWebView.NavigateToString(htmlContent);
-            PreviewPlaceholder.Visibility = Visibility.Collapsed;
-            PreviewWebView.Visibility = Visibility.Visible;
+            if (IsPreviewRenderCurrent(version)) PreviewWebView.NavigateToString(htmlContent);
             await Task.CompletedTask;
-        }
-
-        protected override void ResetPreviewPaneVisually()
-        {
-            PreviewWebView.Visibility = Visibility.Collapsed;
-
-            if (PreviewPlaceholder != null)
-            {
-                PreviewPlaceholder.Visibility = Visibility.Collapsed;
-                PreviewPlaceholder.Text = "Click 'Preview' to see a rendering of your changes.";
-            }
-        }
-
-        protected override void HidePreview(string placeholderText)
-        {
-            PreviewPlaceholder.Text = placeholderText;
-            PreviewWebView.Visibility = Visibility.Collapsed;
-            PreviewPlaceholder.Visibility = Visibility.Visible;
         }
 
         private void CancelButton_Click(object sender, RoutedEventArgs e)

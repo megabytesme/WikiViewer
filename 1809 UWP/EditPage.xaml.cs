@@ -13,6 +13,7 @@ namespace _1809_UWP.Pages
         {
             this.InitializeComponent();
             AttachEditorFunctionality();
+            InitializePreviewControls();
         }
 
         #region Page Setup & Overrides
@@ -24,40 +25,17 @@ namespace _1809_UWP.Pages
         protected override Button SaveAppBarButton => (AppBarButton)SaveButton;
         protected override Button PreviewAppBarButton => (AppBarButton)PreviewButton;
 
-        protected override async Task ShowPreview(string htmlContent)
-        {
-            try
-            {
-                await PreviewWebView.EnsureCoreWebView2Async();
-                PreviewWebView.NavigateToString(htmlContent);
-                PreviewPlaceholder.Visibility = Windows.UI.Xaml.Visibility.Collapsed;
-                PreviewWebView.Visibility = Windows.UI.Xaml.Visibility.Visible;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine(
-                    $"[WebView2] Failed to ensure core or navigate: {ex.Message}"
-                );
-                HidePreview($"Failed to generate preview: {ex.Message}");
-            }
-        }
+        protected override FrameworkElement WebPreviewHost => PreviewWebView;
+        protected override FrameworkElement PreviewPaneHost => PreviewContainerGrid;
+        protected override NativeArticleView NativePreviewHost => NativePreview;
+        protected override ToggleSwitch PreviewModeControl => NativePreviewToggle;
+        protected override TextBlock PreviewPlaceholderControl => PreviewPlaceholder;
+        protected override TextBlock PreviewStatusControl => PreviewStatus;
 
-        protected override void HidePreview(string placeholderText)
+        protected override async Task ShowWebPreviewAsync(string htmlContent, int version)
         {
-            PreviewPlaceholder.Text = placeholderText;
-            PreviewWebView.Visibility = Visibility.Collapsed;
-            PreviewPlaceholder.Visibility = Visibility.Visible;
-        }
-
-        protected override void ResetPreviewPaneVisually()
-        {
-            PreviewWebView.Visibility = Visibility.Collapsed;
-
-            if (PreviewPlaceholder != null)
-            {
-                PreviewPlaceholder.Visibility = Visibility.Collapsed;
-                PreviewPlaceholder.Text = "Click 'Preview' to see a rendering of your changes.";
-            }
+            await PreviewWebView.EnsureCoreWebView2Async();
+            if (IsPreviewRenderCurrent(version)) PreviewWebView.NavigateToString(htmlContent);
         }
 
         private void Cut_Click(object sender, RoutedEventArgs e)

@@ -1,9 +1,10 @@
-﻿<local:EditPageBase
+<local:EditPageBase
     x:Class="_1809_UWP.Pages.EditPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
     xmlns:local="using:WikiViewer.Shared.Uwp.Pages"
+    xmlns:reader="using:WikiViewer.Shared.Uwp.Controls"
     Background="Transparent" NavigationCacheMode="Disabled">
     <Page.Resources>
         <MenuFlyout x:Key="SharedEditorMenu">
@@ -235,8 +236,14 @@
             <RichEditBox x:Name="WikitextEditor" Grid.Column="0" AcceptsReturn="True" TextWrapping="Wrap" Padding="12" FontFamily="Consolas, Courier New" PlaceholderText="Loading Wikitext..." BorderThickness="0,0,1,0" SelectionFlyout="{StaticResource SharedEditorMenu}" ContextFlyout="{StaticResource SharedEditorMenu}" />
             <Rectangle Grid.Column="1" Fill="{ThemeResource CardBackgroundFillColorDefaultBrush}" PointerPressed="Splitter_PointerPressed" PointerMoved="Splitter_PointerMoved" PointerReleased="Splitter_PointerReleased" PointerEntered="Splitter_PointerEntered" PointerExited="Splitter_PointerExited"/>
             <Grid Grid.Column="2" x:Name="PreviewContainerGrid">
-                <muxc:WebView2 x:Name="PreviewWebView" Visibility="Collapsed"/>
-                <TextBlock x:Name="PreviewPlaceholder" Text="Click 'Preview' to see a rendering of your changes." Style="{ThemeResource BodyTextBlockStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
+                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                <StackPanel Margin="12,8" Spacing="6">
+                    <ToggleSwitch x:Name="NativePreviewToggle" Header="Preview renderer" OnContent="Native" OffContent="Web" Toggled="PreviewMode_Toggled"/>
+                    <TextBlock x:Name="PreviewStatus" Text="Generate a preview of your unsaved text." TextWrapping="Wrap" Opacity="0.7"/>
+                </StackPanel>
+                <muxc:WebView2 x:Name="PreviewWebView" Grid.Row="1" Visibility="Collapsed"/>
+                <reader:NativeArticleView x:Name="NativePreview" Grid.Row="1" Visibility="Collapsed"/>
+                <TextBlock x:Name="PreviewPlaceholder" Grid.Row="1" Text="Click 'Preview' to see a rendering of your changes." Style="{ThemeResource BodyTextBlockStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
             </Grid>
         </Grid>
 

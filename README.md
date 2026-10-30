@@ -27,6 +27,8 @@ Raw source, expanded markup, attributes and embedded styles remain available in 
 
 The portable article-model tests run with `dotnet test WikiViewer.Tests/WikiViewer.Tests.csproj -c Release`. Validate XAML and the native control using the UWP heads on Windows too.
 
+The editor's **Preview renderer** switch selects native or Web preview, initially following the default reader preference. Preview captures the exact unsaved text and expands it on the originating wiki; switching renderers reuses that same result. Draft previews are never written to the published-article cache. Changed text marks a preview as out of date, and late responses for older drafts are discarded. Native preview uses the same article renderer and falls back to Web preview on rendering errors. Web preview retains the server's page head and resources when supplied.
+
 ### Building with WikitextParser
 
 The parser fork is maintained at [megabytesme/WikitextParser](https://github.com/megabytesme/WikitextParser), on the `netstandard1.4` branch. Build/package that checkout, then select the resulting local feed without publishing a package:

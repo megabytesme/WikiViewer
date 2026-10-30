@@ -16,6 +16,9 @@
     <Compile Include="$(MSBuildThisFileDirectory)Services\NativeArticleStyleService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\WikitextLayoutService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\ArticleContent.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Models\ArticlePreview.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Services\EditorPreviewSession.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Services\EditorPreviewResponse.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\ArticleContentResponse.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\NativeArticleDocument.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\NativeArticleDocumentService.cs" />

@@ -5,9 +5,11 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
+using WikiViewer.Core;
 using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
+using WikiViewer.Shared.Uwp.Controls;
 using WikiViewer.Shared.Uwp.Services;
 using Windows.UI;
 using Windows.UI.Core;
@@ -24,10 +26,14 @@ namespace WikiViewer.Shared.Uwp.Pages
         private WikiInstance _pageWikiContext;
         protected string _pageTitle;
         protected string _originalWikitext;
+        private readonly EditorPreviewSession _previewSession = new EditorPreviewSession();
+        private bool _previewControlsReady;
+        private bool _changingPreviewMode;
+        private int _previewRenderVersion;
+        private bool _editorAttached;
         private bool isDragging = false;
         private double initialX;
         private GridLength leftColInitialWidth;
-        private string _lastGeneratedPreviewHtml = null;
         private bool _isPreviewModeActiveInNarrow = false;
         private const double NarrowStateWidthTrigger = 800;
         private class WikitextPair
@@ -197,49 +203,101 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected abstract Grid SplitterGrid { get; }
         protected abstract Button SaveAppBarButton { get; }
         protected abstract Button PreviewAppBarButton { get; }
-        protected abstract Task ShowPreview(string htmlContent);
-        protected abstract void HidePreview(string placeholderText);
-        protected abstract void ResetPreviewPaneVisually();
+        protected abstract Task ShowWebPreviewAsync(string htmlContent, int version);
+        protected bool IsPreviewRenderCurrent(int version) => version == _previewRenderVersion;
+        protected abstract FrameworkElement WebPreviewHost { get; }
+        protected abstract FrameworkElement PreviewPaneHost { get; }
+        protected abstract NativeArticleView NativePreviewHost { get; }
+        protected abstract ToggleSwitch PreviewModeControl { get; }
+        protected abstract TextBlock PreviewPlaceholderControl { get; }
+        protected abstract TextBlock PreviewStatusControl { get; }
 
         public EditPageBase()
         {
-            this.SizeChanged += Page_SizeChanged;
-
-            this.Loaded += (s, e) =>
-            {
-                ResetPreviewPaneVisually();
-            };
+            SizeChanged += Page_SizeChanged;
+            Loaded += (s, e) => { if (_previewControlsReady) { ResetPreviewPaneVisually(); SetPreviewLayout(false); } };
         }
 
         private void Page_SizeChanged(object sender, SizeChangedEventArgs e)
         {
-            bool wasNarrow = e.PreviousSize.Width < NarrowStateWidthTrigger;
-            bool isNowWide = e.NewSize.Width >= NarrowStateWidthTrigger;
+            if (!_previewControlsReady || (e.PreviousSize.Width < NarrowStateWidthTrigger) == (e.NewSize.Width < NarrowStateWidthTrigger)) return;
+            if (e.NewSize.Width < NarrowStateWidthTrigger) ResetPreviewPaneVisually();
+            SetPreviewLayout(false);
+        }
 
-            if (wasNarrow && isNowWide)
+        private void SetPreviewLayout(bool showPreview)
+        {
+            bool narrow = ActualWidth < NarrowStateWidthTrigger;
+            _isPreviewModeActiveInNarrow = narrow && showPreview;
+            WikitextEditorTextBox.Visibility = _isPreviewModeActiveInNarrow ? Visibility.Collapsed : Visibility.Visible;
+            PreviewPaneHost.Visibility = !narrow || showPreview ? Visibility.Visible : Visibility.Collapsed;
+            if (PreviewAppBarButton is AppBarButton button)
             {
-                WikitextEditorTextBox.Visibility = Visibility.Visible;
-
-                if (PreviewAppBarButton is AppBarButton appBarButton)
-                {
-                    appBarButton.Label = "Preview";
-                    appBarButton.Icon = new SymbolIcon(Symbol.View);
-                }
-                _isPreviewModeActiveInNarrow = false;
+                button.Label = _isPreviewModeActiveInNarrow ? "Edit" : "Preview";
+                button.Icon = new SymbolIcon(_isPreviewModeActiveInNarrow ? Symbol.Edit : Symbol.View);
             }
-            else if (!wasNarrow && !isNowWide)
+        }
+
+        private void ResetPreviewPaneVisually()
+        {
+            HidePreview("Click 'Preview' to see a rendering of your changes.");
+        }
+
+        protected void InitializePreviewControls()
+        {
+            _previewControlsReady = true;
+            NativePreviewHost.ContentMargin = new Thickness(12, 12, 12, 24);
+            NativePreviewHost.UnsupportedContentMessage = "Some content is available in Web preview. Switch the preview renderer to Web.";
+            PreviewModeControl.IsOn = AppSettings.UseNativeReaderByDefault;
+            SetPreviewLayout(false);
+        }
+
+        protected void HidePreview(string text)
+        {
+            _previewRenderVersion++;
+            NativePreviewHost.ClearArticle();
+            NativePreviewHost.Visibility = WebPreviewHost.Visibility = Visibility.Collapsed;
+            PreviewPlaceholderControl.Text = text;
+            PreviewPlaceholderControl.Visibility = Visibility.Visible;
+        }
+
+        protected async void PreviewMode_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (!_previewControlsReady || _changingPreviewMode || _previewSession.Current == null) return;
+            await RenderPreviewAsync(_previewSession.Current);
+        }
+
+        private async Task RenderPreviewAsync(ArticlePreview preview)
+        {
+            int version = ++_previewRenderVersion;
+            PreviewPlaceholderControl.Visibility = Visibility.Collapsed;
+            PreviewStatusControl.Text = _previewSession.IsStale ? "Preview is out of date. Click Preview to update it." : "Preview of your unsaved text";
+            NativePreviewHost.ClearArticle();
+            if (PreviewModeControl.IsOn)
             {
-                WikitextEditorTextBox.Visibility = Visibility.Visible;
-
-                ResetPreviewPaneVisually();
-
-                if (PreviewAppBarButton is AppBarButton appBarButton)
+                NativePreviewHost.Visibility = Visibility.Visible;
+                WebPreviewHost.Visibility = Visibility.Collapsed;
+                try
                 {
-                    appBarButton.Label = "Preview";
-                    appBarButton.Icon = new SymbolIcon(Symbol.View);
+                    await NativePreviewHost.ShowArticleAsync(preview.Content, new Uri(_pageWikiContext.GetWikiPageUrl(_pageTitle)),
+                        async uri => { await Windows.System.Launcher.LaunchUriAsync(uri); },
+                        url => MediaCacheService.GetLocalUriAsync(url, _pageWikiContext));
+                    return;
                 }
-                _isPreviewModeActiveInNarrow = false;
+                catch (Exception ex)
+                {
+                    if (version != _previewRenderVersion) return;
+                    _changingPreviewMode = true;
+                    PreviewModeControl.IsOn = false;
+                    _changingPreviewMode = false;
+                    PreviewStatusControl.Text = "Native preview could not display this content. Showing Web preview. " + ex.Message;
+                }
             }
+            if (version != _previewRenderVersion) return;
+            NativePreviewHost.Visibility = Visibility.Collapsed;
+            WebPreviewHost.Visibility = Visibility.Visible;
+            try { await ShowWebPreviewAsync(preview.WebHtml, version); }
+            catch (Exception ex) { if (version == _previewRenderVersion) HidePreview("Failed to display Web preview: " + ex.Message); }
         }
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -324,8 +382,9 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         protected void AttachEditorFunctionality()
         {
-            if (WikitextEditorTextBox == null)
+            if (WikitextEditorTextBox == null || _editorAttached)
                 return;
+            _editorAttached = true;
             _highlightDebounceTimer = new DispatcherTimer
             {
                 Interval = TimeSpan.FromMilliseconds(150),
@@ -339,9 +398,17 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         protected override void OnNavigatingFrom(NavigatingCancelEventArgs e)
         {
+            base.OnNavigatingFrom(e);
+            if (e.Cancel) return;
+            _previewSession.Clear();
+            _previewRenderVersion++;
+            NativePreviewHost.ClearArticle();
+            _highlightDebounceTimer?.Stop();
+            _highlightCts?.Cancel();
+            WikitextEditorTextBox.TextChanged -= Editor_TextChanged;
+            WikitextEditorTextBox.SelectionChanged -= Editor_SelectionChanged;
             Window.Current.CoreWindow.CharacterReceived -= CoreWindow_CharacterReceived;
             Window.Current.CoreWindow.KeyDown -= CoreWindow_KeyDown;
-            base.OnNavigatingFrom(e);
         }
 
         private void CoreWindow_CharacterReceived(CoreWindow sender, CharacterReceivedEventArgs e)
@@ -592,12 +659,14 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         private void Editor_TextChanged(object sender, RoutedEventArgs e)
         {
+            WikitextEditorTextBox.Document.GetText(TextGetOptions.None, out var previewSource);
+            _previewSession.SourceChanged(previewSource);
+            if (_previewSession.IsStale) PreviewStatusControl.Text = "Preview is out of date. Click Preview to update it.";
             if (_isUpdatingText)
             {
                 _isUpdatingText = false;
                 return;
             }
-            _lastGeneratedPreviewHtml = null;
             _highlightDebounceTimer.Start();
         }
 
@@ -951,36 +1020,23 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         protected async void PreviewButton_Click(object sender, RoutedEventArgs e)
         {
-            bool isNarrow = this.ActualWidth < NarrowStateWidthTrigger;
-            var button = (AppBarButton)PreviewAppBarButton;
-
-            if (isNarrow)
+            if (_isPreviewModeActiveInNarrow)
             {
-                if (_isPreviewModeActiveInNarrow)
-                {
-                    ResetPreviewPaneVisually();
-                    WikitextEditorTextBox.Visibility = Visibility.Visible;
-                    button.Label = "Preview";
-                    button.Icon = new SymbolIcon(Symbol.View);
-                    _isPreviewModeActiveInNarrow = false;
-                    return;
-                }
-                else
-                {
-                    WikitextEditorTextBox.Visibility = Visibility.Collapsed;
-                    button.Label = "Edit";
-                    button.Icon = new SymbolIcon(Symbol.Edit);
-                }
-            }
-
-            if (!string.IsNullOrEmpty(_lastGeneratedPreviewHtml))
-            {
-                await ShowPreview(_lastGeneratedPreviewHtml);
-                if (isNarrow) { _isPreviewModeActiveInNarrow = true; }
+                ResetPreviewPaneVisually();
+                SetPreviewLayout(false);
                 return;
             }
-
+            WikitextEditorTextBox.Document.GetText(TextGetOptions.None, out var source);
+            _previewSession.SourceChanged(source);
+            SetPreviewLayout(true);
+            if (_previewSession.Current != null && !_previewSession.IsStale)
+            {
+                await RenderPreviewAsync(_previewSession.Current);
+                return;
+            }
+            var request = _previewSession.Begin(source, _pageTitle);
             PreviewAppBarButton.IsEnabled = false;
+            PreviewModeControl.IsEnabled = false;
             HidePreview("Generating preview...");
 
             try
@@ -997,37 +1053,30 @@ namespace WikiViewer.Shared.Uwp.Pages
                         "Could not obtain an API worker for the preview."
                     );
                 }
-                WikitextEditorTextBox.Document.GetText(TextGetOptions.None, out var wikitext);
-                string fullHtml = await WikitextParsingService.ParseWikitextToPreviewHtmlAsync(
-                    wikitext,
-                    _pageTitle,
+                var preview = await WikitextParsingService.ParseEditorPreviewAsync(
+                    request.Source,
+                    request.Title,
                     _pageWikiContext,
                     worker
                 );
-
-                _lastGeneratedPreviewHtml = fullHtml;
-
-                await ShowPreview(fullHtml);
-
-                if (isNarrow)
-                {
-                    _isPreviewModeActiveInNarrow = true;
-                }
+                if (_previewSession.Accept(request, preview)) await RenderPreviewAsync(preview);
+                else if (_previewSession.IsLatest(request)) HidePreview("Text changed while the preview was generated. Click Preview again.");
             }
             catch (Exception ex)
             {
-                HidePreview($"Failed to generate preview: {ex.Message}");
-                if (isNarrow)
+                if (_previewSession.IsLatest(request))
                 {
-                    WikitextEditorTextBox.Visibility = Visibility.Visible;
-                    button.Label = "Preview";
-                    button.Icon = new SymbolIcon(Symbol.View);
-                    _isPreviewModeActiveInNarrow = false;
+                    HidePreview($"Failed to generate preview: {ex.Message}");
+                    SetPreviewLayout(false);
                 }
             }
             finally
             {
-                PreviewAppBarButton.IsEnabled = true;
+                if (_previewSession.IsLatest(request))
+                {
+                    PreviewAppBarButton.IsEnabled = true;
+                    PreviewModeControl.IsEnabled = true;
+                }
             }
         }
 

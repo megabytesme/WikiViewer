@@ -28,6 +28,8 @@ namespace WikiViewer.Shared.Uwp.Controls
         private int _version;
         private Uri _pageUri;
         private readonly ScrollViewer _scroll = new ScrollViewer { HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        public Thickness ContentMargin { get => _root.Margin; set => _root.Margin = value; }
+        public string UnsupportedContentMessage { get; set; } = "Some content is available in Web view. Use the reader button to switch views.";
 
         public NativeArticleView()
         {
@@ -41,17 +43,40 @@ namespace WikiViewer.Shared.Uwp.Controls
             try
             {
             ClearArticle();
+            var document = NativeArticleDocumentService.Parse(content, pageUri);
+            RenderDocument(document, pageUri, navigate, resolveImage);
+            }
+            catch (Exception ex) { _ = LogFailureAsync(ex); throw; }
+        }
+
+        public async Task<bool> ShowArticleAsync(ArticleContent content, Uri pageUri, Func<Uri, Task> navigate, Func<string, Task<string>> resolveImage)
+        {
+            ClearArticle();
+            int version = _version;
+            try
+            {
+                var document = await Task.Run(() => NativeArticleDocumentService.Parse(content, pageUri));
+                if (version != _version) return false;
+                RenderDocument(document, pageUri, navigate, resolveImage);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                if (version != _version) return false;
+                _ = LogFailureAsync(ex); throw;
+            }
+        }
+
+        private void RenderDocument(NativeArticleDocument document, Uri pageUri, Func<Uri, Task> navigate, Func<string, Task<string>> resolveImage)
+        {
             _navigate = navigate;
             _resolveImage = resolveImage;
             _pageUri = pageUri;
-            var document = NativeArticleDocumentService.Parse(content, pageUri);
             if (document.UnsupportedFeatures.Count > 0)
-                _root.Children.Add(new TextBlock { Text = "Some content is available in Web view. Use the reader button to switch views.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12), Opacity = 0.75 });
+                _root.Children.Add(new TextBlock { Text = UnsupportedContentMessage, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12), Opacity = 0.75 });
             AppendBlocks(_root, document.Nodes);
             _root.UpdateLayout();
             _scroll.ChangeView(null, 0, null, true);
-            }
-            catch (Exception ex) { _ = LogFailureAsync(ex); throw; }
         }
 
         private static async Task LogFailureAsync(Exception exception)

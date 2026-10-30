@@ -124,94 +124,34 @@ namespace WikiViewer.Core.Services
                 </html>";
         }
 
-        public static async Task<string> ParseWikitextToPreviewHtmlAsync(
-            string wikitext,
-            string pageTitle,
-            WikiInstance wikiContext,
-            IApiWorker worker
-        )
+        public static async Task<string> ParseWikitextToPreviewHtmlAsync(string wikitext, string pageTitle, WikiInstance wikiContext, IApiWorker worker)
         {
-            if (wikiContext == null || worker == null)
-            {
-                return WrapInHtmlShell(
-                    "Error: Cannot generate preview without a valid wiki context.",
-                    Application.Current.RequestedTheme == ApplicationTheme.Dark,
-                    true
-                );
-            }
-
-            var postData = new Dictionary<string, string>
-            {
-                { "action", "parse" },
-                { "format", "json" },
-                { "text", wikitext },
-                { "title", pageTitle },
-                { "prop", "text|modules|jsconfigvars" },
-                { "pst", "true" },
-                { "disablelimitreport", "true" },
-                { "disableeditsection", "true" },
-                { "preview", "true" },
-            };
-
-            try
-            {
-                string json = await worker.PostAndGetJsonFromApiAsync(
-                    wikiContext.ApiEndpoint,
-                    postData
-                );
-                var response = JObject.Parse(json);
-
-                if (response["error"] != null)
-                {
-                    throw new Exception(
-                        response["error"]["info"]?.ToString()
-                            ?? "Unknown API error during preview generation."
-                    );
-                }
-
-                string previewHtml = response["parse"]?["text"]?["*"]?.ToString();
-                if (string.IsNullOrEmpty(previewHtml))
-                {
-                    return WrapInHtmlShell(
-                        "The server returned an empty preview.",
-                        Application.Current.RequestedTheme == ApplicationTheme.Dark,
-                        true
-                    );
-                }
-
-                var modules = response["parse"]?["modules"]?.Select(m => m.ToString());
-                var moduleStyles = response["parse"]?["modulestyles"]?.Select(m => m.ToString());
-                var allModules = (modules ?? Enumerable.Empty<string>())
-                    .Concat(moduleStyles ?? Enumerable.Empty<string>())
-                    .Distinct();
-
-                string cssUrl = "";
-                if (allModules.Any())
-                {
-                    cssUrl =
-                        $"{wikiContext.BaseUrl.TrimEnd('/')}/{wikiContext.ScriptPath.TrimEnd('/')}/load.php?modules={string.Join("|", allModules)}&only=styles";
-                }
-
-                string headContent =
-                    $@"
-    <meta charset='UTF-8'>
-    <base href='{wikiContext.BaseUrl}'>
-    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-    {(string.IsNullOrEmpty(cssUrl) ? "" : $"<link rel='stylesheet' href='{cssUrl}'>")}
-    <style>{await ThemeManager.GetThemeCssAsync()}</style> 
-";
-
-                return $"<!DOCTYPE html><html><head>{headContent}</head><body><div class='mw-parser-output'>{previewHtml}</div></body></html>";
-            }
+            try { return (await ParseEditorPreviewAsync(wikitext, pageTitle, wikiContext, worker)).WebHtml; }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[Preview Generation] Failed: {ex.Message}");
-                return WrapInHtmlShell(
-                    $"Error generating preview: {ex.Message}",
-                    Application.Current.RequestedTheme == ApplicationTheme.Dark,
-                    true
-                );
+                return WrapInHtmlShell(WebUtility.HtmlEncode("Error generating preview: " + ex.Message),
+                    Application.Current.RequestedTheme == ApplicationTheme.Dark, true);
             }
+        }
+
+        public static async Task<ArticlePreview> ParseEditorPreviewAsync(string wikitext, string pageTitle, WikiInstance wikiContext, IApiWorker worker)
+        {
+            if (wikiContext == null) throw new ArgumentNullException(nameof(wikiContext));
+            if (worker == null) throw new ArgumentNullException(nameof(worker));
+            string json = await worker.PostAndGetJsonFromApiAsync(wikiContext.ApiEndpoint, EditorPreviewResponse.BuildRequest(wikitext, pageTitle));
+            var preview = EditorPreviewResponse.Parse(json, wikitext, pageTitle);
+            string scriptPath = (wikiContext.ScriptPath ?? "").Trim('/');
+            string cssUrl = preview.StyleModules.Count == 0 ? "" : wikiContext.BaseUrl.TrimEnd('/') + "/" +
+                (scriptPath.Length == 0 ? "" : scriptPath + "/") + "load.php?modules=" + Uri.EscapeDataString(string.Join("|", preview.StyleModules)) + "&only=styles";
+            string headContent = "<meta name='viewport' content='width=device-width, initial-scale=1.0'>" +
+                "<base href='" + WebUtility.HtmlEncode(wikiContext.GetWikiPageUrl(pageTitle)) + "'>" +
+                (cssUrl.Length == 0 ? "" : "<link rel='stylesheet' href='" + WebUtility.HtmlEncode(cssUrl) + "'>") +
+                "<style>" + await ThemeManager.GetThemeCssAsync() + "</style>";
+            string body = "<div class='mw-parser-output'>" + preview.Content.HtmlContent + "</div></body></html>";
+            int headEnd = (preview.HeadHtml ?? "").IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
+            preview.WebHtml = headEnd >= 0 ? preview.HeadHtml.Insert(headEnd, headContent) + body :
+                "<!DOCTYPE html><html><head><meta charset='utf-8'>" + headContent + "</head><body>" + body;
+            return preview;
         }
     }
 }
