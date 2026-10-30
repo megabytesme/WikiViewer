@@ -166,23 +166,13 @@ namespace _1809_UWP.Pages
                 Tag = $"home_{wiki.Id}",
             };
 
-            var icon = new BitmapIcon
+            var image = new WikiViewer.Shared.Uwp.Converters.StringToBitmapImageConverter().Convert(wiki.IconUrl, null, null, null) as Windows.UI.Xaml.Media.Imaging.BitmapImage;
+            if (image == null) navItem.Icon = new SymbolIcon(Symbol.Globe);
+            else
             {
-                ShowAsMonochrome = false,
-                Width = 20,
-                Height = 20,
-            };
-            var iconUri = !string.IsNullOrEmpty(wiki.IconUrl)
-                ? new Uri(wiki.IconUrl)
-                : new Uri("ms-appx:///Assets/Square150x150Logo.png");
-            var binding = new Binding
-            {
-                Source = wiki,
-                Path = new PropertyPath("IconUrl"),
-                Mode = BindingMode.OneWay,
-            };
-            BindingOperations.SetBinding(icon, BitmapIcon.UriSourceProperty, binding);
-            navItem.Icon = icon;
+                image.ImageFailed += (sender, args) => navItem.Icon = new SymbolIcon(Symbol.Globe);
+                navItem.Icon = new Microsoft.UI.Xaml.Controls.ImageIcon { Source = image, Width = 20, Height = 20 };
+            }
 
             navItem.MenuItems.Add(
                 new Microsoft.UI.Xaml.Controls.NavigationViewItem

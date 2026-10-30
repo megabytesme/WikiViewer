@@ -25,7 +25,7 @@ namespace WikiViewer.Shared.Uwp.Controls
                 _positions.Add(new ArticleFlowRect { X = 0, Y = y, Width = width, Height = child.DesiredSize.Height });
                 y += child.DesiredSize.Height;
             }
-            double height = Math.Max(y, PositionStyle?.Height?.Resolve(width) ?? 0);
+            double height = Math.Max(0, PositionStyle?.Height?.Resolve(width) ?? y);
             for (int i = 0; i < Children.Count; i++)
             {
                 if (_positions[i] != null) continue;

@@ -20,6 +20,7 @@
     <Compile Include="..\WikiViewer.Core\Services\ArticleColor.cs" Link="Services\ArticleColor.cs" />
     <Compile Include="..\WikiViewer.Core\Services\ArticleStyleSheet.cs" Link="Services\ArticleStyleSheet.cs" />
     <Compile Include="..\WikiViewer.Core\Services\ArticleStyleResourceService.cs" Link="Services\ArticleStyleResourceService.cs" />
+    <Compile Include="..\WikiViewer.Core\Services\FaviconDiscoveryService.cs" Link="Services\FaviconDiscoveryService.cs" />
     <Compile Include="..\WikiViewer.Core\Services\WikiSyntaxService.cs" Link="Services\WikiSyntaxService.cs" />
     <Compile Include="..\WikiViewer.Core\Models\WikiSyntaxConfiguration.cs" Link="Models\WikiSyntaxConfiguration.cs" />
     <Compile Include="..\WikiViewer.Core\Models\NativeArticleStyle.cs" Link="Models\NativeArticleStyle.cs" />

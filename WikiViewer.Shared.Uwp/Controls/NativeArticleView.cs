@@ -413,7 +413,9 @@ namespace WikiViewer.Shared.Uwp.Controls
                         return;
                     }
 #endif
-                    string resolved = resolveImage == null ? null : await resolveImage(node.Uri.AbsoluteUri);
+                    string resolved = null;
+                    try { if (resolveImage != null) resolved = await resolveImage(node.Uri.AbsoluteUri); }
+                    catch (Exception ex) { System.Diagnostics.Debug.WriteLine("Native reader image cache: " + ex.Message); }
                     if (version != _version || scope?.Active == false) return;
                     Uri uri;
                     uri = Uri.TryCreate(resolved, UriKind.Absolute, out uri) ? uri : node.Uri;

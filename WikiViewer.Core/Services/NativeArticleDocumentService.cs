@@ -28,7 +28,11 @@ namespace WikiViewer.Core.Services
             var root = htmlDocument.DocumentNode.SelectSingleNode("//*[contains(concat(' ', normalize-space(@class), ' '), ' mw-parser-output ')]")
                 ?? htmlDocument.DocumentNode.SelectSingleNode("//body") ?? htmlDocument.DocumentNode;
             var result = new NativeArticleDocument { RawWikitext = content.RawWikitext, RevisionId = content.RevisionId, Syntax = content.Syntax };
-            foreach (var sheet in content.ResolvedStyleSheets ?? Enumerable.Empty<string>()) result.StyleRules.AddRange(ArticleStyleSheet.Parse(sheet, viewportWidth));
+            foreach (var sheet in content.ResolvedStyleSheets ?? Enumerable.Empty<string>())
+            {
+                var css = ArticleStyleResourceService.NormalizeResponse(sheet);
+                if (css != null) result.StyleRules.AddRange(ArticleStyleSheet.Parse(css, viewportWidth));
+            }
             foreach (var sheet in htmlDocument.DocumentNode.SelectNodes("//style") ?? Enumerable.Empty<HtmlNode>())
             {
                 result.EmbeddedStyleSheets.Add(sheet.InnerText);
@@ -69,7 +73,7 @@ namespace WikiViewer.Core.Services
             }
             var style = NativeArticleStyleService.Read(source, document.StyleRules, parentStyle);
             Inherit(style, parentStyle);
-            var node = new NativeArticleNode { Kind = NativeArticleNodeKind.Container, Id = source.GetAttributeValue("id", null),
+            var node = new NativeArticleNode { Kind = NativeArticleNodeKind.Container, Id = WebUtility.HtmlDecode(source.GetAttributeValue("id", null) ?? (tag == "a" ? source.GetAttributeValue("name", null) : null)),
                 TagName = tag, Classes = source.GetAttributeValue("class", ""), Style = style,
                 IsBlock = style.Position == "absolute" || style.Display == "block" || tag == "div" || tag == "section" || tag == "article" || tag == "figure" || tag == "figcaption" || tag == "caption",
                 PreserveWhitespace = preserveWhitespace || tag == "pre" || style.PreserveWhitespace, RightToLeft = style.Direction != null ? style.Direction == "rtl" : rtl };

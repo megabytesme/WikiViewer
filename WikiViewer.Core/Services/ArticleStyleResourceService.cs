@@ -10,6 +10,16 @@ namespace WikiViewer.Core.Services
 {
     public static class ArticleStyleResourceService
     {
+        // WebView returns a document wrapper when navigating to text/css resources.
+        public static string NormalizeResponse(string response)
+        {
+            if (string.IsNullOrWhiteSpace(response)) return null;
+            if (!response.TrimStart().StartsWith("<", StringComparison.Ordinal)) return response;
+            var document = new HtmlDocument(); document.LoadHtml(response);
+            var pre = document.DocumentNode.SelectNodes("//pre");
+            return pre?.Count == 1 ? WebUtility.HtmlDecode(pre[0].InnerText) : null;
+        }
+
         public static List<Uri> GetStyleUrls(ArticleContent content, Uri pageUri, string scriptPath)
         {
             var document = new HtmlDocument(); document.LoadHtml(content.HeadHtml ?? "");
@@ -40,7 +50,7 @@ namespace WikiViewer.Core.Services
             {
                 try
                 {
-                    string css = await fetch(uri.AbsoluteUri);
+                    string css = NormalizeResponse(await fetch(uri.AbsoluteUri));
                     if (css == null || css.Length > 1000000 || size + css.Length > 2000000) continue;
                     size += css.Length; content.ResolvedStyleSheets.Add(css);
                 }

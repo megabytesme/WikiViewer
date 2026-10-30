@@ -99,7 +99,7 @@ namespace _1809_UWP.Services
 
             if (extension == ".svg")
                 return await GetSvgBytesAsync(url);
-            if (new[] { ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp" }.Contains(extension))
+            if (new[] { ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico" }.Contains(extension))
                 return await GetRasterImageBytesAsync(url);
             return await DownloadFileAsBytesAsync(url, extension);
         }
@@ -174,10 +174,14 @@ namespace _1809_UWP.Services
                             throw new Exception($"Image navigation failed for {url}");
 
                         const string script =
-                            @"(function() { const img = document.querySelector('img'); if (img && img.naturalWidth > 0) { const canvas = document.createElement('canvas'); canvas.width = img.naturalWidth; canvas.height = img.naturalHeight; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0); return canvas.toDataURL('image/png').split(',')[1]; } return null; })();";
-                        string scriptResult = await tempWorker.CoreWebView2.ExecuteScriptAsync(
-                            script
-                        );
+                            @"(function() { const img = document.querySelector('img'); const imageDocument = document.contentType.startsWith('image/') || (document.body && document.body.children.length === 1 && document.body.firstElementChild === img); if (imageDocument && img && img.complete && img.naturalWidth > 0) { const canvas = document.createElement('canvas'); canvas.width = img.naturalWidth; canvas.height = img.naturalHeight; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0); return canvas.toDataURL('image/png').split(',')[1]; } return null; })();";
+                        string scriptResult = null;
+                        for (int attempt = 0; attempt < 10; attempt++)
+                        {
+                            scriptResult = await tempWorker.CoreWebView2.ExecuteScriptAsync(script);
+                            if (!string.IsNullOrEmpty(scriptResult) && scriptResult != "null") break;
+                            await Task.Delay(100);
+                        }
                         if (string.IsNullOrEmpty(scriptResult) || scriptResult == "null")
                             throw new Exception(
                                 "Failed to get Base64 data from rasterization script."
