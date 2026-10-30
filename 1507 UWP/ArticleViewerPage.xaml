@@ -4,6 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:WikiViewer.Shared.Uwp.Pages"
     xmlns:controls="using:_1507_UWP.Controls"
+    xmlns:reader="using:WikiViewer.Shared.Uwp.Controls"
     Background="Transparent">
 
     <Page.Resources>
@@ -33,10 +34,12 @@
                  Grid.Row="0"
                  ScrollViewer.VerticalScrollBarVisibility="Visible"
                  DefaultBackgroundColor="Transparent" />
+        <reader:NativeArticleView x:Name="NativeReader" Grid.Row="0" Visibility="Collapsed"/>
 
         <CommandBar Grid.Row="1"
                     VerticalAlignment="Bottom"
                     HorizontalAlignment="Stretch">
+            <AppBarToggleButton x:Name="NativeReaderButton" Icon="Read" Label="Native reader (Preview)" Click="NativeReaderButton_Click"/>
             <AppBarButton x:Name="EditButton"
                           Icon="Edit"
                           Label="Edit"

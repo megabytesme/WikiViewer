@@ -12,6 +12,7 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Controls with XAML -->
+    <Compile Include="$(MSBuildThisFileDirectory)Controls\NativeArticleView.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Controls\SaveDialog.xaml.cs">
       <DependentUpon>SaveDialog.xaml</DependentUpon>
     </Compile>

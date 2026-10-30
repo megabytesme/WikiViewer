@@ -25,6 +25,7 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected string _verificationUrl = null;
         protected bool _isInitialized = false;
         protected readonly Stack<string> _articleHistory = new Stack<string>();
+        private int _articleRequestVersion;
         public bool CanGoBackInPage => _articleHistory.Count > 1;
         protected abstract AppBarButton RefreshAppBarButton { get; }
         protected abstract Type GetArticleViewerPageType();
@@ -38,6 +39,7 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected abstract void ShowLoadingOverlay();
         protected abstract void HideLoadingOverlay();
         protected abstract Task DisplayProcessedHtmlAsync(string html);
+        protected virtual bool TryDisplayNativeArticle(string html) => false;
         protected abstract void ShowVerificationPanel(string url);
         protected abstract void InitializePlatformControls();
         protected abstract void UninitializePlatformControls();
@@ -292,6 +294,7 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         private void Page_Unloaded(object sender, RoutedEventArgs e)
         {
+            _articleRequestVersion++;
             DataTransferManager.GetForCurrentView().DataRequested -= OnDataRequested;
             AuthenticationService.AuthenticationStateChanged -= OnAuthenticationStateChanged;
             UninitializePlatformControls();
@@ -328,6 +331,7 @@ namespace WikiViewer.Shared.Uwp.Pages
             }
 
             ReviewRequestService.IncrementPageLoadCount();
+            int requestVersion = ++_articleRequestVersion;
             if (ReviewRequestService.CanRequestReview)
             {
                 Debug.WriteLine("Conditions met to request review.");
@@ -375,6 +379,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                             worker,
                             _pageWikiContext
                         );
+                    if (requestVersion != _articleRequestVersion) return;
 
                     var doc = new HtmlDocument();
                     doc.LoadHtml(htmlContent);
@@ -411,13 +416,17 @@ namespace WikiViewer.Shared.Uwp.Pages
                         mainPage?.SetPageTitle(resolvedTitle);
                     }
 
-                    var processedHtml = await ArticleProcessingService.BuildArticleHtmlAsync(
-                        htmlContent,
-                        _pageTitleToFetch,
-                        _pageWikiContext
-                    );
-                    await DisplayProcessedHtmlAsync(processedHtml);
-                    EnhanceDisplayedHtmlWithCachedMediaAsync(htmlContent);
+                    if (!TryDisplayNativeArticle(htmlContent))
+                    {
+                        var processedHtml = await ArticleProcessingService.BuildArticleHtmlAsync(
+                            htmlContent,
+                            _pageTitleToFetch,
+                            _pageWikiContext
+                        );
+                        if (requestVersion != _articleRequestVersion) return;
+                        await DisplayProcessedHtmlAsync(processedHtml);
+                        EnhanceDisplayedHtmlWithCachedMediaAsync(htmlContent);
+                    }
                     await UpdateEditButtonForPageAsync();
 
                     var lastUpdated = await ArticleProcessingService.FetchLastUpdatedTimestampAsync(
@@ -435,6 +444,7 @@ namespace WikiViewer.Shared.Uwp.Pages
             }
             catch (NeedsUserVerificationException ex)
             {
+                if (requestVersion != _articleRequestVersion) return;
 #if UWP_1809
                 ShowVerificationPanel(ex.Url);
 #else
@@ -452,12 +462,13 @@ namespace WikiViewer.Shared.Uwp.Pages
             }
             catch (Exception ex)
             {
+                if (requestVersion != _articleRequestVersion) return;
                 ArticleTitleTextBlock.Text = "An error occurred";
                 LoadingTextBlock.Text = ex.Message;
             }
             finally
             {
-                HideLoadingOverlay();
+                if (requestVersion == _articleRequestVersion) HideLoadingOverlay();
                 UpdateFavoriteButton();
             }
         }

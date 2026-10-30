@@ -19,6 +19,38 @@ namespace _1507_UWP.Pages
 
         public ArticleViewerPage() => this.InitializeComponent();
 
+        private void NativeReaderButton_Click(object sender, RoutedEventArgs e)
+        {
+            NativeReader.Visibility = NativeReaderButton.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+            ArticleDisplayWebView.Visibility = NativeReaderButton.IsChecked == true ? Visibility.Collapsed : Visibility.Visible;
+            ArticleDisplayWebView.Stop();
+            NativeReader.ClearArticle();
+            StartArticleFetch();
+        }
+
+        protected override bool TryDisplayNativeArticle(string html)
+        {
+            if (NativeReaderButton.IsChecked != true) return false;
+            var wiki = _pageWikiContext;
+            NativeReader.ShowArticle(html, new Uri(wiki.GetWikiPageUrl(_pageTitleToFetch)), async uri =>
+            {
+                var target = WikiManager.GetWikiByHost(uri.Host);
+                string prefix = "/" + (target?.ArticlePath ?? "").Trim('/');
+                prefix = prefix.TrimEnd('/') + "/";
+                if (target != null && uri.AbsolutePath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    string title = Uri.UnescapeDataString(uri.AbsolutePath.Substring(prefix.Length));
+                    if (HandleSpecialLink(uri)) return;
+                    if (title.StartsWith("File:", StringComparison.OrdinalIgnoreCase) || title.StartsWith("Image:", StringComparison.OrdinalIgnoreCase))
+                        await ShowImageViewerAsync(title);
+                    else if (target.Id == _pageWikiContext.Id) NavigateToInternalPage(title);
+                    else Frame.Navigate(typeof(ArticleViewerPage), new ArticleNavigationParameter { WikiId = target.Id, PageTitle = title });
+                }
+                else await ShowWikiDetectionPromptAsync(uri);
+            }, url => MediaCacheService.GetLocalUriAsync(url, wiki));
+            return true;
+        }
+
         protected override TextBlock ArticleTitleTextBlock => new TextBlock();
         protected override TextBlock LoadingTextBlock => LoadingText;
         protected override TextBlock LastUpdatedTextBlock => LastUpdatedText;
@@ -87,6 +119,7 @@ namespace _1507_UWP.Pages
 
         protected override void UninitializePlatformControls()
         {
+            NativeReader.ClearArticle();
             ArticleDisplayWebView.NavigationStarting -= ArticleDisplayWebView_NavigationStarting;
             ArticleDisplayWebView.NavigationCompleted -= ArticleDisplayWebView_NavigationCompleted;
             _uiSettings.ColorValuesChanged -= ThemeChanged;

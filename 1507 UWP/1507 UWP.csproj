@@ -10,6 +10,7 @@
     <RootNamespace>_1507_UWP</RootNamespace>
     <AssemblyName>1507_UWP</AssemblyName>
     <DefaultLanguage>en-US</DefaultLanguage>
+    <WikitextParserVersion Condition="'$(WikitextParserVersion)' == ''">0.0.1</WikitextParserVersion>
     <TargetPlatformIdentifier>UAP</TargetPlatformIdentifier>
     <TargetPlatformVersion Condition=" '$(TargetPlatformVersion)' == '' ">10.0.10240.0</TargetPlatformVersion>
     <TargetPlatformVersion>10.0.10240.0</TargetPlatformVersion>
@@ -267,7 +268,7 @@
       <Version>10.0.3</Version>
     </PackageReference>
     <PackageReference Include="WikitextParser">
-      <Version>0.0.1</Version>
+      <Version>$(WikitextParserVersion)</Version>
     </PackageReference>
   </ItemGroup>
   <ItemGroup />

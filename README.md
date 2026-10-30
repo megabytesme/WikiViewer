@@ -17,6 +17,25 @@
 * **Discover Something New:** Jump to a random article with a single click and explore the depths of your favorite topics.
 * **Privacy-Focused by Design:** Your data is your own. The app collects no personal information, and all caches, favourites, and credentials are stored securely and only on your local device.
 
+## Native reader preview
+
+Open an article and select **Native reader (Preview)** in its command bar to switch between native UWP controls and Web view. The default remains Web view. The preview is available in both UWP heads and uses the wiki's existing `action=parse` result, including server-expanded templates and Lua modules, with the existing article and image caches.
+
+The reader supports paragraphs, headings, text formatting, internal/external links, citation anchors, images, nested lists and scrollable tables with spans. CSS-dependent layouts and interactive content may differ; use the reader button to return to Web view. It does not run page scripts. Large articles are not yet virtualized, and it is not a complete replacement for browser rendering.
+
+The portable article-model tests run with `dotnet test WikiViewer.Tests/WikiViewer.Tests.csproj -c Release`. Validate XAML and the native control using the UWP heads on Windows too.
+
+### Building with WikitextParser
+
+The parser fork is maintained at [megabytesme/WikitextParser](https://github.com/megabytesme/WikitextParser), on the `netstandard1.4` branch. Build/package that checkout, then select the resulting local feed without publishing a package:
+
+```powershell
+dotnet pack C:\path\to\WikitextParser\WikitextParser\WikitextParser.csproj -c Release -o C:\path\to\parser-feed
+MSBuild "1809 UWP\1809 UWP.csproj" /restore /p:Configuration=Release /p:Platform=ARM64 /p:WikitextParserVersion=0.1.0 /p:RestoreAdditionalProjectSources=C:\path\to\parser-feed
+```
+
+Use MSBuild from Visual Studio with UWP targets installed. The version property defaults to the existing published `0.0.1` package until `0.1.0` is published. Native article rendering consumes server HTML directly, so it does not depend on a local parser for template evaluation. The expanded parser adds local syntax coverage and compatibility diagnostics; it does not implement the entire MediaWiki runtime.
+
 ## Download
 
 <a href="https://apps.microsoft.com/detail/9NXGG8M4XF48"><img src="https://get.microsoft.com/images/en-us%20dark.svg" width="200"/>
@@ -66,4 +85,3 @@ This project utilizes a **Shared UI Logic (MVVM-like)** architecture to support 
 ## License
 
 This project is licensed under the CC BY-NC-SA 4.0 License - see the [LICENSE](LICENSE.md) file for details.
-

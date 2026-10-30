@@ -19,6 +19,31 @@ namespace _1809_UWP.Pages
 
         public ArticleViewerPage() => this.InitializeComponent();
 
+        private void NativeReaderButton_Click(object sender, Windows.UI.Xaml.RoutedEventArgs e)
+        {
+            NativeReader.Visibility = NativeReaderButton.IsChecked == true ? Windows.UI.Xaml.Visibility.Visible : Windows.UI.Xaml.Visibility.Collapsed;
+            ArticleDisplayWebView.Visibility = NativeReaderButton.IsChecked == true ? Windows.UI.Xaml.Visibility.Collapsed : Windows.UI.Xaml.Visibility.Visible;
+            ArticleDisplayWebView.CoreWebView2?.Stop();
+            NativeReader.ClearArticle();
+            StartArticleFetch();
+        }
+
+        protected override bool TryDisplayNativeArticle(string html)
+        {
+            if (NativeReaderButton.IsChecked != true) return false;
+            var wiki = _pageWikiContext;
+            NativeReader.ShowArticle(html, new Uri(wiki.GetWikiPageUrl(_pageTitleToFetch)), async uri =>
+            {
+                var target = WikiManager.GetWikiByHost(uri.Host);
+                string prefix = "/" + (target?.ArticlePath ?? "").Trim('/');
+                prefix = prefix.TrimEnd('/') + "/";
+                if (target != null && uri.AbsolutePath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    HandleValidPageNavigation(uri.AbsolutePath.Substring(prefix.Length), target, uri);
+                else await ShowWikiDetectionPromptAsync(uri);
+            }, url => MediaCacheService.GetLocalUriAsync(url, wiki));
+            return true;
+        }
+
         protected override TextBlock ArticleTitleTextBlock => ArticleTitle;
         protected override TextBlock LoadingTextBlock => LoadingText;
         protected override TextBlock LastUpdatedTextBlock => LastUpdatedText;
@@ -177,6 +202,7 @@ namespace _1809_UWP.Pages
 
         protected override void UninitializePlatformControls()
         {
+            NativeReader.ClearArticle();
             if (ArticleDisplayWebView?.CoreWebView2 != null)
                 ArticleDisplayWebView.CoreWebView2.NavigationStarting -=
                     ArticleDisplayWebView_NavigationStarting;
