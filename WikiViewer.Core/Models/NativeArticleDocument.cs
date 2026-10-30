@@ -6,7 +6,7 @@ namespace WikiViewer.Core.Models
     public enum NativeArticleNodeKind
     {
         Container, Text, Paragraph, Heading, Strong, Emphasis, Underline, Strike, Code,
-        Preformatted, Link, Image, LineBreak, Rule, List, ListItem, Table, TableRow, TableCell, Quote, Unsupported
+        Preformatted, Link, Image, Media, LineBreak, Rule, List, ListItem, Table, TableRow, TableCell, Quote, Unsupported
     }
 
     public sealed class NativeArticleNode
@@ -30,10 +30,20 @@ namespace WikiViewer.Core.Models
         public string Classes { get; set; }
         public string SourceFileName { get; set; }
         public string OriginalHtml { get; set; }
+        public string SvgContent { get; set; }
+        public Uri PosterUri { get; set; }
+        public List<NativeMediaSource> MediaSources { get; } = new List<NativeMediaSource>();
         public Dictionary<string, string> Attributes { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         public bool HasSourceLayout { get; set; }
         public NativeArticleStyle Style { get; set; } = new NativeArticleStyle();
         public List<NativeArticleNode> Children { get; } = new List<NativeArticleNode>();
+    }
+
+    public sealed class NativeMediaSource
+    {
+        public Uri Uri { get; set; }
+        public string ContentType { get; set; }
+        public string Label { get; set; }
     }
 
     public sealed class NativeArticleDocument

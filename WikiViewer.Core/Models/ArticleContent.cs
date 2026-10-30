@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace WikiViewer.Core.Models
 {
@@ -9,6 +10,9 @@ namespace WikiViewer.Core.Models
         public long RevisionId { get; set; }
         public string HtmlContent { get; set; }
         public string RawWikitext { get; set; }
+        public string HeadHtml { get; set; }
+        public List<string> StyleModules { get; set; } = new List<string>();
+        public List<string> ResolvedStyleSheets { get; set; } = new List<string>();
         public bool HasRawSource => RawWikitext != null;
     }
 

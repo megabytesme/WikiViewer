@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Newtonsoft.Json.Linq;
 using WikiViewer.Core.Models;
 
@@ -8,7 +9,7 @@ namespace WikiViewer.Core.Services
     {
         public static string BuildUrl(string endpoint, string title) => endpoint +
             "?action=parse&page=" + Uri.EscapeDataString(title) +
-            "&prop=text%7Cwikitext%7Crevid&format=json&disableeditsection=true";
+            "&prop=text%7Cwikitext%7Crevid%7Cheadhtml%7Cmodules%7Cjsconfigvars&format=json&disableeditsection=true";
 
         public static ArticleContent Parse(string json, string requestedTitle)
         {
@@ -24,7 +25,10 @@ namespace WikiViewer.Core.Services
                 Title = (string)parsed["title"] ?? requestedTitle,
                 RevisionId = (long?)parsed["revid"] ?? 0,
                 HtmlContent = html,
-                RawWikitext = ReadText(parsed["wikitext"])
+                RawWikitext = ReadText(parsed["wikitext"]),
+                HeadHtml = ReadText(parsed["headhtml"]),
+                StyleModules = (parsed["modules"] ?? new JArray()).Concat(parsed["modulestyles"] ?? new JArray())
+                    .Select(token => (string)token).Where(value => !string.IsNullOrWhiteSpace(value)).Distinct(StringComparer.Ordinal).ToList()
             };
         }
 

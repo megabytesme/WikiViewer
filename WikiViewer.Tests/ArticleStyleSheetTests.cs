@@ -5,6 +5,51 @@ namespace WikiViewer.Tests;
 
 public class ArticleStyleSheetTests
 {
+    [Theory]
+    [InlineData(".box > p[data-kind='lead']", true)]
+    [InlineData(".box > div > p", false)]
+    [InlineData("h2 + p", true)]
+    [InlineData("h2 ~ p", true)]
+    [InlineData("p[data-kind^='le'][data-kind$='ad']", true)]
+    [InlineData("p:not(.other):nth-child(2)", true)]
+    [InlineData("p:first-child", false)]
+    [InlineData("p:last-child", true)]
+    [InlineData("p:hover", false)]
+    public void StaticSelectorsPreserveRelationships(string selector, bool matches)
+    {
+        var document = NativeArticleDocumentService.Parse("<style>" + selector + "{color:#123456}</style><div class='box'><h2>Title</h2><!-- gap --><p data-kind='lead'>Text</p></div>", new Uri("https://example.org/Page"));
+        Assert.Equal(matches, document.Nodes.Single().Children.Last().Style.Foreground == "#123456");
+    }
+
+    [Fact]
+    public void ImportantCascadeVariablesAndQuotedSemicolonsRemainIntact()
+    {
+        const string html = "<style>.box{--Color:#abcdef;color:var(--Color);width:220px!important}#target{width:240px}.box p{background:var(--missing,#eeeeee)}</style><div class='box' id='target' style='width:280px'><p title='x'>Text</p></div>";
+        var node = NativeArticleDocumentService.Parse(html, new Uri("https://example.org/Page")).Nodes.Single();
+        Assert.Equal(220, node.Style.Width.Value);
+        Assert.Equal("#abcdef", node.Children[0].Style.Foreground);
+        Assert.Equal("#eeeeee", node.Children[0].Style.Background);
+    }
+
+    [Fact]
+    public void CyclicVariablesDoNotHangOrEraseOtherProperties()
+    {
+        var node = NativeArticleDocumentService.Parse("<div style='--a:var(--b);--b:var(--a);width:var(--a);color:#123456'>Text</div>", new Uri("https://example.org/Page")).Nodes.Single();
+        Assert.Null(node.Style.Width);
+        Assert.Equal("#123456", node.Style.Foreground);
+    }
+
+    [Theory]
+    [InlineData(320, true)]
+    [InlineData(800, false)]
+    public void WidthMediaRulesRequireMatchingViewport(double width, bool hidden)
+    {
+        var content = new WikiViewer.Core.Models.ArticleContent { HtmlContent = "<style>@media screen and (max-width:400px){.box{display:none}}@media print{.box{color:red}}</style><div class='box'>Text</div>" };
+        var node = NativeArticleDocumentService.Parse(content, new Uri("https://example.org/Page"), width).Nodes.Single();
+        Assert.Equal(hidden, node.Style.Hidden);
+        Assert.Null(node.Style.Foreground);
+    }
+
     [Fact]
     public void AppliesTemplateStylesWithSpecificityAndInlineOverrides()
     {

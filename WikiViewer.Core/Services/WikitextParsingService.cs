@@ -140,6 +140,7 @@ namespace WikiViewer.Core.Services
             if (worker == null) throw new ArgumentNullException(nameof(worker));
             string json = await worker.PostAndGetJsonFromApiAsync(wikiContext.ApiEndpoint, EditorPreviewResponse.BuildRequest(wikitext, pageTitle));
             var preview = EditorPreviewResponse.Parse(json, wikitext, pageTitle);
+            await ArticleStyleResourceService.ResolveAsync(preview.Content, new Uri(wikiContext.GetWikiPageUrl(pageTitle)), wikiContext.ScriptPath, worker.GetRawHtmlFromUrlAsync);
             string scriptPath = (wikiContext.ScriptPath ?? "").Trim('/');
             string cssUrl = preview.StyleModules.Count == 0 ? "" : wikiContext.BaseUrl.TrimEnd('/') + "/" +
                 (scriptPath.Length == 0 ? "" : scriptPath + "/") + "load.php?modules=" + Uri.EscapeDataString(string.Join("|", preview.StyleModules)) + "&only=styles";

@@ -18,6 +18,7 @@
     <Compile Include="..\WikiViewer.Core\Services\NativeFlowLayout.cs" Link="Services\NativeFlowLayout.cs" />
     <Compile Include="..\WikiViewer.Core\Services\ArticleColor.cs" Link="Services\ArticleColor.cs" />
     <Compile Include="..\WikiViewer.Core\Services\ArticleStyleSheet.cs" Link="Services\ArticleStyleSheet.cs" />
+    <Compile Include="..\WikiViewer.Core\Services\ArticleStyleResourceService.cs" Link="Services\ArticleStyleResourceService.cs" />
     <Compile Include="..\WikiViewer.Core\Models\NativeArticleStyle.cs" Link="Models\NativeArticleStyle.cs" />
     <Compile Include="..\WikiViewer.Core\Services\NativeArticleStyleService.cs" Link="Services\NativeArticleStyleService.cs" />
     <Compile Include="..\WikiViewer.Core\Services\WikitextLayoutService.cs" Link="Services\WikitextLayoutService.cs" />
@@ -29,5 +30,6 @@
     <Compile Include="..\WikiViewer.Core\Managers\ArticleCacheManager.cs" Link="Managers\ArticleCacheManager.cs" />
     <Compile Include="..\WikiViewer.Core\Interfaces\IStorageProvider.cs" Link="Interfaces\IStorageProvider.cs" />
     <Compile Include="..\WikiViewer.Core\Services\NativeArticleDocumentService.cs" Link="Services\NativeArticleDocumentService.cs" />
+    <Compile Include="..\WikiViewer.Core\Services\NativeSvgService.cs" Link="Services\NativeSvgService.cs" />
   </ItemGroup>
 </Project>

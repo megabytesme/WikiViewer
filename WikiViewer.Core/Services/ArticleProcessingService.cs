@@ -94,6 +94,7 @@ namespace WikiViewer.Core.Services
             {
                 string json = await worker.GetJsonFromApiAsync(ArticleContentResponse.BuildUrl(wiki.ApiEndpoint, resolvedTitle));
                 var content = ArticleContentResponse.Parse(json, resolvedTitle);
+                await ArticleStyleResourceService.ResolveAsync(content, new Uri(wiki.GetWikiPageUrl(resolvedTitle)), wiki.ScriptPath, worker.GetRawHtmlFromUrlAsync);
                 await ArticleCacheManager.SaveArticleContentAsync(
                     resolvedTitle,
                     wiki.Id,

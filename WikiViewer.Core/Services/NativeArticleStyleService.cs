@@ -10,9 +10,10 @@ namespace WikiViewer.Core.Services
     /// <summary>Retains inline declarations and maps a bounded CSS/MediaWiki class subset to native properties.</summary>
     public static class NativeArticleStyleService
     {
-        internal static NativeArticleStyle Read(HtmlNode element, IEnumerable<ArticleCssRule> rules = null)
+        internal static NativeArticleStyle Read(HtmlNode element, IEnumerable<ArticleCssRule> rules = null, NativeArticleStyle parent = null)
         {
             var style = new NativeArticleStyle();
+            if (parent != null) foreach (var variable in parent.Variables) style.Variables[variable.Key] = variable.Value;
             var classes = (element.GetAttributeValue("class", "") ?? "").Split(new[] { ' ', '\t', '\n' }, StringSplitOptions.RemoveEmptyEntries);
             Func<string, bool> has = name => classes.Contains(name, StringComparer.OrdinalIgnoreCase);
             style.IsInfobox = has("infobox");
@@ -48,14 +49,15 @@ namespace WikiViewer.Core.Services
             style.Height = ArticleLength.Parse(element.GetAttributeValue("height", ""));
             style.Background = element.GetAttributeValue("bgcolor", style.Background);
             style.Foreground = element.GetAttributeValue("color", style.Foreground);
-            string declarations = string.Join(";", (rules ?? new ArticleCssRule[0]).Where(rule => ArticleStyleSheet.Matches(rule, element))
-                .OrderBy(rule => rule.Specificity).Select(rule => rule.Declarations)) + ";" + element.GetAttributeValue("style", "");
-            foreach (string declaration in declarations.Split(';'))
+            var declarations = (rules ?? new ArticleCssRule[0]).Where(rule => ArticleStyleSheet.Matches(rule, element))
+                .OrderBy(rule => rule.Specificity).SelectMany(rule => rule.Values ?? ArticleStyleSheet.ReadDeclarations(rule.Declarations))
+                .Concat(ArticleStyleSheet.ReadDeclarations(element.GetAttributeValue("style", ""))).OrderBy(d => d.Important).ToList();
+            foreach (var declaration in declarations.Where(d => d.Name.StartsWith("--"))) style.Variables[declaration.Name] = declaration.Value;
+            foreach (var declaration in declarations.Where(d => !d.Name.StartsWith("--")))
             {
-                int colon = declaration.IndexOf(':');
-                if (colon < 0) continue;
-                string key = declaration.Substring(0, colon).Trim().ToLowerInvariant();
-                string value = Regex.Replace(declaration.Substring(colon + 1).Trim(), @"\s*!important\s*$", "", RegexOptions.IgnoreCase);
+                string key = declaration.Name;
+                string value = ResolveVariables(declaration.Value, style.Variables);
+                if (value == null) continue;
                 style.Declarations[key] = value;
                 switch (key)
                 {
@@ -86,7 +88,16 @@ namespace WikiViewer.Core.Services
                     case "margin": SetEdges(style.Margin, value); if (value.Contains("auto")) style.Alignment = "center"; break;
                     case "column-count": case "-moz-column-count": case "-webkit-column-count":
                         int columns; if (int.TryParse(value, out columns)) style.ColumnCount = Math.Max(1, Math.Min(4, columns)); break;
-                    case "display": if (value == "none") style.Hidden = true; break;
+                    case "display": style.Display = value; style.Hidden = value == "none"; break;
+                    case "flex-wrap": style.Wrap = value == "wrap" || value == "wrap-reverse"; break;
+                    case "gap": case "grid-gap": style.Gap = ArticleLength.Parse(value); break;
+                    case "grid-template-columns":
+                        var repeat = Regex.Match(value, @"^repeat\(\s*(\d+)\s*,");
+                        int count;
+                        if (repeat.Success && int.TryParse(repeat.Groups[1].Value, out count)) style.GridColumns = Math.Max(1, Math.Min(12, count));
+                        else if (Regex.IsMatch(value, @"^(?:[\d.]+(?:fr|px|%|em)|auto)(?:\s+(?:[\d.]+(?:fr|px|%|em)|auto))*$"))
+                            style.GridColumns = Math.Min(12, value.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).Length);
+                        break;
                     case "white-space": style.PreserveWhitespace = value == "pre" || value == "pre-wrap"; break;
                     default:
                         if (key.StartsWith("padding-")) SetEdge(style.Padding, key.Substring(8), value);
@@ -94,7 +105,7 @@ namespace WikiViewer.Core.Services
                         break;
                 }
             }
-            if (style.Background != null && style.Foreground == null)
+            if (style.Background != null && style.Foreground == null && parent?.Foreground == null)
             {
                 uint? color = ArticleColor.Parse(style.Background);
                 if (color.HasValue && (color.Value >> 24) > 127)
@@ -105,6 +116,24 @@ namespace WikiViewer.Core.Services
                 }
             }
             return style;
+        }
+
+        private static string ResolveVariables(string value, Dictionary<string, string> variables)
+        {
+            // Bound substitution, including cycles and nested fallback values.
+            for (int step = 0; step < 24 && value.Contains("var("); step++)
+            {
+                int start = value.LastIndexOf("var(", StringComparison.Ordinal), end = value.IndexOf(')', start);
+                if (end < 0) return null;
+                string expression = value.Substring(start + 4, end - start - 4);
+                int comma = expression.IndexOf(',');
+                string name = (comma < 0 ? expression : expression.Substring(0, comma)).Trim(), replacement;
+                if (!variables.TryGetValue(name, out replacement)) replacement = comma < 0 ? null : expression.Substring(comma + 1).Trim();
+                if (replacement == null) return null;
+                value = value.Substring(0, start) + replacement + value.Substring(end + 1);
+                if (value.Length > 16000) return null;
+            }
+            return value.Contains("var(") ? null : value;
         }
 
         private static void SetEdge(ArticleEdges edges, string edge, string value)

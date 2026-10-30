@@ -23,6 +23,24 @@ namespace WikiViewer.Core.Services
     /// <summary>Paragraph-level float/column layout, shared by the UWP panel and portable regression tests.</summary>
     public static class NativeFlowLayout
     {
+        public static List<ArticleFlowRect> Tiles(double width, int itemCount, int columns, double gap, Func<int, double, double> measureHeight)
+        {
+            width = Math.Max(1, width); gap = Math.Max(0, Math.Min(100, gap));
+            int count = Math.Max(1, Math.Min(columns > 0 ? columns : (int)((width + gap) / (200 + gap)), Math.Max(1, (int)((width + gap) / (120 + gap)))));
+            double cell = Math.Max(1, (width - gap * (count - 1)) / count), y = 0;
+            var result = new List<ArticleFlowRect>();
+            for (int start = 0; start < itemCount; start += count)
+            {
+                double height = 0;
+                for (int i = start; i < Math.Min(itemCount, start + count); i++)
+                {
+                    double measured = Math.Max(0, measureHeight(i, cell)); height = Math.Max(height, measured);
+                    result.Add(new ArticleFlowRect { X = (i - start) * (cell + gap), Y = y, Width = cell, Height = measured });
+                }
+                y += height + gap;
+            }
+            return result;
+        }
         public static List<ArticleFlowRect> Arrange(double width, IList<ArticleFlowItem> items, Func<int, double, double> measureHeight, int columns = 1)
         {
             width = Math.Max(1, width);

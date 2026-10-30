@@ -13,24 +13,28 @@ namespace WikiViewer.Core.Services
         public static NativeArticleDocument Parse(string html, Uri pageUri)
             => Parse(new ArticleContent { HtmlContent = html }, pageUri);
 
-        public static NativeArticleDocument Parse(ArticleContent content, Uri pageUri)
+        public static NativeArticleDocument Parse(ArticleContent content, Uri pageUri, double? viewportWidth = null)
         {
             if (pageUri == null || !pageUri.IsAbsoluteUri) throw new ArgumentException("An absolute page URI is required.", nameof(pageUri));
             var htmlDocument = new HtmlDocument();
-            htmlDocument.LoadHtml(content.HtmlContent ?? "");
+            htmlDocument.LoadHtml(string.IsNullOrEmpty(content.HeadHtml) ? content.HtmlContent ?? "" : content.HeadHtml + (content.HtmlContent ?? "") + "</body></html>");
             var root = htmlDocument.DocumentNode.SelectSingleNode("//*[contains(concat(' ', normalize-space(@class), ' '), ' mw-parser-output ')]")
                 ?? htmlDocument.DocumentNode.SelectSingleNode("//body") ?? htmlDocument.DocumentNode;
             var result = new NativeArticleDocument { RawWikitext = content.RawWikitext, RevisionId = content.RevisionId };
+            foreach (var sheet in content.ResolvedStyleSheets ?? Enumerable.Empty<string>()) result.StyleRules.AddRange(ArticleStyleSheet.Parse(sheet, viewportWidth));
             foreach (var sheet in htmlDocument.DocumentNode.SelectNodes("//style") ?? Enumerable.Empty<HtmlNode>())
             {
                 result.EmbeddedStyleSheets.Add(sheet.InnerText);
-                result.StyleRules.AddRange(ArticleStyleSheet.Parse(sheet.InnerText));
+                result.StyleRules.AddRange(ArticleStyleSheet.Parse(sheet.InnerText, viewportWidth));
             }
             try { result.SourceImages.AddRange(WikitextLayoutService.ReadImages(content.RawWikitext)); }
             catch (Exception) { result.UnsupportedFeatures.Add("raw source layout"); }
+            NativeArticleStyle rootStyle = null;
+            foreach (var ancestor in root.AncestorsAndSelf().Reverse().Where(a => a.NodeType == HtmlNodeType.Element))
+                rootStyle = NativeArticleStyleService.Read(ancestor, result.StyleRules, rootStyle);
             foreach (var child in root.ChildNodes)
             {
-                var node = Convert(child, pageUri, result, false, false, false, NativeArticleStyleService.Read(root, result.StyleRules), 0);
+                var node = Convert(child, pageUri, result, false, false, false, rootStyle, 0);
                 if (node != null) NormalizeFlow(node);
                 if (node != null) result.Nodes.Add(node);
             }
@@ -50,7 +54,7 @@ namespace WikiViewer.Core.Services
                 document.UnsupportedFeatures.Add("deeply nested content");
                 return new NativeArticleNode { Kind = NativeArticleNodeKind.Unsupported, Text = "This section is available in Web view." };
             }
-            var style = NativeArticleStyleService.Read(source, document.StyleRules);
+            var style = NativeArticleStyleService.Read(source, document.StyleRules, parentStyle);
             Inherit(style, parentStyle);
             var node = new NativeArticleNode { Kind = NativeArticleNodeKind.Container, Id = source.GetAttributeValue("id", null),
                 TagName = tag, Classes = source.GetAttributeValue("class", ""), Style = style,
@@ -85,6 +89,7 @@ namespace WikiViewer.Core.Services
                     int start;
                     if (int.TryParse(source.GetAttributeValue("start", ""), out start)) node.ListStart = Math.Max(-1000000, Math.Min(1000000, start));
                     if (tag == "dl") node.Text = "definition";
+                    if (node.Classes.Split(' ').Contains("gallery")) { node.Kind = NativeArticleNodeKind.Container; node.IsBlock = true; style.Display = "gallery"; style.Wrap = true; }
                     break;
                 case "li": case "dt": case "dd":
                     node.Kind = NativeArticleNodeKind.ListItem; node.IsHeader = tag == "dt";
@@ -103,7 +108,34 @@ namespace WikiViewer.Core.Services
                     break;
                 case "details": node.IsBlock = true; style.Collapsible = true; style.InitiallyCollapsed = !source.Attributes.Contains("open"); break;
                 case "summary": node.Kind = NativeArticleNodeKind.Paragraph; style.FontWeight = "bold"; break;
-                case "video": case "audio": case "iframe": case "object": case "embed": case "svg": case "math":
+                case "svg":
+                    node.OriginalHtml = source.OuterHtml;
+                    node.SvgContent = NativeSvgService.Prepare(source.OuterHtml);
+                    node.Text = WebUtility.HtmlDecode(source.SelectSingleNode(".//title")?.InnerText ?? source.GetAttributeValue("aria-label", "Vector image"));
+                    node.Kind = node.SvgContent != null ? NativeArticleNodeKind.Image : NativeArticleNodeKind.Unsupported;
+                    if (node.SvgContent == null) document.UnsupportedFeatures.Add("svg");
+                    return node;
+                case "video": case "audio":
+                    node.Kind = NativeArticleNodeKind.Media; node.IsBlock = true;
+                    node.OriginalHtml = source.OuterHtml;
+                    node.PosterUri = Resolve(source.GetAttributeValue("poster", ""), pageUri);
+                    var candidates = new[] { source }.Concat(source.ChildNodes.Where(c => c.Name.Equals("source", StringComparison.OrdinalIgnoreCase)));
+                    foreach (var candidate in candidates)
+                    {
+                        var uri = Resolve(candidate.GetAttributeValue("src", ""), pageUri);
+                        if (uri == null || node.MediaSources.Any(s => s.Uri == uri)) continue;
+                        node.MediaSources.Add(new NativeMediaSource { Uri = uri, ContentType = candidate.GetAttributeValue("type", ""),
+                            Label = candidate.GetAttributeValue("data-title", null) ?? candidate.GetAttributeValue("title", null) ?? uri.Segments.Last() });
+                    }
+                    node.Uri = node.MediaSources.FirstOrDefault()?.Uri;
+                    if (node.MediaSources.Count == 0)
+                    {
+                        document.UnsupportedFeatures.Add(tag); node.Kind = NativeArticleNodeKind.Unsupported;
+                        node.Text = WebUtility.HtmlDecode(source.InnerText);
+                    }
+                    break;
+                case "source": case "track": return null;
+                case "iframe": case "object": case "embed": case "math":
                     node.OriginalHtml = source.OuterHtml;
                     document.UnsupportedFeatures.Add(tag);
                     node.Kind = NativeArticleNodeKind.Unsupported;
@@ -115,6 +147,7 @@ namespace WikiViewer.Core.Services
                     node.IsBlock = true;
                     break;
             }
+            if (node.Classes.Split(' ').Contains("gallerybox")) { node.Kind = NativeArticleNodeKind.Container; node.IsBlock = true; node.Style.Float = null; }
             // UWP Hyperlink labels permit Run and Span, but not nested Hyperlink,
             // LineBreak or embedded block controls. Preserve their readable content.
             if (insideLink)

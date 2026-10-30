@@ -10,6 +10,15 @@ namespace WikiViewer.Core.Models
         public string Selector { get; set; }
         public string Declarations { get; set; }
         public int Specificity { get; set; }
+        internal Func<HtmlAgilityPack.HtmlNode, bool> Match { get; set; }
+        internal List<ArticleCssDeclaration> Values { get; set; }
+    }
+
+    internal sealed class ArticleCssDeclaration
+    {
+        public string Name;
+        public string Value;
+        public bool Important;
     }
 
     public sealed class SourceImageLayout
@@ -52,6 +61,10 @@ namespace WikiViewer.Core.Models
         public string Float { get; set; }
         public bool PositionExplicit { get; set; }
         public string Clear { get; set; }
+        public string Display { get; set; }
+        public bool Wrap { get; set; }
+        public int GridColumns { get; set; }
+        public ArticleLength Gap { get; set; }
         public string Foreground { get; set; }
         public string Background { get; set; }
         public string BorderColor { get; set; }
@@ -75,5 +88,6 @@ namespace WikiViewer.Core.Models
         public bool IsThumbnail { get; set; }
         public bool PreserveWhitespace { get; set; }
         public Dictionary<string, string> Declarations { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, string> Variables { get; } = new Dictionary<string, string>(StringComparer.Ordinal);
     }
 }
