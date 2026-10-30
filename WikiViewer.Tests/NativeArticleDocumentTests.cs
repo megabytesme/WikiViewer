@@ -76,6 +76,22 @@ public class NativeArticleDocumentTests
     }
 
     [Fact]
+    public void LinkLabelsExcludeUwpUnsupportedInlineStructures()
+    {
+        var nodes = All(Parse("<p><a href='/wiki/A'>before<br><span>after</span></a></p>").Nodes).ToList();
+        var link = nodes.Single(n => n.Kind == NativeArticleNodeKind.Link);
+        Assert.DoesNotContain(All(link.Children), n => n.Kind == NativeArticleNodeKind.LineBreak || n.Kind == NativeArticleNodeKind.Link || n.IsBlock);
+        Assert.Equal("before after", string.Concat(All(link.Children).Select(n => n.Text)));
+    }
+
+    [Fact]
+    public void RetainsDeclaredThumbnailWidth()
+    {
+        var image = Assert.Single(Parse("<img src='/image.png' width='120' height='160'>").Nodes);
+        Assert.Equal(120, image.ImageWidth);
+    }
+
+    [Fact]
     public void CapsExcessiveNestingAndUntrustedSpans()
     {
         var document = Parse(string.Concat(Enumerable.Repeat("<div>", 300)) + "text" + string.Concat(Enumerable.Repeat("</div>", 300)));

@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
 using Windows.Foundation;
+using Windows.Storage;
 using Windows.UI;
 using Windows.UI.Text;
 using Windows.UI.Xaml;
@@ -36,6 +37,8 @@ namespace WikiViewer.Shared.Uwp.Controls
 
         public void ShowArticle(string html, Uri pageUri, Func<Uri, Task> navigate, Func<string, Task<string>> resolveImage)
         {
+            try
+            {
             ClearArticle();
             _navigate = navigate;
             _resolveImage = resolveImage;
@@ -44,7 +47,20 @@ namespace WikiViewer.Shared.Uwp.Controls
             if (document.UnsupportedFeatures.Count > 0)
                 _root.Children.Add(new TextBlock { Text = "Some content is available in Web view. Use the reader button to switch views.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12), Opacity = 0.75 });
             AppendBlocks(_root, document.Nodes);
+            _root.UpdateLayout();
             _scroll.ChangeView(null, 0, null, true);
+            }
+            catch (Exception ex) { _ = LogFailureAsync(ex); throw; }
+        }
+
+        private static async Task LogFailureAsync(Exception exception)
+        {
+            try
+            {
+                var file = await ApplicationData.Current.LocalFolder.CreateFileAsync("native-reader-error.log", CreationCollisionOption.ReplaceExisting);
+                await FileIO.WriteTextAsync(file, exception.ToString());
+            }
+            catch (Exception) { }
         }
 
         public void ClearArticle()
@@ -163,7 +179,7 @@ namespace WikiViewer.Shared.Uwp.Controls
         private FrameworkElement Image(NativeArticleNode node)
         {
             if (node.Uri == null) return new TextBlock { Text = node.Text ?? "[Image]", TextWrapping = TextWrapping.Wrap };
-            var image = new Image { MaxWidth = Math.Max(80, _root.ActualWidth > 0 ? _root.ActualWidth - 40 : 320), MaxHeight = 600, Stretch = Stretch.Uniform, Margin = new Thickness(0, 8, 0, 8) };
+            var image = new Image { Width = node.ImageWidth > 0 ? node.ImageWidth : double.NaN, MaxWidth = Math.Max(80, _root.ActualWidth > 0 ? _root.ActualWidth - 40 : 320), MaxHeight = 600, Stretch = Stretch.Uniform, Margin = new Thickness(0, 8, 0, 8) };
             Windows.UI.Xaml.Automation.AutomationProperties.SetName(image, node.Text ?? "");
             _images.Add(image);
             int version = _version;

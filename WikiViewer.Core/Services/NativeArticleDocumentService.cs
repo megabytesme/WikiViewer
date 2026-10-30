@@ -20,13 +20,13 @@ namespace WikiViewer.Core.Services
             var result = new NativeArticleDocument();
             foreach (var child in root.ChildNodes)
             {
-                var node = Convert(child, pageUri, result, false, false, 0);
+                var node = Convert(child, pageUri, result, false, false, false, 0);
                 if (node != null) result.Nodes.Add(node);
             }
             return result;
         }
 
-        private static NativeArticleNode Convert(HtmlNode source, Uri pageUri, NativeArticleDocument document, bool preserveWhitespace, bool rtl, int depth)
+        private static NativeArticleNode Convert(HtmlNode source, Uri pageUri, NativeArticleDocument document, bool preserveWhitespace, bool rtl, bool insideLink, int depth)
         {
             if (source.NodeType == HtmlNodeType.Comment) return null;
             if (source.NodeType == HtmlNodeType.Text)
@@ -61,6 +61,8 @@ namespace WikiViewer.Core.Services
                     node.Kind = NativeArticleNodeKind.Image;
                     node.Text = WebUtility.HtmlDecode(source.GetAttributeValue("alt", ""));
                     node.Uri = Resolve(source.GetAttributeValue("data-src", null) ?? source.GetAttributeValue("src", ""), pageUri);
+                    int imageWidth;
+                    if (int.TryParse(source.GetAttributeValue("width", ""), out imageWidth)) node.ImageWidth = Math.Max(0, Math.Min(2000, imageWidth));
                     break;
                 case "ul": case "ol": case "dl":
                     node.Kind = NativeArticleNodeKind.List; node.Ordered = tag == "ol";
@@ -89,9 +91,18 @@ namespace WikiViewer.Core.Services
                     node.Text = WebUtility.HtmlDecode(source.InnerText);
                     return node;
             }
+            // UWP Hyperlink labels permit Run and Span, but not nested Hyperlink,
+            // LineBreak or embedded block controls. Preserve their readable content.
+            if (insideLink)
+            {
+                if (node.Kind == NativeArticleNodeKind.LineBreak) { node.Kind = NativeArticleNodeKind.Text; node.Text = " "; }
+                if (node.Kind == NativeArticleNodeKind.Link || node.IsBlock || node.Kind == NativeArticleNodeKind.Paragraph || node.Kind == NativeArticleNodeKind.Heading ||
+                    node.Kind == NativeArticleNodeKind.Quote || node.Kind == NativeArticleNodeKind.Preformatted || node.Kind == NativeArticleNodeKind.List || node.Kind == NativeArticleNodeKind.Table)
+                { node.Kind = NativeArticleNodeKind.Container; node.IsBlock = false; }
+            }
             foreach (var child in source.ChildNodes)
             {
-                var converted = Convert(child, pageUri, document, node.PreserveWhitespace, node.RightToLeft, depth + 1);
+                var converted = Convert(child, pageUri, document, node.PreserveWhitespace, node.RightToLeft, insideLink || node.Kind == NativeArticleNodeKind.Link, depth + 1);
                 if (converted != null) node.Children.Add(converted);
             }
             return node;

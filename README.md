@@ -21,7 +21,7 @@
 
 Open an article and select **Native reader (Preview)** in its command bar to switch between native UWP controls and Web view. The default remains Web view. The preview is available in both UWP heads and uses the wiki's existing `action=parse` result, including server-expanded templates and Lua modules, with the existing article and image caches.
 
-The reader supports paragraphs, headings, text formatting, internal/external links, citation anchors, images, nested lists and scrollable tables with spans. CSS-dependent layouts and interactive content may differ; use the reader button to return to Web view. It does not run page scripts. Large articles are not yet virtualized, and it is not a complete replacement for browser rendering.
+The reader supports paragraphs, headings, text formatting, internal/external links, citation anchors, images, nested lists and scrollable tables with spans. CSS-dependent layouts and interactive content may differ; use the reader button to return to Web view. If native rendering fails, the article opens in Web view automatically. It does not run page scripts. Large articles are not yet virtualized, and it is not a complete replacement for browser rendering.
 
 The portable article-model tests run with `dotnet test WikiViewer.Tests/WikiViewer.Tests.csproj -c Release`. Validate XAML and the native control using the UWP heads on Windows too.
 

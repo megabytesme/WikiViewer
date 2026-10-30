@@ -31,6 +31,8 @@ namespace _1507_UWP.Pages
         protected override bool TryDisplayNativeArticle(string html)
         {
             if (NativeReaderButton.IsChecked != true) return false;
+            try
+            {
             var wiki = _pageWikiContext;
             NativeReader.ShowArticle(html, new Uri(wiki.GetWikiPageUrl(_pageTitleToFetch)), async uri =>
             {
@@ -49,6 +51,16 @@ namespace _1507_UWP.Pages
                 else await ShowWikiDetectionPromptAsync(uri);
             }, url => MediaCacheService.GetLocalUriAsync(url, wiki));
             return true;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Native reader fallback: " + ex.Message);
+                NativeReader.ClearArticle();
+                NativeReaderButton.IsChecked = false;
+                NativeReader.Visibility = Visibility.Collapsed;
+                ArticleDisplayWebView.Visibility = Visibility.Visible;
+                return false;
+            }
         }
 
         protected override TextBlock ArticleTitleTextBlock => new TextBlock();

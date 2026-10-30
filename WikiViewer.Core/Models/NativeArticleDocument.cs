@@ -16,6 +16,7 @@ namespace WikiViewer.Core.Models
         public string Id { get; set; }
         public Uri Uri { get; set; }
         public int Level { get; set; }
+        public int ImageWidth { get; set; }
         public int ColumnSpan { get; set; } = 1;
         public int RowSpan { get; set; } = 1;
         public bool IsHeader { get; set; }
