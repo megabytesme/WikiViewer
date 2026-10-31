@@ -46,18 +46,21 @@ namespace _1507_UWP.Services
         )
         {
             WebViewApiWorker worker = null;
+            bool reusable = false;
             try
             {
                 worker = await AcquireWorkerAsync(wiki);
 
                 await worker.InitializeAsync(wiki.BaseUrl);
-                return await operation(worker);
+                var result = await operation(worker);
+                reusable = true; return result;
             }
             finally
             {
                 if (worker != null)
                 {
-                    await ReleaseWorkerAsync(worker);
+                    if (reusable) await ReleaseWorkerAsync(worker);
+                    else worker.Dispose();
                 }
             }
         }

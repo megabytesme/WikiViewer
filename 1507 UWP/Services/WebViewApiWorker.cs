@@ -24,6 +24,8 @@ namespace _1507_UWP.Services
         public WikiInstance WikiContext { get; set; }
 
         private Task _initializationTask;
+        private static Task<string> ExecuteScriptAsync(WebView view, string script)
+            => NetworkOperationTimeout.RunAsync(async () => await view.InvokeScriptAsync("eval", new[] { script }), TimeSpan.FromSeconds(10), "WebView stopped responding while reading the page. Try another connection method.");
         private readonly SemaphoreSlim _initSemaphore = new SemaphoreSlim(1, 1);
 
         public async Task InitializeAsync(string baseUrl)
@@ -76,7 +78,7 @@ namespace _1507_UWP.Services
                             null;
                         navHandler = (s, e) =>
                         {
-                            WebView.NavigationCompleted -= navHandler;
+                            s.NavigationCompleted -= navHandler;
                             if (!tcs.Task.IsCompleted)
                                 tcs.SetResult(e.IsSuccess);
                         };
@@ -93,7 +95,7 @@ namespace _1507_UWP.Services
                 }
             );
 
-            bool success = await tcs.Task;
+            bool success = await NetworkOperationTimeout.RunAsync(() => tcs.Task, TimeSpan.FromSeconds(30), "WebView initialization timed out. Try another connection method.");
             if (success)
             {
                 IsInitialized = true;
@@ -178,18 +180,15 @@ namespace _1507_UWP.Services
                     TypedEventHandler<WebView, WebViewNavigationCompletedEventArgs> navHandler = null;
                     navHandler = (s, e) =>
                     {
-                        this.WebView.NavigationCompleted -= navHandler;
+                        s.NavigationCompleted -= navHandler;
                         navTcs.TrySetResult(e.IsSuccess);
                     };
                     this.WebView.NavigationCompleted += navHandler;
                     this.WebView.NavigateWithHttpRequestMessage(httpRequest);
-                    await navTcs.Task;
+                    await NetworkOperationTimeout.RunAsync(() => navTcs.Task, TimeSpan.FromSeconds(30), "WebView navigation timed out. Configure a resolver in Settings > Connection or try another method.");
 
                     await Task.Delay(250);
-                    string fullHtml = await this.WebView.InvokeScriptAsync(
-                        "eval",
-                        new[] { "document.documentElement.outerHTML" }
-                    );
+                    string fullHtml = await ExecuteScriptAsync(this.WebView, "document.documentElement.outerHTML");
 
                     if (string.IsNullOrEmpty(fullHtml))
                         throw new Exception("POST operation resulted in a blank page.");
@@ -247,23 +246,20 @@ namespace _1507_UWP.Services
                         null;
                     navHandler = (s, e) =>
                     {
-                        WebView.NavigationCompleted -= navHandler;
+                        s.NavigationCompleted -= navHandler;
                         navTcs.TrySetResult((e.IsSuccess, e.WebErrorStatus));
                     };
                     WebView.NavigationCompleted += navHandler;
                     WebView.Navigate(new Uri(url));
 
-                    var (isSuccess, status) = await navTcs.Task;
+                    var (isSuccess, status) = await NetworkOperationTimeout.RunAsync(() => navTcs.Task, TimeSpan.FromSeconds(30), "WebView navigation timed out. Configure a resolver in Settings > Connection or try another method.");
                     if (!isSuccess && status == WebErrorStatus.Forbidden)
                         throw new NeedsUserVerificationException(
                             "Navigation was forbidden by the server.",
                             url
                         );
 
-                    string fullHtml = await WebView.InvokeScriptAsync(
-                        "eval",
-                        new[] { "document.documentElement.outerHTML" }
-                    );
+                    string fullHtml = await ExecuteScriptAsync(WebView, "document.documentElement.outerHTML");
 
                     if (CloudflareDetector.IsCloudflareChallenge(fullHtml))
                         throw new NeedsUserVerificationException(
@@ -333,7 +329,7 @@ namespace _1507_UWP.Services
                             null;
                         navHandler = (s, e) =>
                         {
-                            this.WebView.NavigationCompleted -= navHandler;
+                            s.NavigationCompleted -= navHandler;
                             navTcs.TrySetResult(e.IsSuccess);
                         };
                         this.WebView.NavigationCompleted += navHandler;
@@ -341,10 +337,10 @@ namespace _1507_UWP.Services
                             "<html><head><title>Downloader</title></head><body></body></html>"
                         );
 
-                        if (!await navTcs.Task)
+                        if (!await NetworkOperationTimeout.RunAsync(() => navTcs.Task, TimeSpan.FromSeconds(30), "WebView download navigation timed out."))
                             throw new Exception("Navigation to downloader page failed.");
 
-                        await this.WebView.InvokeScriptAsync("eval", new[] { jsScript });
+                        await ExecuteScriptAsync(this.WebView, jsScript);
 
                         var timeoutTask = Task.Delay(TimeSpan.FromSeconds(30));
                         var completedTask = await Task.WhenAny(tcs.Task, timeoutTask);

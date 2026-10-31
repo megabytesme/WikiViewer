@@ -18,6 +18,10 @@
     <Compile Include="$(MSBuildThisFileDirectory)Services\NativeFlowLayout.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\NativeResponsiveLayout.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\NativeMediaService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Services\ResolverConfigurationService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Services\ResolverRequestService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Services\NetworkOperationTimeout.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Models\ResolverConfiguration.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\ArticleSectionService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\NativeArticleStyle.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\NativeArticleStyleService.cs" />

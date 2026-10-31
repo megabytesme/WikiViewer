@@ -18,6 +18,19 @@
     <Compile Include="..\WikiViewer.Core\Services\NativeFlowLayout.cs" Link="Services\NativeFlowLayout.cs" />
     <Compile Include="..\WikiViewer.Core\Services\NativeResponsiveLayout.cs" Link="Services\NativeResponsiveLayout.cs" />
     <Compile Include="..\WikiViewer.Core\Services\NativeMediaService.cs" Link="Services\NativeMediaService.cs" />
+    <Compile Include="..\WikiViewer.Core\Services\ResolverConfigurationService.cs" Link="Services\ResolverConfigurationService.cs" />
+    <Compile Include="..\WikiViewer.Core\Services\ResolverRequestService.cs" Link="Services\ResolverRequestService.cs" />
+    <Compile Include="..\WikiViewer.Core\Services\NetworkOperationTimeout.cs" Link="Services\NetworkOperationTimeout.cs" />
+    <Compile Include="..\WikiViewer.Core\Services\WikiPathDetectorService.cs" Link="Services\WikiPathDetectorService.cs" />
+    <Compile Include="..\WikiViewer.Core\Services\CloudflareDetector.cs" Link="Services\CloudflareDetector.cs" />
+    <Compile Include="..\WikiViewer.Core\Models\WikiInstance.cs" Link="Models\WikiInstance.cs" />
+    <Compile Include="..\WikiViewer.Core\Models\ApiModels.cs" Link="Models\ApiModels.cs" />
+    <Compile Include="..\WikiViewer.Core\Enums\ConnectionMethod.cs" Link="Enums\ConnectionMethod.cs" />
+    <Compile Include="..\WikiViewer.Core\Interfaces\IApiWorker.cs" Link="Interfaces\IApiWorker.cs" />
+    <Compile Include="..\WikiViewer.Core\Models\ResolverConfiguration.cs" Link="Models\ResolverConfiguration.cs" />
+    <Compile Include="..\WikiViewer.Core\Models\UserCredentials.cs" Link="Models\UserCredentials.cs" />
+    <Compile Include="..\WikiViewer.Core\Interfaces\ICredentialService.cs" Link="Interfaces\ICredentialService.cs" />
+    <Compile Include="..\WikiViewer.Core\Interfaces\ISettingsProvider.cs" Link="Interfaces\ISettingsProvider.cs" />
     <Compile Include="..\WikiViewer.Core\Services\ArticleSectionService.cs" Link="Services\ArticleSectionService.cs" />
     <Compile Include="..\WikiViewer.Core\Services\ArticleColor.cs" Link="Services\ArticleColor.cs" />
     <Compile Include="..\WikiViewer.Core\Services\ArticleThemeService.cs" Link="Services\ArticleThemeService.cs" />

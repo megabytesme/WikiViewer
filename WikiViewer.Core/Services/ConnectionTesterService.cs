@@ -29,6 +29,7 @@ namespace WikiViewer.Core.Services
 
             foreach (var method in methodsToTest)
             {
+                if (method == ConnectionMethod.HttpClientProxy && ResolverConfigurationService.Current?.Load() == null) continue;
                 Debug.WriteLine($"[ConnectionTester] Starting test for: {method}");
                 using (
                     var worker = factory.CreateApiWorker(

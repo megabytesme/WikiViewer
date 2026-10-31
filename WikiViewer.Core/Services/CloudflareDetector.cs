@@ -1,3 +1,7 @@
+using System;
+using HtmlAgilityPack;
+using Newtonsoft.Json.Linq;
+
 namespace WikiViewer.Core.Services
 {
     public static class CloudflareDetector
@@ -31,6 +35,16 @@ namespace WikiViewer.Core.Services
             {
                 if (html.Contains(marker))
                 {
+                    // Real article/API content can mention these strings or include Cloudflare's
+                    // background scripts. A script reference alone is not an interstitial.
+                    string trimmed = html.TrimStart();
+                    if (trimmed.StartsWith("{", StringComparison.Ordinal) || trimmed.StartsWith("[", StringComparison.Ordinal))
+                    {
+                        try { JToken.Parse(trimmed); return false; } catch (Newtonsoft.Json.JsonException) { }
+                    }
+                    var document = new HtmlDocument(); document.LoadHtml(html);
+                    if (document.DocumentNode.SelectSingleNode("//*[contains(concat(' ',normalize-space(@class),' '),' mw-parser-output ')]") != null &&
+                        document.DocumentNode.SelectSingleNode("//link[@rel='EditURI']") != null) return false;
                     return true;
                 }
             }

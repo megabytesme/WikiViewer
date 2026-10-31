@@ -46,21 +46,24 @@ namespace _1809_UWP.Services
         )
         {
             WebView2ApiWorker worker = null;
+            bool reusable = false;
             try
             {
                 worker = await AcquireWorkerAsync(wiki);
 
-                return await CoreApplication.MainView.CoreWindow.Dispatcher.RunTaskAsync(async () =>
+                var result = await CoreApplication.MainView.CoreWindow.Dispatcher.RunTaskAsync(async () =>
                 {
                     await worker.InitializeAsync(wiki.BaseUrl);
                     return await operation(worker);
                 });
+                reusable = true; return result;
             }
             finally
             {
                 if (worker != null)
                 {
-                    await ReleaseWorkerAsync(worker);
+                    if (reusable) await ReleaseWorkerAsync(worker);
+                    else worker.Dispose();
                 }
             }
         }

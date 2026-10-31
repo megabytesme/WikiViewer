@@ -12,6 +12,7 @@ using System.Text;
 using System.Threading.Tasks;
 using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
+using WikiViewer.Core.Services;
 using WikiViewer.Shared.Uwp.Services;
 using Windows.ApplicationModel.Core;
 using Windows.Foundation;
@@ -27,6 +28,21 @@ namespace _1809_UWP.Services
         public bool IsInitialized { get; private set; }
         public WikiInstance WikiContext { get; set; }
         private Task _initializationTask;
+
+        private static async Task<bool> WaitForNavigationAsync(CoreWebView2 view, Task<bool> navigation)
+        {
+            try
+            {
+                bool success = await NetworkOperationTimeout.RunAsync(() => navigation, TimeSpan.FromSeconds(30),
+                    "WebView navigation did not finish within 30 seconds. The site may require verification; configure a resolver in Settings > Connection or try another method.");
+                if (!success) throw new InvalidOperationException("WebView could not navigate to the wiki. Try another connection method.");
+                return true;
+            }
+            catch { view.Stop(); throw; }
+        }
+
+        private static Task<string> ExecuteScriptAsync(CoreWebView2 view, string script)
+            => NetworkOperationTimeout.RunAsync(async () => await view.ExecuteScriptAsync(script), TimeSpan.FromSeconds(10), "WebView stopped responding while reading the page. Try another connection method.");
 
         public Task InitializeAsync(string baseUrl = null)
         {
@@ -54,7 +70,7 @@ namespace _1809_UWP.Services
                             );
                         WebView = new WebView2();
                         WikiViewer.Shared.Uwp.App.UIHost.Children.Add(WebView);
-                        await WebView.EnsureCoreWebView2Async();
+                        await NetworkOperationTimeout.RunAsync(async () => await WebView.EnsureCoreWebView2Async(), TimeSpan.FromSeconds(30), "WebView initialization timed out. Try another connection method.");
 
                         if (WebView.CoreWebView2 == null)
                         {
@@ -63,9 +79,8 @@ namespace _1809_UWP.Services
                             );
                         }
 
-                        if (!string.IsNullOrEmpty(baseUrl))
-                            WebView.CoreWebView2.Navigate(baseUrl);
-
+                        // The operation performs its own navigation. Starting an unawaited base-page
+                        // navigation here can race it and report the canceled base navigation as its result.
                         tcs.SetResult(true);
                     }
                     catch (Exception ex)
@@ -115,7 +130,7 @@ namespace _1809_UWP.Services
                     try
                     {
                         WikiViewer.Shared.Uwp.App.UIHost.Children.Add(tempWorker);
-                        await tempWorker.EnsureCoreWebView2Async();
+                        await NetworkOperationTimeout.RunAsync(async () => await tempWorker.EnsureCoreWebView2Async(), TimeSpan.FromSeconds(30), "WebView initialization timed out.");
                         if (this.WebView?.CoreWebView2 != null)
                             await CopyCookiesInternalAsync(
                                 this.WebView.CoreWebView2,
@@ -151,7 +166,7 @@ namespace _1809_UWP.Services
                     try
                     {
                         WikiViewer.Shared.Uwp.App.UIHost.Children.Add(tempWorker);
-                        await tempWorker.EnsureCoreWebView2Async();
+                        await NetworkOperationTimeout.RunAsync(async () => await tempWorker.EnsureCoreWebView2Async(), TimeSpan.FromSeconds(30), "WebView initialization timed out.");
                         if (this.WebView?.CoreWebView2 != null)
                             await CopyCookiesInternalAsync(
                                 this.WebView.CoreWebView2,
@@ -170,7 +185,7 @@ namespace _1809_UWP.Services
                         };
                         tempWorker.CoreWebView2.NavigationCompleted += navHandler;
                         tempWorker.CoreWebView2.Navigate(url);
-                        if (!await navTcs.Task)
+                        if (!await WaitForNavigationAsync(tempWorker.CoreWebView2, navTcs.Task))
                             throw new Exception($"Image navigation failed for {url}");
 
                         const string script =
@@ -178,7 +193,7 @@ namespace _1809_UWP.Services
                         string scriptResult = null;
                         for (int attempt = 0; attempt < 10; attempt++)
                         {
-                            scriptResult = await tempWorker.CoreWebView2.ExecuteScriptAsync(script);
+                            scriptResult = await ExecuteScriptAsync(tempWorker.CoreWebView2, script);
                             if (!string.IsNullOrEmpty(scriptResult) && scriptResult != "null") break;
                             await Task.Delay(100);
                         }
@@ -215,7 +230,7 @@ namespace _1809_UWP.Services
                     try
                     {
                         WikiViewer.Shared.Uwp.App.UIHost.Children.Add(tempWorker);
-                        await tempWorker.EnsureCoreWebView2Async();
+                        await NetworkOperationTimeout.RunAsync(async () => await tempWorker.EnsureCoreWebView2Async(), TimeSpan.FromSeconds(30), "WebView initialization timed out.");
                         if (this.WebView?.CoreWebView2 != null)
                             await CopyCookiesInternalAsync(
                                 this.WebView.CoreWebView2,
@@ -273,14 +288,14 @@ namespace _1809_UWP.Services
                         };
                         tempWorker.CoreWebView2.NavigationCompleted += navHandler;
                         tempWorker.CoreWebView2.Navigate(this.WikiContext.BaseUrl);
-                        if (!await navTcs.Task)
+                        if (!await WaitForNavigationAsync(tempWorker.CoreWebView2, navTcs.Task))
                             throw new Exception(
                                 $"Navigation to base URL '{this.WikiContext.BaseUrl}' failed, preventing download context setup."
                             );
 
                         string script =
                             $"(async () => {{ try {{ const response = await fetch('{url}'); if (!response.ok) {{ return `Error: ${{response.status}} ${{response.statusText}}`; }} const blob = await response.blob(); const blobUrl = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = blobUrl; a.download = ''; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(blobUrl); return 'Download initiated'; }} catch (e) {{ return `Error: ${{e.message}}`; }} }})();";
-                        await tempWorker.CoreWebView2.ExecuteScriptAsync(script);
+                        await ExecuteScriptAsync(tempWorker.CoreWebView2, script);
 
                         var timeoutTask = Task.Delay(TimeSpan.FromSeconds(30));
                         var completedTask = await Task.WhenAny(downloadTcs.Task, timeoutTask);
@@ -320,8 +335,8 @@ namespace _1809_UWP.Services
             };
             worker.CoreWebView2.NavigationCompleted += navHandler;
             worker.CoreWebView2.Navigate(url);
-            await navCompleteTcs.Task;
-            string scriptResult = await worker.CoreWebView2.ExecuteScriptAsync(
+            await WaitForNavigationAsync(worker.CoreWebView2, navCompleteTcs.Task);
+            string scriptResult = await ExecuteScriptAsync(worker.CoreWebView2,
                 "document.documentElement.outerHTML"
             );
             return JsonConvert.DeserializeObject<string>(scriptResult);
@@ -398,13 +413,13 @@ namespace _1809_UWP.Services
                     };
                     WebView.CoreWebView2.NavigationCompleted += navHandler;
                     WebView.CoreWebView2.Navigate(url);
-                    await navCompleteTcs.Task;
+                    await WaitForNavigationAsync(WebView.CoreWebView2, navCompleteTcs.Task);
 
                     var stopwatch = Stopwatch.StartNew();
                     while (stopwatch.Elapsed.TotalSeconds < 15)
                     {
                         await Task.Delay(250);
-                        string scriptResult = await WebView.CoreWebView2.ExecuteScriptAsync(
+                        string scriptResult = await ExecuteScriptAsync(WebView.CoreWebView2,
                             "document.documentElement.outerHTML"
                         );
                         if (string.IsNullOrEmpty(scriptResult))

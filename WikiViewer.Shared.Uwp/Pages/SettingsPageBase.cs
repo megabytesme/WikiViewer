@@ -10,6 +10,8 @@ using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
 using WikiViewer.Shared.Uwp.Services;
 using Windows.Storage;
+using Windows.Storage.Pickers;
+using Newtonsoft.Json.Linq;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Documents;
@@ -31,6 +33,10 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected abstract ToggleSwitch EnableCustomThemingToggleControl { get; }
         protected abstract ToggleSwitch ShowCssRefreshButtonToggleControl { get; }
         protected abstract ToggleSwitch NativeReaderDefaultToggleControl { get; }
+        protected abstract TextBox ResolverUrlControl { get; }
+        protected abstract TextBox ResolverUsernameControl { get; }
+        protected abstract PasswordBox ResolverPasswordControl { get; }
+        protected abstract TextBlock ResolverStatusControl { get; }
         private bool _isLoaded;
 
         public SettingsPageBase()
@@ -45,6 +51,7 @@ namespace WikiViewer.Shared.Uwp.Pages
             _isLoaded = true;
             PopulateConcurrencyComboBox();
             PopulateDefaultConnectionMethodComboBox();
+            LoadResolverControls();
 
             var savedLevel = AppSettings.DownloadConcurrencyLevel;
 
@@ -91,7 +98,67 @@ namespace WikiViewer.Shared.Uwp.Pages
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
             _isLoaded = false;
+            ResolverPasswordControl.Password = "";
             WikiManager.WikisChanged -= OnWikisChanged;
+        }
+
+        private void LoadResolverControls()
+        {
+            var configuration = ResolverConfigurationService.Current?.Load();
+            ResolverUrlControl.Text = configuration?.Endpoint.AbsoluteUri ?? "";
+            ResolverUsernameControl.Text = configuration?.Username ?? "";
+            ResolverPasswordControl.Password = "";
+            ResolverStatusControl.Text = configuration != null ? "Resolver configured. Proxy is available across the app. Leave the password blank to keep it." : "Configure a resolver to enable Proxy. Credentials are stored in Windows Credential Locker.";
+        }
+
+        private void RefreshProxyChoice()
+        {
+            bool enabled = ResolverConfigurationService.Current?.Load() != null;
+            var item = DefaultConnectionMethodComboBoxControl.Items.OfType<ComboBoxItem>().FirstOrDefault(i => Equals(i.Tag, (int)ConnectionMethod.HttpClientProxy));
+            if (item != null) item.IsEnabled = enabled;
+            if (!enabled && AppSettings.DefaultConnectionMethod == ConnectionMethod.HttpClientProxy)
+            {
+                AppSettings.DefaultConnectionMethod = ConnectionMethod.Auto;
+                DefaultConnectionMethodComboBoxControl.SelectedItem = DefaultConnectionMethodComboBoxControl.Items.OfType<ComboBoxItem>().FirstOrDefault(i => Equals(i.Tag, (int)ConnectionMethod.Auto));
+            }
+        }
+
+        protected void SaveResolverButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                ResolverConfigurationService.Current.Save(ResolverUrlControl.Text, ResolverUsernameControl.Text, ResolverPasswordControl.Password);
+                LoadResolverControls(); RefreshProxyChoice();
+            }
+            catch (ArgumentException ex) { ResolverStatusControl.Text = ex.Message; }
+            catch (Exception) { ResolverStatusControl.Text = "Windows could not save the resolver credentials. Your existing configuration has been kept."; }
+        }
+
+        protected void RemoveResolverButton_Click(object sender, RoutedEventArgs e)
+        {
+            try { ResolverConfigurationService.Current.Clear(); LoadResolverControls(); RefreshProxyChoice(); }
+            catch (Exception) { ResolverStatusControl.Text = "Windows could not remove the resolver configuration. Try again."; }
+        }
+
+        protected async void ImportResolverButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary };
+                picker.FileTypeFilter.Add(".json");
+                var file = await picker.PickSingleFileAsync();
+                if (file == null) return;
+                var json = JObject.Parse(await FileIO.ReadTextAsync(file));
+                var resolver = json["Resolver"] as JObject ?? json;
+                string username = (string)resolver.GetValue("Username", StringComparison.OrdinalIgnoreCase);
+                string password = (string)resolver.GetValue("Password", StringComparison.OrdinalIgnoreCase);
+                if (string.IsNullOrWhiteSpace(username) || string.IsNullOrEmpty(password)) { ResolverStatusControl.Text = "The file must contain Username and Password, optionally inside a Resolver object."; return; }
+                string url = (string)(resolver.GetValue("Url", StringComparison.OrdinalIgnoreCase) ?? resolver.GetValue("Endpoint", StringComparison.OrdinalIgnoreCase));
+                if (!string.IsNullOrWhiteSpace(url)) ResolverUrlControl.Text = url;
+                ResolverUsernameControl.Text = username; ResolverPasswordControl.Password = password;
+                ResolverStatusControl.Text = "Credentials imported. Check the resolver URL and select Save resolver to enable Proxy.";
+            }
+            catch (Exception) { ResolverStatusControl.Text = "The resolver credentials could not be imported. Check the JSON file and try again."; }
         }
 
         protected void NativeReaderDefaultToggle_Toggled(object sender, RoutedEventArgs e)
@@ -185,6 +252,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                 {
                     Content = "Proxy (Last Resort)",
                     Tag = (int)ConnectionMethod.HttpClientProxy,
+                    IsEnabled = ResolverConfigurationService.Current?.Load() != null,
                 }
             );
         }

@@ -136,6 +136,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                 {
                     Content = "Proxy (Last Resort)",
                     Tag = ConnectionMethod.HttpClientProxy,
+                    IsEnabled = ResolverConfigurationService.Current?.Load() != null,
                 }
             );
             ConnectionMethodComboBoxControl.SelectedValuePath = "Tag";

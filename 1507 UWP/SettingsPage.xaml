@@ -50,6 +50,16 @@
                 <Border BorderThickness="1" BorderBrush="{ThemeResource SystemControlForegroundBaseLowBrush}" Padding="16" Margin="0,0,0,16">
                     <StackPanel>
                         <TextBlock Text="Connection" Style="{ThemeResource SubtitleTextBlockStyle}" Margin="0,0,0,12"/>
+                        <TextBox x:Name="ResolverUrl" Header="Resolver URL" PlaceholderText="https://your-resolver.example" Margin="0,0,0,12"/>
+                        <TextBox x:Name="ResolverUsername" Header="Resolver username" Margin="0,0,0,12"/>
+                        <PasswordBox x:Name="ResolverPassword" Header="Resolver password" PasswordRevealMode="Hidden" Margin="0,0,0,12"/>
+                        <TextBlock Text="Proxy sends wiki requests through your chosen resolver. The password is saved in Windows Credential Locker." TextWrapping="Wrap" Opacity="0.7"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,12,0,12">
+                            <Button x:Name="SaveResolverButton" Content="Save resolver" Click="SaveResolverButton_Click" Margin="0,0,12,0"/>
+                            <Button x:Name="RemoveResolverButton" Content="Remove resolver" Click="RemoveResolverButton_Click"/>
+                        </StackPanel>
+                        <Button x:Name="ImportResolverButton" Content="Import credentials from JSON…" Click="ImportResolverButton_Click"/>
+                        <TextBlock x:Name="ResolverStatus" TextWrapping="Wrap" Margin="0,12,0,12"/>
                         <ComboBox x:Name="DefaultConnectionMethodComboBox"
                                   Header="Default connection method for new wikis"
                                   SelectionChanged="DefaultConnectionMethodComboBox_SelectionChanged"

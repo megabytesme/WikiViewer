@@ -78,6 +78,11 @@ namespace WikiViewer.Shared.Uwp
             var credentialService = new CredentialService();
 
             AppSettings.SettingsProvider = settingsProvider;
+            ResolverConfigurationService.Current = new ResolverConfigurationService(settingsProvider, credentialService);
+            ResolverConfigurationService.Current.Changed += (sender, args) =>
+            {
+                foreach (var wiki in WikiManager.GetWikis() ?? new System.Collections.Generic.List<WikiViewer.Core.Models.WikiInstance>()) wiki.ResolvedConnectionMethod = null;
+            };
             ArticleCacheManager.StorageProvider = storageProvider;
             AccountManager.StorageProvider = storageProvider;
             AccountManager.CredentialService = credentialService;

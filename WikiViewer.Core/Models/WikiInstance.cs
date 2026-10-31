@@ -60,7 +60,10 @@ namespace WikiViewer.Core.Models
             }
         }
 
-        public string GetWikiPageUrl(string pageTitle) =>
-            $"{BaseUrl.TrimEnd('/')}/{ArticlePath.Trim('/')}/{Uri.EscapeDataString(pageTitle)}";
+        public string GetWikiPageUrl(string pageTitle)
+        {
+            string path = (ArticlePath ?? "").Trim('/');
+            return BaseUrl.TrimEnd('/') + (path.Length > 0 ? "/" + path : "") + "/" + Uri.EscapeDataString(pageTitle);
+        }
     }
 }

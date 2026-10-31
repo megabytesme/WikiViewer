@@ -15,31 +15,20 @@ namespace WikiViewer.Core.Services
 {
     public class ProxyHttpClientApiWorker : IApiWorker, IDisposable
     {
-        private static readonly HttpClient _sharedGatekeeperClient = new HttpClient();
+        private static readonly HttpClient _sharedGatekeeperClient = CreateClient();
 
         private readonly HttpClient _gatekeeperClient;
-        private const string GatekeeperEndpoint = "https://wikiflareresolverr.ddns.net";
 
         private readonly bool _isSharedClient;
 
         public bool IsInitialized { get; private set; }
         public WikiInstance WikiContext { get; set; }
 
-        static ProxyHttpClientApiWorker()
+        private static HttpClient CreateClient()
         {
-#if UWP_1507
-            _sharedGatekeeperClient.DefaultRequestHeaders.UserAgent.ParseAdd(
-                "WikiViewer/1.0.1.0 (https://github.com/megabytesme/WikiViewer) UWP/1507 (System.Net.Http.HttpClient)"
-            );
-#elif UWP_1809
-            _sharedGatekeeperClient.DefaultRequestHeaders.UserAgent.ParseAdd(
-                "WikiViewer/2.0.1.0 (https://github.com/megabytesme/WikiViewer) UWP/1809 (System.Net.Http.HttpClient)"
-            );
-#else
-            _sharedGatekeeperClient.DefaultRequestHeaders.UserAgent.ParseAdd(
-                "WikiViewer (https://github.com/megabytesme/WikiViewer) (System.Net.Http.HttpClient)"
-            );
-#endif
+            var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(100) };
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("WikiViewer (https://github.com/megabytesme/WikiViewer)");
+            return client;
         }
 
         public ProxyHttpClientApiWorker()
@@ -49,24 +38,11 @@ namespace WikiViewer.Core.Services
         {
             if (useDedicatedClient)
             {
-                _gatekeeperClient = new HttpClient();
+                _gatekeeperClient = CreateClient();
                 _isSharedClient = false;
             }
             else
             {
-#if UWP_1507
-                _sharedGatekeeperClient.DefaultRequestHeaders.UserAgent.ParseAdd(
-                    "WikiViewer/1.0.1.0 (https://github.com/megabytesme/WikiViewer) UWP/1507 (System.Net.Http.HttpClient)"
-                );
-#elif UWP_1809
-                _sharedGatekeeperClient.DefaultRequestHeaders.UserAgent.ParseAdd(
-                    "WikiViewer/2.0.1.0 (https://github.com/megabytesme/WikiViewer) UWP/1809 (System.Net.Http.HttpClient)"
-                );
-#else
-                _sharedGatekeeperClient.DefaultRequestHeaders.UserAgent.ParseAdd(
-                    "WikiViewer (https://github.com/megabytesme/WikiViewer) (System.Net.Http.HttpClient)"
-                );
-#endif
                 _gatekeeperClient = _sharedGatekeeperClient;
                 _isSharedClient = true;
             }
@@ -74,6 +50,8 @@ namespace WikiViewer.Core.Services
 
         public Task InitializeAsync(string baseUrl)
         {
+            if (ResolverConfigurationService.Current?.Load() == null)
+                throw new InvalidOperationException("Configure a resolver URL, username and password in Settings > Connection before using Proxy.");
             IsInitialized = true;
             return Task.CompletedTask;
         }
@@ -112,43 +90,7 @@ namespace WikiViewer.Core.Services
 
         private async Task<byte[]> MakeGatekeeperRequest(object payload)
         {
-            string jsonPayload = JsonConvert.SerializeObject(payload);
-            var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
-            HttpResponseMessage response;
-            try
-            {
-                response = await _gatekeeperClient.PostAsync(
-                    GatekeeperEndpoint + "/v1/request",
-                    content
-                );
-            }
-            catch (Exception ex)
-            {
-                throw new Exception("Failed to connect to the gatekeeper proxy service.", ex);
-            }
-
-            if (!response.IsSuccessStatusCode)
-            {
-                string errorContent = await response.Content.ReadAsStringAsync();
-                throw new Exception(
-                    $"Proxy returned a non-success status code: {response.StatusCode} - {errorContent}"
-                );
-            }
-
-            byte[] bytes = await response.Content.ReadAsByteArrayAsync();
-            if (bytes.Length > 2 && bytes[0] == 0x1F && bytes[1] == 0x8B)
-            {
-                using (var compressedStream = new MemoryStream(bytes))
-                using (
-                    var gzipStream = new GZipStream(compressedStream, CompressionMode.Decompress)
-                )
-                using (var resultStream = new MemoryStream())
-                {
-                    await gzipStream.CopyToAsync(resultStream);
-                    bytes = resultStream.ToArray();
-                }
-            }
-            return bytes;
+            return await ResolverRequestService.SendAsync(_gatekeeperClient, ResolverConfigurationService.Current?.Load(), payload);
         }
 
         public async Task<byte[]> GetRawBytesFromUrlAsync(string url)

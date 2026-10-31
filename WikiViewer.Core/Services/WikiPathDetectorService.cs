@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using HtmlAgilityPack;
 using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
+using Newtonsoft.Json.Linq;
 
 namespace WikiViewer.Core.Services
 {
@@ -26,6 +27,22 @@ namespace WikiViewer.Core.Services
 
             try
             {
+                // Siteinfo describes the actual paths and avoids rendering a challenge-protected
+                // homepage just to discover its API. Nonstandard installs retain HTML discovery.
+                foreach (string path in new[] { "api.php", "w/api.php" })
+                {
+                    try
+                    {
+                        string json = await worker.GetJsonFromApiAsync(new Uri(baseUri, path).AbsoluteUri + "?action=query&meta=siteinfo&format=json");
+                        if (string.IsNullOrWhiteSpace(json)) continue;
+                        var general = JObject.Parse(json)["query"]?["general"];
+                        string apiScriptPath = (string)general?["scriptpath"], apiArticlePath = (string)general?["articlepath"];
+                        if (apiScriptPath == null || apiArticlePath == null || !apiArticlePath.EndsWith("$1", StringComparison.Ordinal) ||
+                            apiArticlePath.IndexOf('?') >= 0 || !apiArticlePath.StartsWith("/", StringComparison.Ordinal)) continue;
+                        return new WikiPaths { ScriptPath = apiScriptPath.Trim('/'), ArticlePath = apiArticlePath.Substring(0, apiArticlePath.Length - 2).Trim('/') };
+                    }
+                    catch (Exception) { /* Keep bounded HTML discovery for other MediaWiki installations. */ }
+                }
                 string mainPageHtml = await worker.GetRawHtmlFromUrlAsync(baseUrl);
 
                 if (string.IsNullOrEmpty(mainPageHtml))
