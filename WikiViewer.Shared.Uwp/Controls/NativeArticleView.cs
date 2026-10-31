@@ -327,11 +327,15 @@ namespace WikiViewer.Shared.Uwp.Controls
                 {
                     var overlay = new ArticlePositionPanel { PositionStyle = node.Style }; AppendBlocks(overlay, node.Children, node); return overlay;
                 }
-                if (node.Style.Display == "grid" || node.Style.Display == "gallery" || node.Style.Display == "flex" && (!node.Style.Declarations.ContainsKey("flex-direction") || node.Style.Declarations["flex-direction"] == "row"))
+                if (node.Style.Display == "grid" || node.Style.Display == "gallery" || node.Style.Display == "flex" && node.Style.FlexDirection == "row")
                 {
                     var tiles = new ArticleTilePanel { Columns = node.Style.GridColumns > 0 ? node.Style.GridColumns : node.Style.Display == "flex" && !node.Style.Wrap ? node.Children.Count(IsBlock) : 0,
-                        Gap = node.Style.Gap?.Resolve(800) ?? 8 };
-                    AppendBlocks(tiles, node.Children, node);
+                        Gap = node.Style.Gap?.Resolve(800) ?? 8, FlowStyle = node.Style };
+                    foreach (var child in node.Children.Where(c => !c.Style.Hidden && (c.Kind != NativeArticleNodeKind.Text || !string.IsNullOrWhiteSpace(c.Text))))
+                    {
+                        var item = IsBlock(child) ? RenderBlock(child) : ArticleVisualStyle.Block(Text(new[] { child }, node), child, _palette);
+                        Register(child.Id, item); tiles.Children.Add(item);
+                    }
                     return tiles;
                 }
                 var panel = new ArticleFlowPanel { ColumnCount = node.Style.ColumnCount, Margin = new Thickness(node.Kind == NativeArticleNodeKind.Quote ? 20 : 0, 0, 0, 0),
@@ -387,8 +391,16 @@ namespace WikiViewer.Shared.Uwp.Controls
             Span span;
             if (node.Kind == NativeArticleNodeKind.Link && node.Uri != null)
             {
+                if (Descendants(node).Any(n => n.Kind == NativeArticleNodeKind.Media))
+                {
+                    // Players have their own interactive controls and cannot live inside Hyperlink.
+                    var player = new ArticleFlowPanel(); AppendBlocks(player, node.Children, node);
+                    var destination = new HyperlinkButton { Content = "Open linked page" };
+                    destination.Click += async (s, e) => await Navigate(node.Uri);
+                    player.Children.Add(destination); inlines.Add(new InlineUIContainer { Child = player }); return;
+                }
                 var image = Descendants(node).FirstOrDefault(n => n.Kind == NativeArticleNodeKind.Image);
-                if (image != null)
+                if (image != null || Descendants(node).Any(n => n.Kind == NativeArticleNodeKind.Math))
                 {
                     var label = new ArticleFlowPanel();
                     // Preserve every image and text node in the link, including gallery/image labels.
@@ -424,16 +436,17 @@ namespace WikiViewer.Shared.Uwp.Controls
             var fallback = new TextBlock { Text = (node.Text ?? "Image") + " (available in Web view)", TextWrapping = TextWrapping.Wrap, Visibility = Visibility.Collapsed };
             host.Children.Add(fallback);
             Action failed = () => { image.Visibility = Visibility.Collapsed; fallback.Visibility = Visibility.Visible; };
-            image.ImageFailed += (s, e) => failed();
             Windows.UI.Xaml.Automation.AutomationProperties.SetName(image, node.Text ?? "");
             _images.Add(image);
             var scope = _scope; scope?.Images.Add(image);
             int version = _version;
             var resolveImage = _resolveImage;
+            bool started = false;
             image.Loaded += async (s, e) =>
             {
                 LimitImageWidth(image);
-                if (image.Source != null || version != _version || scope?.Active == false) return;
+                if (started || version != _version || scope?.Active == false) return;
+                started = true;
                 try
                 {
 #if UWP_1809
@@ -449,24 +462,46 @@ namespace WikiViewer.Shared.Uwp.Controls
                         return;
                     }
 #endif
-                    string resolved = null;
-                    try { if (resolveImage != null) resolved = await resolveImage(node.Uri.AbsoluteUri); }
-                    catch (Exception ex) { System.Diagnostics.Debug.WriteLine("Native reader image cache: " + ex.Message); }
-                    if (version != _version || scope?.Active == false) return;
-                    Uri uri;
-                    uri = Uri.TryCreate(resolved, UriKind.Absolute, out uri) ? uri : node.Uri;
-#if UWP_1809
-                    if (IsSvg(node.Uri))
+                    var candidates = node.ImageSources.Count > 0 ? node.ImageSources : new List<Uri> { node.Uri };
+                    foreach (var remote in candidates)
                     {
-                        var svg = new SvgImageSource(uri); svg.OpenFailed += (sender, args) => { if (version == _version) failed(); }; image.Source = svg;
+                        string resolved = null;
+                        try { if (resolveImage != null) resolved = await resolveImage(remote.AbsoluteUri); }
+                        catch (Exception ex) { System.Diagnostics.Debug.WriteLine("Native reader image cache: " + ex.Message); }
+                        if (version != _version || scope?.Active == false) return;
+                        Uri local;
+                        if (Uri.TryCreate(resolved, UriKind.Absolute, out local) && await LoadImageSourceAsync(image, local, IsSvg(remote))) return;
+                        if (version != _version || scope?.Active == false) return;
+                        if (await LoadImageSourceAsync(image, remote, IsSvg(remote))) return;
+                        if (version != _version || scope?.Active == false) return;
                     }
-                    else
-#endif
-                    image.Source = new BitmapImage(uri);
+                    failed();
                 }
                 catch (Exception ex) { if (version == _version) failed(); System.Diagnostics.Debug.WriteLine("Native reader image: " + ex.Message); }
             };
             return host;
+        }
+
+        private static async Task<bool> LoadImageSourceAsync(Image image, Uri uri, bool vector)
+        {
+            var complete = new TaskCompletionSource<bool>();
+#if UWP_1809
+            if (vector)
+            {
+                var svg = new SvgImageSource();
+                svg.Opened += (s, e) => complete.TrySetResult(true);
+                svg.OpenFailed += (s, e) => complete.TrySetResult(false);
+                image.Source = svg; svg.UriSource = uri;
+            }
+            else
+#endif
+            {
+                var bitmap = new BitmapImage();
+                bitmap.ImageOpened += (s, e) => complete.TrySetResult(true);
+                bitmap.ImageFailed += (s, e) => complete.TrySetResult(false);
+                image.Source = bitmap; bitmap.UriSource = uri;
+            }
+            return await Task.WhenAny(complete.Task, Task.Delay(TimeSpan.FromSeconds(15))) == complete.Task && await complete.Task;
         }
 
         private FrameworkElement MathView(NativeArticleNode node)
@@ -481,7 +516,7 @@ namespace WikiViewer.Shared.Uwp.Controls
         {
             var panel = new StackPanel { Margin = new Thickness(0, 8, 0, 8) };
             if (node.PosterUri != null) panel.Children.Add(Image(new NativeArticleNode { Kind = NativeArticleNodeKind.Image, Uri = node.PosterUri, Text = "Video poster", ImageWidth = 480 }));
-            var sources = node.MediaSources.OrderBy(s => s.ContentType.Contains("mp4") || s.ContentType.Contains("mpeg") ? 0 : 1).ToList();
+            var sources = NativeMediaService.PlaybackSources(node.MediaSources);
             if (sources.Count > 0)
             {
                 var media = new MediaElement { AutoPlay = false, AreTransportControlsEnabled = true, MaxHeight = node.TagName == "audio" ? 80 : 480, MinHeight = 64, Stretch = Stretch.Uniform };
@@ -491,11 +526,61 @@ namespace WikiViewer.Shared.Uwp.Controls
                 var status = new TextBlock { TextWrapping = TextWrapping.Wrap };
                 int version = _version;
                 var scope = _scope;
-                media.MediaFailed += (s, e) => { if (version == _version) status.Text = "Windows could not play this format. Choose another source or use Web view."; };
-                load.Click += (s, e) => { if (version != _version || scope?.Active == false) return; status.Text = ""; media.Source = ((NativeMediaSource)choices.SelectedItem).Uri; media.Play(); };
-                choices.SelectionChanged += (s, e) => { media.Stop(); media.Source = null; };
-                _media.Add(media); _scope?.Media.Add(media); panel.Children.Add(media); panel.Children.Add(load); panel.Children.Add(status);
+                var attempted = new HashSet<Uri>();
+                bool cached = false, changingChoice = false, playing = false;
+                int request = 0;
+                var resolveMedia = _resolveImage;
                 var open = new HyperlinkButton { Content = "Open media file", NavigateUri = sources[0].Uri };
+                Action start = () =>
+                {
+                    var selected = choices.SelectedItem as NativeMediaSource;
+                    if (selected == null || version != _version || scope?.Active == false) return;
+                    request++; cached = false; playing = true; attempted.Add(selected.Uri);
+                    status.Text = "Loading " + selected.Label + "…"; open.NavigateUri = selected.Uri;
+                    media.Source = selected.Uri;
+                };
+                media.MediaOpened += (s, e) =>
+                {
+                    if (version != _version || scope?.Active == false || !playing) return;
+                    status.Text = ""; media.Play();
+                };
+                media.MediaFailed += async (s, e) =>
+                {
+                    if (version != _version || scope?.Active == false || !playing) return;
+                    var selected = choices.SelectedItem as NativeMediaSource;
+                    if (selected == null) return;
+                    int current = request;
+                    if (!cached && resolveMedia != null)
+                    {
+                        cached = true;
+                        status.Text = "Trying a downloaded copy…";
+                        string local = null;
+                        try { local = await resolveMedia(selected.Uri.AbsoluteUri); }
+                        catch (Exception ex) { System.Diagnostics.Debug.WriteLine("Native media cache: " + ex.Message); }
+                        if (version != _version || scope?.Active == false || current != request) return;
+                        Uri uri;
+                        if (Uri.TryCreate(local, UriKind.Absolute, out uri) && uri != selected.Uri) { media.Source = uri; return; }
+                    }
+                    // Leave the failing routed event before replacing its media source.
+                    await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Low, () =>
+                    {
+                        if (version != _version || scope?.Active == false || current != request) return;
+                        int next = sources.FindIndex(source => !attempted.Contains(source.Uri));
+                        if (next >= 0)
+                        {
+                            changingChoice = true; choices.SelectedIndex = next; changingChoice = false; start();
+                        }
+                        else { playing = false; status.Text = "Windows could not play the available sources. " + e.ErrorMessage + " Use Open media file or Web view."; }
+                    });
+                };
+                load.Click += (s, e) => { attempted.Clear(); start(); };
+                choices.SelectionChanged += (s, e) =>
+                {
+                    if (changingChoice) return;
+                    request++; playing = false; media.Stop(); media.Source = null; status.Text = "";
+                    var selected = choices.SelectedItem as NativeMediaSource; if (selected != null) open.NavigateUri = selected.Uri;
+                };
+                _media.Add(media); _scope?.Media.Add(media); panel.Children.Add(media); panel.Children.Add(load); panel.Children.Add(status);
                 panel.Children.Add(open);
             }
             else panel.Children.Add(new TextBlock { Text = "Media available in Web view.", TextWrapping = TextWrapping.Wrap });
@@ -541,9 +626,9 @@ namespace WikiViewer.Shared.Uwp.Controls
                     if (column >= 64) throw new NotSupportedException("This wide table requires Web view.");
                     int columns = Math.Min(cell.ColumnSpan, 64 - column), rowSpan = Math.Min(cell.RowSpan, rows.Count - row);
                     for (int r = row; r < row + rowSpan; r++) for (int c = column; c < column + columns; c++) occupied.Add(r + ":" + c);
-                    var panel = new StackPanel { MinWidth = 80, MaxWidth = 360 };
+                    var panel = new ArticleFlowPanel();
                     AppendBlocks(panel, cell.Children, cell);
-                    var border = new Border { Child = panel, BorderThickness = new Thickness(0.5), BorderBrush = _palette.Get(cell.Style.BorderColor ?? node.Style.BorderColor, ArticleColorRole.Border, cell.Style.ColorContext),
+                    var border = new Border { Child = panel, Tag = cell, BorderThickness = new Thickness(0.5), BorderBrush = _palette.Get(cell.Style.BorderColor ?? node.Style.BorderColor, ArticleColorRole.Border, cell.Style.ColorContext),
                         Background = _palette.Get(cell.Style.Background ?? rows[row].Style.Background ?? node.Style.Background, ArticleColorRole.Background),
                         Padding = ArticleVisualStyle.Edges(cell.Style.Padding, new Thickness(8)) };
                     if (cell.Style.VerticalAlignment == "top") panel.VerticalAlignment = VerticalAlignment.Top;
@@ -558,7 +643,7 @@ namespace WikiViewer.Shared.Uwp.Controls
             for (int column = 0; column < maxColumn; column++) grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             var wrapper = new StackPanel();
             foreach (var caption in node.Children.Where(c => c.IsBlock)) wrapper.Children.Add(RenderBlock(caption));
-            wrapper.Children.Add(new ScrollViewer { Content = grid, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled });
+            wrapper.Children.Add(new ArticleTableView(grid));
             return wrapper;
         }
 

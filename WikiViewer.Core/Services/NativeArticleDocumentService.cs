@@ -91,13 +91,15 @@ namespace WikiViewer.Core.Services
                 case "code": case "tt": case "kbd": case "samp": node.Kind = NativeArticleNodeKind.Code; break;
                 case "pre": node.Kind = NativeArticleNodeKind.Preformatted; break;
                 case "blockquote": node.Kind = NativeArticleNodeKind.Quote; break;
+                case "center": node.IsBlock = true; style.Alignment = "center"; break;
                 case "br": node.Kind = NativeArticleNodeKind.LineBreak; break;
                 case "hr": node.Kind = NativeArticleNodeKind.Rule; break;
                 case "a": node.Kind = NativeArticleNodeKind.Link; node.Uri = Resolve(source.GetAttributeValue("href", ""), pageUri); break;
                 case "img":
                     node.Kind = NativeArticleNodeKind.Image;
                     node.Text = WebUtility.HtmlDecode(source.GetAttributeValue("alt", ""));
-                    node.Uri = Resolve(source.GetAttributeValue("data-src", null) ?? source.GetAttributeValue("src", ""), pageUri);
+                    node.ImageSources.AddRange(NativeMediaService.ImageSources(source, pageUri));
+                    node.Uri = node.ImageSources.FirstOrDefault();
                     int imageWidth;
                     if (int.TryParse(source.GetAttributeValue("width", ""), out imageWidth)) node.ImageWidth = Math.Max(0, Math.Min(2000, imageWidth));
                     ApplySourceImage(source, node, document);
@@ -122,7 +124,7 @@ namespace WikiViewer.Core.Services
                     node.ColumnSpan = Span(source, "colspan"); node.RowSpan = Span(source, "rowspan"); break;
                 case "div": case "span": case "section": case "article": case "figure": case "figcaption":
                 case "tbody": case "thead": case "tfoot": case "caption": case "small": case "big":
-                case "sup": case "sub": case "abbr": case "q": case "time": case "ruby": case "rb": case "rt": case "rp":
+                case "sup": case "sub": case "abbr": case "q": case "time": case "ruby": case "rb": case "rt": case "rp": case "picture":
                     break;
                 case "details": node.IsBlock = true; style.Collapsible = true; style.InitiallyCollapsed = !source.Attributes.Contains("open"); break;
                 case "summary": node.Kind = NativeArticleNodeKind.Paragraph; style.FontWeight = "bold"; break;
@@ -140,10 +142,8 @@ namespace WikiViewer.Core.Services
                     var candidates = new[] { source }.Concat(source.ChildNodes.Where(c => c.Name.Equals("source", StringComparison.OrdinalIgnoreCase)));
                     foreach (var candidate in candidates)
                     {
-                        var uri = Resolve(candidate.GetAttributeValue("src", ""), pageUri);
-                        if (uri == null || node.MediaSources.Any(s => s.Uri == uri)) continue;
-                        node.MediaSources.Add(new NativeMediaSource { Uri = uri, ContentType = candidate.GetAttributeValue("type", ""),
-                            Label = candidate.GetAttributeValue("data-title", null) ?? candidate.GetAttributeValue("title", null) ?? uri.Segments.Last() });
+                        var mediaSource = NativeMediaService.ReadSource(candidate, pageUri);
+                        if (mediaSource != null && !node.MediaSources.Any(s => s.Uri == mediaSource.Uri)) node.MediaSources.Add(mediaSource);
                     }
                     node.Uri = node.MediaSources.FirstOrDefault()?.Uri;
                     if (node.MediaSources.Count == 0)
@@ -176,8 +176,9 @@ namespace WikiViewer.Core.Services
                 if (node.Kind != NativeArticleNodeKind.Image) style.Float = null;
                 style.Collapsible = false;
                 if (node.Kind == NativeArticleNodeKind.LineBreak) { node.Kind = NativeArticleNodeKind.Text; node.Text = " "; }
-                if (node.Kind == NativeArticleNodeKind.Link || node.IsBlock || node.Kind == NativeArticleNodeKind.Paragraph || node.Kind == NativeArticleNodeKind.Heading ||
-                    node.Kind == NativeArticleNodeKind.Quote || node.Kind == NativeArticleNodeKind.Preformatted || node.Kind == NativeArticleNodeKind.List || node.Kind == NativeArticleNodeKind.Table)
+                if (node.Kind != NativeArticleNodeKind.Image && node.Kind != NativeArticleNodeKind.Media &&
+                    (node.Kind == NativeArticleNodeKind.Link || node.IsBlock || node.Kind == NativeArticleNodeKind.Paragraph || node.Kind == NativeArticleNodeKind.Heading ||
+                    node.Kind == NativeArticleNodeKind.Quote || node.Kind == NativeArticleNodeKind.Preformatted || node.Kind == NativeArticleNodeKind.List || node.Kind == NativeArticleNodeKind.Table))
                 { node.Kind = NativeArticleNodeKind.Container; node.IsBlock = false; }
             }
             foreach (var child in source.ChildNodes)
@@ -185,7 +186,62 @@ namespace WikiViewer.Core.Services
                 var converted = Convert(child, pageUri, document, node.PreserveWhitespace, node.RightToLeft, insideLink || node.Kind == NativeArticleNodeKind.Link, style, depth + 1);
                 if (converted != null) node.Children.Add(converted);
             }
+            if (node.Kind == NativeArticleNodeKind.List && (style.Display == "grid" || style.Display == "flex"))
+            {
+                node.Kind = NativeArticleNodeKind.Container; node.IsBlock = true;
+                foreach (var item in node.Children.Where(c => c.Kind == NativeArticleNodeKind.ListItem))
+                { item.Kind = NativeArticleNodeKind.Container; item.IsBlock = true; }
+            }
+            else if (node.Kind == NativeArticleNodeKind.List && source.AncestorsAndSelf().Any(a => a.GetAttributeValue("class", "").Split(' ').Contains("hlist")))
+            {
+                // MediaWiki horizontal lists are readable, wrapping text with separators.
+                node.Kind = NativeArticleNodeKind.Container; node.IsBlock = false;
+                var items = node.Children.Where(c => c.Kind == NativeArticleNodeKind.ListItem).ToList();
+                node.Children.Clear();
+                bool nested = source.Ancestors().Any(a => a.Name == "ul" || a.Name == "ol");
+                if (nested) node.Children.Add(new NativeArticleNode { Kind = NativeArticleNodeKind.Text, Text = " (" });
+                foreach (var item in items)
+                {
+                    if (node.Children.Count > (nested ? 1 : 0)) node.Children.Add(new NativeArticleNode { Kind = NativeArticleNodeKind.Text, Text = " · " });
+                    item.Kind = NativeArticleNodeKind.Container; item.IsBlock = false; node.Children.Add(item);
+                }
+                if (nested) node.Children.Add(new NativeArticleNode { Kind = NativeArticleNodeKind.Text, Text = ")" });
+            }
+            if (node.Classes.Split(' ').Contains("navbox-inner") && style.Display == "grid") NormalizeNavigationBox(node);
             return node;
+        }
+
+        private static void NormalizeNavigationBox(NativeArticleNode node)
+        {
+            // These grids encode group/list relationships, including nested subgroups.
+            // Keep that relationship rather than scattering each child into equal tiles.
+            var children = node.Children.Where(c => c.Kind != NativeArticleNodeKind.Text || !string.IsNullOrWhiteSpace(c.Text)).ToList();
+            node.Kind = NativeArticleNodeKind.Table; node.IsBlock = true; node.Style.Display = "block"; node.Children.Clear();
+            NativeArticleNode group = null;
+            Action<NativeArticleNode, NativeArticleNode> row = (label, body) =>
+            {
+                var line = new NativeArticleNode { Kind = NativeArticleNodeKind.TableRow };
+                foreach (var part in new[] { label, body }.Where(p => p != null))
+                {
+                    var cell = new NativeArticleNode { Kind = NativeArticleNodeKind.TableCell, ColumnSpan = label == null || body == null ? 2 : 1 };
+                    cell.Style.ColorContext = part.Style.ColorContext;
+                    if (part == label && body != null) cell.Style.Width = ArticleLength.Parse("24%");
+                    cell.Children.Add(part); line.Children.Add(cell);
+                }
+                node.Children.Add(line);
+            };
+            foreach (var child in children)
+            {
+                var classes = (child.Classes ?? "").Split(' ');
+                if (classes.Contains("navbox-group"))
+                {
+                    if (group != null) row(null, group);
+                    group = child;
+                }
+                else if (classes.Contains("navbox-list")) { row(group, child); group = null; }
+                else { if (group != null) { row(null, group); group = null; } row(null, child); }
+            }
+            if (group != null) row(null, group);
         }
 
         private static NativeArticleNode ReadMath(HtmlNode source, NativeArticleDocument document, int depth)

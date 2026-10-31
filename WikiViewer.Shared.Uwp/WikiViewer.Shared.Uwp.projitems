@@ -15,6 +15,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)Controls\NativeArticleView.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Controls\ArticleFlowPanel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Controls\ArticleTilePanel.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Controls\ArticleTableView.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Controls\ArticlePositionPanel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Controls\ArticleMathView.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Controls\ArticleTextFlowPanel.cs" />

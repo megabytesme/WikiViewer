@@ -16,6 +16,8 @@
   <ItemGroup>
     <Compile Include="..\WikiViewer.Core\Models\NativeArticleDocument.cs" Link="Models\NativeArticleDocument.cs" />
     <Compile Include="..\WikiViewer.Core\Services\NativeFlowLayout.cs" Link="Services\NativeFlowLayout.cs" />
+    <Compile Include="..\WikiViewer.Core\Services\NativeResponsiveLayout.cs" Link="Services\NativeResponsiveLayout.cs" />
+    <Compile Include="..\WikiViewer.Core\Services\NativeMediaService.cs" Link="Services\NativeMediaService.cs" />
     <Compile Include="..\WikiViewer.Core\Services\ArticleSectionService.cs" Link="Services\ArticleSectionService.cs" />
     <Compile Include="..\WikiViewer.Core\Services\ArticleColor.cs" Link="Services\ArticleColor.cs" />
     <Compile Include="..\WikiViewer.Core\Services\ArticleThemeService.cs" Link="Services\ArticleThemeService.cs" />

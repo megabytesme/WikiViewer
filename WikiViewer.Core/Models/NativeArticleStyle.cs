@@ -79,6 +79,13 @@ namespace WikiViewer.Core.Models
         public ArticleLength TranslateY { get; set; }
         public int ZIndex { get; set; }
         public bool Wrap { get; set; }
+        public string FlexDirection { get; set; } = "row";
+        public double FlexGrow { get; set; }
+        public double FlexShrink { get; set; } = 1;
+        public ArticleLength FlexBasis { get; set; }
+        public string JustifyContent { get; set; }
+        public ArticleLength MinWidth { get; set; }
+        public ArticleLength GridMinimum { get; set; }
         public int GridColumns { get; set; }
         public ArticleLength Gap { get; set; }
         public string Foreground { get; set; }

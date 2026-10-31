@@ -16,6 +16,8 @@
     <Compile Include="$(MSBuildThisFileDirectory)Services\ArticleColor.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\ArticleThemeService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\NativeFlowLayout.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Services\NativeResponsiveLayout.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Services\NativeMediaService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\ArticleSectionService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\NativeArticleStyle.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\NativeArticleStyleService.cs" />

@@ -78,6 +78,7 @@ namespace WikiViewer.Core.Services
                     case "width": style.Width = ArticleLength.Parse(value); break;
                     case "height": style.Height = ArticleLength.Parse(value); break;
                     case "max-width": style.MaxWidth = ArticleLength.Parse(value); break;
+                    case "min-width": style.MinWidth = ArticleLength.Parse(value); break;
                     case "text-align": style.Alignment = value.ToLowerInvariant(); break;
                     case "direction": if (value == "rtl" || value == "ltr") style.Direction = value; break;
                     case "vertical-align": style.VerticalAlignment = value.ToLowerInvariant(); if (value == "super" || value == "sub") style.VerticalText = value == "super" ? "sup" : "sub"; break;
@@ -115,8 +116,30 @@ namespace WikiViewer.Core.Services
                         if (translate.Success) { style.TranslateX = ArticleLength.Parse(translate.Groups[1].Value, true); style.TranslateY = ArticleLength.Parse(translate.Groups[2].Value, true); }
                         break;
                     case "flex-wrap": style.Wrap = value == "wrap" || value == "wrap-reverse"; break;
+                    case "flex-direction": style.FlexDirection = value; break;
+                    case "flex-flow":
+                        foreach (var token in value.Split(' '))
+                        {
+                            if (token == "row" || token == "column") style.FlexDirection = token;
+                            if (token == "wrap" || token == "wrap-reverse") style.Wrap = true;
+                            if (token == "nowrap") style.Wrap = false;
+                        }
+                        break;
+                    case "flex-grow": style.FlexGrow = FlexNumber(value, 0); break;
+                    case "flex-shrink": style.FlexShrink = FlexNumber(value, 1); break;
+                    case "flex-basis": style.FlexBasis = ArticleLength.Parse(value); break;
+                    case "flex":
+                        var flex = value.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                        style.FlexGrow = value == "auto" ? 1 : FlexNumber(flex.FirstOrDefault(), 0);
+                        style.FlexShrink = value == "none" ? 0 : flex.Length > 1 ? FlexNumber(flex[1], 1) : 1;
+                        style.FlexBasis = ArticleLength.Parse(flex.LastOrDefault());
+                        if (flex.Length == 1 && value != "none" && value != "auto") style.FlexBasis = ArticleLength.Parse("0px");
+                        break;
+                    case "justify-content": style.JustifyContent = value; break;
                     case "gap": case "grid-gap": style.Gap = ArticleLength.Parse(value); break;
                     case "grid-template-columns":
+                        var auto = Regex.Match(value, @"^repeat\(\s*auto-(?:fill|fit)\s*,\s*minmax\(\s*([^,]+),\s*1fr\s*\)\s*\)$");
+                        if (auto.Success) style.GridMinimum = ArticleLength.Parse(auto.Groups[1].Value);
                         var repeat = Regex.Match(value, @"^repeat\(\s*(\d+)\s*,");
                         int count;
                         if (repeat.Success && int.TryParse(repeat.Groups[1].Value, out count)) style.GridColumns = Math.Max(1, Math.Min(12, count));
@@ -141,6 +164,13 @@ namespace WikiViewer.Core.Services
                 }
             }
             return style;
+        }
+
+        private static double FlexNumber(string value, double fallback)
+        {
+            double number;
+            return double.TryParse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out number) &&
+                number >= 0 && number <= 1000 ? number : fallback;
         }
 
         private static string ResolveVariables(string value, Dictionary<string, string> variables)

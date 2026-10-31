@@ -33,6 +33,7 @@ namespace WikiViewer.Core.Models
         public string SvgContent { get; set; }
         public Uri PosterUri { get; set; }
         public List<NativeMediaSource> MediaSources { get; } = new List<NativeMediaSource>();
+        public List<Uri> ImageSources { get; } = new List<Uri>();
         public Dictionary<string, string> Attributes { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         public bool HasSourceLayout { get; set; }
         public NativeArticleStyle Style { get; set; } = new NativeArticleStyle();
@@ -44,6 +45,7 @@ namespace WikiViewer.Core.Models
         public Uri Uri { get; set; }
         public string ContentType { get; set; }
         public string Label { get; set; }
+        public int Height { get; set; }
     }
 
     public sealed class NativeArticleDocument

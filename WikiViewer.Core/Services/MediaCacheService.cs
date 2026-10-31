@@ -189,7 +189,7 @@ namespace WikiViewer.Core.Services
                     await worker.InitializeAsync(wiki.BaseUrl);
                     byte[] imageBytes = await worker.GetRawBytesFromUrlAsync(remoteUrl);
 
-                    if (imageBytes?.Length > 0)
+                    if (imageBytes?.Length > 0 && !NativeMediaService.IsErrorDocument(imageBytes))
                     {
                         string hashedUrl = GetHashedString(remoteUrl);
 
