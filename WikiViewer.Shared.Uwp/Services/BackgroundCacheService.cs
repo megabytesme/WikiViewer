@@ -13,18 +13,20 @@ namespace WikiViewer.Shared.Uwp.Services
     public static class BackgroundCacheService
     {
         public static async Task CacheArticlesAsync(
-            Dictionary<string, WikiInstance> articlesToCache
+            IEnumerable<KeyValuePair<string, WikiInstance>> articlesToCache
         )
         {
-            if (articlesToCache == null || !articlesToCache.Any())
+            var requests = articlesToCache?.Where(item => item.Value != null && !string.IsNullOrWhiteSpace(item.Key)).ToList();
+            if (requests == null || requests.Count == 0)
                 return;
 
             await App.UIReady;
 
             int maxConcurrency = AppSettings.MaxConcurrentDownloads;
-            var semaphore = new SemaphoreSlim(maxConcurrency);
+            using (var semaphore = new SemaphoreSlim(maxConcurrency))
+            {
 
-            var cachingTasks = articlesToCache.Select(
+            var cachingTasks = requests.GroupBy(kvp => CacheKeyService.Article(kvp.Value.Id, kvp.Key)).Select(group => group.First()).Select(
                 async (kvp) =>
                 {
                     string title = kvp.Key;
@@ -33,19 +35,9 @@ namespace WikiViewer.Shared.Uwp.Services
                     await semaphore.WaitAsync();
                     try
                     {
-                        using (var tempWorker = App.ApiWorkerFactory.CreateApiWorker(wiki))
-                        {
-                            await tempWorker.InitializeAsync(wiki.BaseUrl);
-
-                            var stopwatch = Stopwatch.StartNew();
-                            await ArticleProcessingService.FetchAndProcessArticleAsync(
-                                title,
-                                stopwatch,
-                                tempWorker,
-                                wiki,
-                                true
-                            );
-                        }
+                        var content = await ArticleProcessingService.LoadAsync(title, wiki);
+                        content = await ArticleProcessingService.RevalidateAsync(title, wiki, content);
+                        await ArticleProcessingService.EnrichAsync(title, wiki, content);
                     }
                     catch (Exception ex)
                     {
@@ -61,6 +53,7 @@ namespace WikiViewer.Shared.Uwp.Services
             );
 
             await Task.WhenAll(cachingTasks);
+            }
         }
     }
 }

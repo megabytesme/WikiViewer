@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,7 +13,6 @@ using Windows.Security.Cryptography;
 using Windows.Security.Cryptography.Core;
 using Windows.Storage.Streams;
 #else
-using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 #endif
@@ -27,14 +27,16 @@ namespace WikiViewer.Core.Services
 
         private const string MapFileName = "MediaCacheMap.json";
         private static ConcurrentDictionary<string, string> _urlToLocalPathMap;
-        private static readonly ConcurrentDictionary<string, Task<string>> _inFlightDownloads =
-            new ConcurrentDictionary<string, Task<string>>();
+        private static readonly AsyncRequestCoordinator<string> Downloads = new AsyncRequestCoordinator<string>();
+        private static readonly ConcurrentDictionary<string, bool> VerifiedPaths = new ConcurrentDictionary<string, bool>();
+        private static int _generation;
         private static SemaphoreSlim _downloadSemaphore;
         private static bool _isInitialized = false;
 
         private static Timer _saveTimer;
         private static readonly SemaphoreSlim _saveLock = new SemaphoreSlim(1, 1);
-        private static bool _isMapDirty = false;
+        private static long _mapVersion;
+        private static long _savedVersion;
 
         public static async Task InitializeAsync()
         {
@@ -76,25 +78,27 @@ namespace WikiViewer.Core.Services
 
         private static void RequestSave()
         {
-            _isMapDirty = true;
+            Interlocked.Increment(ref _mapVersion);
             _saveTimer.Change(2000, Timeout.Infinite);
         }
 
         private static async Task SaveMapAsync()
         {
-            if (!_isInitialized || !_isMapDirty)
+            if (!_isInitialized || Interlocked.Read(ref _mapVersion) == Interlocked.Read(ref _savedVersion))
                 return;
 
             await _saveLock.WaitAsync();
             try
             {
-                if (!_isMapDirty)
+                long version = Interlocked.Read(ref _mapVersion);
+                if (version == Interlocked.Read(ref _savedVersion))
                     return;
 
                 Debug.WriteLine("[MediaCacheService] Debounced save triggered. Saving map...");
                 string json = JsonConvert.SerializeObject(_urlToLocalPathMap, Formatting.None);
                 await StorageProvider.WriteTextAsync(MapFileName, json);
-                _isMapDirty = false;
+                Interlocked.Exchange(ref _savedVersion, version);
+                if (version != Interlocked.Read(ref _mapVersion)) _saveTimer.Change(2000, Timeout.Infinite);
                 Debug.WriteLine("[MediaCacheService] Map saved successfully.");
             }
             catch (Exception ex)
@@ -110,11 +114,13 @@ namespace WikiViewer.Core.Services
         public static async Task<string> GetLocalUriAsync(
             string remoteUrl,
             WikiInstance wiki,
-            string originalThumbnailUrl = null
+            string originalThumbnailUrl = null,
+            CancellationToken cancellationToken = default(CancellationToken)
         )
         {
             if (string.IsNullOrEmpty(remoteUrl) || wiki == null)
                 return null;
+            cancellationToken.ThrowIfCancellationRequested();
 
             string mapKey = remoteUrl;
 
@@ -129,11 +135,12 @@ namespace WikiViewer.Core.Services
             if (_urlToLocalPathMap.TryGetValue(mapKey, out var localPath))
             {
                 if (
-                    await StorageProvider.FileExistsAsync(
+                    VerifiedPaths.ContainsKey(localPath) || await StorageProvider.FileExistsAsync(
                         $"cache\\{System.IO.Path.GetFileName(localPath)}"
                     )
                 )
                 {
+                    VerifiedPaths[localPath] = true;
                     if (mapKey != remoteUrl)
                     {
                         _urlToLocalPathMap[remoteUrl] = localPath;
@@ -150,14 +157,18 @@ namespace WikiViewer.Core.Services
                 }
             }
 
-            string finalPath = await _inFlightDownloads.GetOrAdd(
-                remoteUrl,
-                (url) => DownloadAndCacheAsync(url, wiki)
-            );
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try { return await Downloads.RunAsync(_generation + ":" + remoteUrl, () => DownloadAndCacheAsync(remoteUrl, wiki, cancellationToken)); }
+                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                { /* Another page canceled a queued request. This live consumer still needs it. */ }
+            }
+        }
 
-            _inFlightDownloads.TryRemove(remoteUrl, out _);
-
-            return finalPath;
+        public static async Task ClearMappingsAsync()
+        {
+            Interlocked.Increment(ref _generation); _urlToLocalPathMap.Clear(); VerifiedPaths.Clear(); RequestSave(); await SaveMapAsync();
         }
 
         private static string GetHashedString(string input)
@@ -179,17 +190,37 @@ namespace WikiViewer.Core.Services
 #endif
         }
 
-        private static async Task<string> DownloadAndCacheAsync(string remoteUrl, WikiInstance wiki)
+        private static async Task<string> DownloadAndCacheAsync(string remoteUrl, WikiInstance wiki, CancellationToken cancellationToken)
         {
-            await _downloadSemaphore.WaitAsync();
+            int generation = _generation;
+            await _downloadSemaphore.WaitAsync(cancellationToken);
             try
             {
-                using (var worker = ApiWorkerFactory.CreateApiWorker(wiki))
+                byte[] bytes = null;
+                var method = wiki.ResolvedConnectionMethod ?? wiki.PreferredConnectionMethod;
+                string extension = System.IO.Path.GetExtension(new Uri(remoteUrl).AbsolutePath).ToLowerInvariant();
+                bool rasterOrVector = new[] { ".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".svg", ".ico" }.Contains(extension);
+                if (rasterOrVector && method != WikiViewer.Core.Enums.ConnectionMethod.HttpClient && method != WikiViewer.Core.Enums.ConnectionMethod.HttpClientProxy)
+                {
+                    try
+                    {
+                        using (var direct = new HttpClientApiWorker())
+                        {
+                            await direct.InitializeAsync(wiki.BaseUrl);
+                            bytes = await NetworkOperationTimeout.RunAsync(() => direct.GetRawBytesFromUrlAsync(remoteUrl), TimeSpan.FromSeconds(3), "Direct image download timed out.");
+                            if (NativeMediaService.IsErrorDocument(bytes)) bytes = null;
+                        }
+                    }
+                    catch (Exception) { /* Protected files keep the selected wiki backend. */ }
+                }
+                if (bytes == null) using (var worker = ApiWorkerFactory.CreateApiWorker(wiki))
                 {
                     await worker.InitializeAsync(wiki.BaseUrl);
-                    byte[] imageBytes = await worker.GetRawBytesFromUrlAsync(remoteUrl);
+                    bytes = await worker.GetRawBytesFromUrlAsync(remoteUrl);
+                }
+                    byte[] imageBytes = bytes;
 
-                    if (imageBytes?.Length > 0 && !NativeMediaService.IsErrorDocument(imageBytes))
+                    if (generation == _generation && imageBytes?.Length > 0 && !NativeMediaService.IsErrorDocument(imageBytes))
                     {
                         string hashedUrl = GetHashedString(remoteUrl);
 
@@ -203,13 +234,13 @@ namespace WikiViewer.Core.Services
                         var relativePath = $"/cache/{fileName}";
 
                         await StorageProvider.WriteBytesAsync($"cache\\{fileName}", imageBytes);
-
+                        if (generation != _generation) return null;
                         _urlToLocalPathMap[remoteUrl] = relativePath;
+                        VerifiedPaths[relativePath] = true;
                         RequestSave();
 
                         return $"ms-appdata:///local{relativePath}";
                     }
-                }
             }
             catch (Exception ex)
             {

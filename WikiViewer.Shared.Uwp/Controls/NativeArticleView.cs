@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Threading;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
 using Windows.Foundation;
@@ -38,13 +39,17 @@ namespace WikiViewer.Shared.Uwp.Controls
         private sealed class RenderScope
         {
             public bool Active = true;
+            public readonly CancellationTokenSource Cancellation = new CancellationTokenSource();
             public readonly List<Image> Images = new List<Image>();
             public readonly List<MediaElement> Media = new List<MediaElement>();
             public readonly Dictionary<string, FrameworkElement> Anchors = new Dictionary<string, FrameworkElement>();
         }
         private Func<Uri, Task> _navigate;
-        private Func<string, Task<string>> _resolveImage;
+        private Func<string, CancellationToken, Task<string>> _resolveImage;
+        private CancellationTokenSource _assetCancellation = new CancellationTokenSource();
         private int _version;
+        private bool _interacted;
+        public bool CanUpdateLayout => !_interacted && (_sections != null ? (FindScrollViewer(_sections)?.VerticalOffset ?? 0) < 1 : _scroll.VerticalOffset < 1);
         private Uri _pageUri;
         private readonly ScrollViewer _scroll = new ScrollViewer { HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         public Thickness ContentMargin { get => _root.Margin; set => _root.Margin = value; }
@@ -52,6 +57,8 @@ namespace WikiViewer.Shared.Uwp.Controls
 
         public NativeArticleView()
         {
+            AddHandler(UIElement.PointerPressedEvent, new Windows.UI.Xaml.Input.PointerEventHandler((s, e) => _interacted = true), true);
+            KeyDown += (s, e) => _interacted = true;
             _scroll.Content = _root;
             Content = _scroll;
             Loaded += (s, e) =>
@@ -86,7 +93,7 @@ namespace WikiViewer.Shared.Uwp.Controls
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine("Native theme update: " + ex.GetType().Name); }
         }
 
-        public void ShowArticle(ArticleContent content, Uri pageUri, Func<Uri, Task> navigate, Func<string, Task<string>> resolveImage)
+        public void ShowArticle(ArticleContent content, Uri pageUri, Func<Uri, Task> navigate, Func<string, CancellationToken, Task<string>> resolveImage)
         {
             try
             {
@@ -97,14 +104,14 @@ namespace WikiViewer.Shared.Uwp.Controls
             catch (Exception ex) { _ = LogFailureAsync(ex); throw; }
         }
 
-        public async Task<bool> ShowArticleAsync(ArticleContent content, Uri pageUri, Func<Uri, Task> navigate, Func<string, Task<string>> resolveImage)
+        public async Task<bool> ShowArticleAsync(ArticleContent content, Uri pageUri, Func<Uri, Task> navigate, Func<string, CancellationToken, Task<string>> resolveImage)
         {
             ClearArticle();
             int version = _version;
             try
             {
                 double? width = ActualWidth > 0 ? (double?)ActualWidth : null;
-                var document = await Task.Run(() => NativeArticleDocumentService.Parse(content, pageUri, width));
+                var document = await NativeDocumentCache.GetAsync(content, pageUri, width);
                 if (version != _version) return false;
                 RenderDocument(document, pageUri, navigate, resolveImage);
                 return true;
@@ -116,7 +123,22 @@ namespace WikiViewer.Shared.Uwp.Controls
             }
         }
 
-        private void RenderDocument(NativeArticleDocument document, Uri pageUri, Func<Uri, Task> navigate, Func<string, Task<string>> resolveImage)
+        public async Task<bool> TryUpdateStylesAsync(ArticleContent content)
+        {
+            if (!CanUpdateLayout || _pageUri == null) return false;
+            int version = _version;
+            var page = _pageUri; var navigate = _navigate; var resolve = _resolveImage;
+            double? width = ActualWidth > 0 ? (double?)ActualWidth : null;
+            // Keep readable controls in place while preparing optional styles. Input or
+            // navigation during parsing means the prepared layout waits for an explicit reload.
+            var document = await NativeDocumentCache.GetAsync(content, page, width);
+            if (version != _version || !CanUpdateLayout) return false;
+            ClearArticle();
+            RenderDocument(document, page, navigate, resolve);
+            return true;
+        }
+
+        private void RenderDocument(NativeArticleDocument document, Uri pageUri, Func<Uri, Task> navigate, Func<string, CancellationToken, Task<string>> resolveImage)
         {
             _navigate = navigate;
             _resolveImage = resolveImage;
@@ -196,7 +218,9 @@ namespace WikiViewer.Shared.Uwp.Controls
 
         private void ReleaseScope(RenderScope scope)
         {
+            if (!scope.Active) return;
             scope.Active = false;
+            scope.Cancellation.Cancel(); scope.Cancellation.Dispose();
             foreach (var image in scope.Images) { _images.Remove(image); image.Source = null; }
             foreach (var media in scope.Media) { _media.Remove(media); media.Stop(); media.Source = null; }
             foreach (var anchor in scope.Anchors) { FrameworkElement current; if (_anchors.TryGetValue(anchor.Key, out current) && current == anchor.Value) _anchors.Remove(anchor.Key); }
@@ -215,6 +239,8 @@ namespace WikiViewer.Shared.Uwp.Controls
 
         public void ClearArticle()
         {
+            _assetCancellation.Cancel(); _assetCancellation.Dispose(); _assetCancellation = new CancellationTokenSource();
+            _interacted = false;
             _version++;
             foreach (var scope in _scopes.ToArray()) ReleaseScope(scope);
             _scope = null; _anchorSections.Clear();
@@ -432,13 +458,20 @@ namespace WikiViewer.Shared.Uwp.Controls
                 return new TextBlock { Text = (node.Text ?? "Vector image") + " (available in Web view)", TextWrapping = TextWrapping.Wrap };
 #endif
             var image = new Image { Width = node.ImageWidth > 0 ? node.ImageWidth : double.NaN, MaxWidth = Math.Max(80, _root.ActualWidth > 0 ? _root.ActualWidth - 40 : 320), MaxHeight = 600, Stretch = Stretch.Uniform, Margin = new Thickness(0, 8, 0, 8) };
-            var host = new Grid(); host.Children.Add(image);
+            var host = new Grid { MinHeight = Math.Min(32, node.ImageWidth > 0 ? node.ImageWidth : 32) }; host.Children.Add(image);
+            double indicatorSize = Math.Min(32, node.ImageWidth > 0 ? node.ImageWidth : 32);
+            var progress = new ProgressRing { Width = indicatorSize, Height = indicatorSize, IsActive = false, Visibility = Visibility.Collapsed, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            host.Children.Add(progress);
+            Windows.UI.Xaml.Automation.AutomationProperties.SetName(progress, "Loading image");
+            bool complete = false;
+            Action finished = () => { complete = true; progress.IsActive = false; progress.Visibility = Visibility.Collapsed; host.MinHeight = 0; };
             var fallback = new TextBlock { Text = (node.Text ?? "Image") + " (available in Web view)", TextWrapping = TextWrapping.Wrap, Visibility = Visibility.Collapsed };
             host.Children.Add(fallback);
-            Action failed = () => { image.Visibility = Visibility.Collapsed; fallback.Visibility = Visibility.Visible; };
+            Action failed = () => { finished(); image.Visibility = Visibility.Collapsed; fallback.Visibility = Visibility.Visible; };
             Windows.UI.Xaml.Automation.AutomationProperties.SetName(image, node.Text ?? "");
             _images.Add(image);
             var scope = _scope; scope?.Images.Add(image);
+            var cancellationToken = scope?.Cancellation.Token ?? _assetCancellation.Token;
             int version = _version;
             var resolveImage = _resolveImage;
             bool started = false;
@@ -447,6 +480,7 @@ namespace WikiViewer.Shared.Uwp.Controls
                 LimitImageWidth(image);
                 if (started || version != _version || scope?.Active == false) return;
                 started = true;
+                _ = ShowImageProgressAsync(progress, () => !complete && version == _version && scope?.Active != false);
                 try
                 {
 #if UWP_1809
@@ -459,6 +493,7 @@ namespace WikiViewer.Shared.Uwp.Controls
                             stream.Seek(0);
                             if (await svg.SetSourceAsync(stream) != SvgImageSourceLoadStatus.Success && version == _version) failed();
                         }
+                        finished();
                         return;
                     }
 #endif
@@ -466,13 +501,15 @@ namespace WikiViewer.Shared.Uwp.Controls
                     foreach (var remote in candidates)
                     {
                         string resolved = null;
-                        try { if (resolveImage != null) resolved = await resolveImage(remote.AbsoluteUri); }
+                        try { if (resolveImage != null) resolved = await resolveImage(remote.AbsoluteUri, cancellationToken); }
                         catch (Exception ex) { System.Diagnostics.Debug.WriteLine("Native reader image cache: " + ex.Message); }
                         if (version != _version || scope?.Active == false) return;
                         Uri local;
-                        if (Uri.TryCreate(resolved, UriKind.Absolute, out local) && await LoadImageSourceAsync(image, local, IsSvg(remote))) return;
+                        if (Uri.TryCreate(resolved, UriKind.Absolute, out local) && await LoadImageSourceAsync(image, local, IsSvg(remote))) { finished(); return; }
                         if (version != _version || scope?.Active == false) return;
-                        if (await LoadImageSourceAsync(image, remote, IsSvg(remote))) return;
+                        if (!System.Net.NetworkInformation.NetworkInterface.GetIsNetworkAvailable())
+                        { fallback.Text = (node.Text ?? "Image") + " — unavailable offline"; failed(); return; }
+                        if (await LoadImageSourceAsync(image, remote, IsSvg(remote))) { finished(); return; }
                         if (version != _version || scope?.Active == false) return;
                     }
                     failed();
@@ -480,6 +517,12 @@ namespace WikiViewer.Shared.Uwp.Controls
                 catch (Exception ex) { if (version == _version) failed(); System.Diagnostics.Debug.WriteLine("Native reader image: " + ex.Message); }
             };
             return host;
+        }
+
+        private static async Task ShowImageProgressAsync(ProgressRing progress, Func<bool> pending)
+        {
+            await Task.Delay(120);
+            if (pending()) { progress.IsActive = true; progress.Visibility = Visibility.Visible; }
         }
 
         private static async Task<bool> LoadImageSourceAsync(Image image, Uri uri, bool vector)
@@ -524,8 +567,11 @@ namespace WikiViewer.Shared.Uwp.Controls
                 if (sources.Count > 1) panel.Children.Add(choices);
                 var load = new Button { Content = node.TagName == "audio" ? "Play audio" : "Play video" };
                 var status = new TextBlock { TextWrapping = TextWrapping.Wrap };
+                var buffering = new ProgressBar { IsIndeterminate = true, Visibility = Visibility.Collapsed, MaxWidth = 480, Height = 4 };
+                Windows.UI.Xaml.Automation.AutomationProperties.SetName(buffering, "Loading media");
                 int version = _version;
                 var scope = _scope;
+                var cancellationToken = scope?.Cancellation.Token ?? _assetCancellation.Token;
                 var attempted = new HashSet<Uri>();
                 bool cached = false, changingChoice = false, playing = false;
                 int request = 0;
@@ -537,12 +583,20 @@ namespace WikiViewer.Shared.Uwp.Controls
                     if (selected == null || version != _version || scope?.Active == false) return;
                     request++; cached = false; playing = true; attempted.Add(selected.Uri);
                     status.Text = "Loading " + selected.Label + "…"; open.NavigateUri = selected.Uri;
+                    buffering.IsIndeterminate = true; buffering.Visibility = Visibility.Visible;
                     media.Source = selected.Uri;
                 };
                 media.MediaOpened += (s, e) =>
                 {
                     if (version != _version || scope?.Active == false || !playing) return;
-                    status.Text = ""; media.Play();
+                    status.Text = ""; buffering.Visibility = Visibility.Collapsed; media.Play();
+                };
+                media.BufferingProgressChanged += (s, e) =>
+                {
+                    if (version != _version || scope?.Active == false || !playing) return;
+                    double value = media.BufferingProgress;
+                    buffering.IsIndeterminate = value <= 0; buffering.Value = value * 100;
+                    buffering.Visibility = value < 1 ? Visibility.Visible : Visibility.Collapsed;
                 };
                 media.MediaFailed += async (s, e) =>
                 {
@@ -554,8 +608,9 @@ namespace WikiViewer.Shared.Uwp.Controls
                     {
                         cached = true;
                         status.Text = "Trying a downloaded copy…";
+                        buffering.IsIndeterminate = true; buffering.Visibility = Visibility.Visible;
                         string local = null;
-                        try { local = await resolveMedia(selected.Uri.AbsoluteUri); }
+                        try { local = await resolveMedia(selected.Uri.AbsoluteUri, cancellationToken); }
                         catch (Exception ex) { System.Diagnostics.Debug.WriteLine("Native media cache: " + ex.Message); }
                         if (version != _version || scope?.Active == false || current != request) return;
                         Uri uri;
@@ -570,7 +625,7 @@ namespace WikiViewer.Shared.Uwp.Controls
                         {
                             changingChoice = true; choices.SelectedIndex = next; changingChoice = false; start();
                         }
-                        else { playing = false; status.Text = "Windows could not play the available sources. " + e.ErrorMessage + " Use Open media file or Web view."; }
+                        else { playing = false; buffering.Visibility = Visibility.Collapsed; status.Text = "Windows could not play the available sources. " + e.ErrorMessage + " Use Open media file or Web view."; }
                     });
                 };
                 load.Click += (s, e) => { attempted.Clear(); start(); };
@@ -578,9 +633,11 @@ namespace WikiViewer.Shared.Uwp.Controls
                 {
                     if (changingChoice) return;
                     request++; playing = false; media.Stop(); media.Source = null; status.Text = "";
+                    buffering.Visibility = Visibility.Collapsed;
                     var selected = choices.SelectedItem as NativeMediaSource; if (selected != null) open.NavigateUri = selected.Uri;
                 };
                 _media.Add(media); _scope?.Media.Add(media); panel.Children.Add(media); panel.Children.Add(load); panel.Children.Add(status);
+                panel.Children.Add(buffering);
                 panel.Children.Add(open);
             }
             else panel.Children.Add(new TextBlock { Text = "Media available in Web view.", TextWrapping = TextWrapping.Wrap });

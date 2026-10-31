@@ -25,15 +25,18 @@
             <AppBarButton x:Name="EditButton" Icon="Edit" Label="Edit" Click="EditButton_Click" Visibility="Collapsed"/>
             <AppBarButton x:Name="FavoriteButton" Icon="Favorite" Label="Add to Favourites" Click="FavoriteButton_Click"/>
             <AppBarButton x:Name="ShareButton" Icon="Share" Label="Share" Click="ShareButton_Click"/>
+            <AppBarButton x:Name="ReloadPageButton" Icon="Refresh" Label="Reload page" Click="ReloadPageButton_Click"/>
             <AppBarButton x:Name="RefreshButton" Icon="Refresh" Label="Refresh Theme" Click="RefreshButton_Click"/>
         </CommandBar>
         <Grid x:Name="LoadingOverlay" Opacity="0" IsHitTestVisible="False" Background="{StaticResource PageTitleBarAcrylicBrush}">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
                 <ProgressRing IsActive="True" Width="60" Height="60"/>
                 <TextBlock x:Name="LoadingText" Text="Loading..." HorizontalAlignment="Center"/>
-                <TextBlock x:Name="LastUpdatedText" Style="{ThemeResource BodyTextBlockStyle}" Opacity="0.7" Visibility="Collapsed" Margin="0,4,0,0"/>
             </StackPanel>
         </Grid>
+        <Border VerticalAlignment="Bottom" Margin="20,0,20,54" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Padding="4">
+            <TextBlock x:Name="LastUpdatedText" FontSize="12" Opacity="0.8" TextWrapping="Wrap" Visibility="Collapsed"/>
+        </Border>
         <Grid x:Name="VerificationPanel" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Visibility="Collapsed">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>

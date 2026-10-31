@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace WikiViewer.Core.Models
 {
@@ -32,12 +33,20 @@ namespace WikiViewer.Core.Models
         public string OriginalHtml { get; set; }
         public string SvgContent { get; set; }
         public Uri PosterUri { get; set; }
-        public List<NativeMediaSource> MediaSources { get; } = new List<NativeMediaSource>();
-        public List<Uri> ImageSources { get; } = new List<Uri>();
-        public Dictionary<string, string> Attributes { get; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        public List<NativeMediaSource> MediaSources { get; private set; } = new List<NativeMediaSource>();
+        public List<Uri> ImageSources { get; private set; } = new List<Uri>();
+        public Dictionary<string, string> Attributes { get; private set; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         public bool HasSourceLayout { get; set; }
         public NativeArticleStyle Style { get; set; } = new NativeArticleStyle();
-        public List<NativeArticleNode> Children { get; } = new List<NativeArticleNode>();
+        public List<NativeArticleNode> Children { get; private set; } = new List<NativeArticleNode>();
+        public NativeArticleNode CopyForRendering()
+        {
+            var copy = (NativeArticleNode)MemberwiseClone(); copy.Style = Style.Copy();
+            copy.Children = Children.Select(c => c.CopyForRendering()).ToList();
+            copy.Attributes = new Dictionary<string, string>(Attributes, StringComparer.OrdinalIgnoreCase);
+            copy.MediaSources = new List<NativeMediaSource>(MediaSources); copy.ImageSources = new List<Uri>(ImageSources);
+            return copy;
+        }
     }
 
     public sealed class NativeMediaSource

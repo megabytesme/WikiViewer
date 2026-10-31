@@ -16,6 +16,9 @@ namespace _1507_UWP.Pages
 {
     public sealed partial class ArticleViewerPage
     {
+        protected override bool UsesNativeReader => NativeReaderButton.IsChecked == true;
+        protected override Task<bool> TryUpdateNativeStylesAsync(ArticleContent content)
+            => UsesNativeReader ? NativeReader.TryUpdateStylesAsync(content) : Task.FromResult(false);
         private readonly UISettings _uiSettings = new UISettings();
 
         public ArticleViewerPage()
@@ -46,7 +49,7 @@ namespace _1507_UWP.Pages
             try
             {
             var wiki = _pageWikiContext;
-            await NativeReader.ShowArticleAsync(content, new Uri(wiki.GetWikiPageUrl(_pageTitleToFetch)), async uri =>
+            return await NativeReader.ShowArticleAsync(content, new Uri(wiki.GetWikiPageUrl(_pageTitleToFetch)), async uri =>
             {
                 var target = WikiManager.GetWikiByHost(uri.Host);
                 string prefix = "/" + (target?.ArticlePath ?? "").Trim('/');
@@ -61,8 +64,7 @@ namespace _1507_UWP.Pages
                     else Frame.Navigate(typeof(ArticleViewerPage), new ArticleNavigationParameter { WikiId = target.Id, PageTitle = title });
                 }
                 else await ShowWikiDetectionPromptAsync(uri);
-            }, url => MediaCacheService.GetLocalUriAsync(url, wiki));
-            return true;
+            }, (url, token) => MediaCacheService.GetLocalUriAsync(url, wiki, cancellationToken: token));
             }
             catch (Exception ex)
             {

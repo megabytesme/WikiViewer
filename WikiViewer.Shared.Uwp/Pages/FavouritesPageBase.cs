@@ -78,10 +78,9 @@ namespace WikiViewer.Shared.Uwp.Pages
                 Windows.UI.Core.CoreDispatcherPriority.Normal,
                 async () =>
                 {
-                    var itemToUpdate = _unifiedFavourites.FirstOrDefault(item =>
-                        item.ArticlePageTitle == e.PageTitle
-                    );
-                    if (itemToUpdate != null)
+                    var items = _unifiedFavourites.Where(item => CacheKeyService.Title(item.ArticlePageTitle) == CacheKeyService.Title(e.PageTitle) &&
+                        (!e.WikiId.HasValue || item.WikiId == e.WikiId.Value)).ToList();
+                    foreach (var itemToUpdate in items)
                     {
                         var wiki = WikiManager.GetWikiById(itemToUpdate.WikiId);
                         await FindAndSetLeadImage(itemToUpdate, wiki);
@@ -104,7 +103,7 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         private async Task PreCacheFavouriteArticlesAsync()
         {
-            var articlesToCache = new Dictionary<string, WikiInstance>();
+            var articlesToCache = new List<KeyValuePair<string, WikiInstance>>();
             foreach (var item in _unifiedFavourites)
             {
                 if (
@@ -115,7 +114,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                     )
                 )
                 {
-                    articlesToCache[item.ArticlePageTitle] = WikiManager.GetWikiById(item.WikiId);
+                    articlesToCache.Add(new KeyValuePair<string, WikiInstance>(item.ArticlePageTitle, WikiManager.GetWikiById(item.WikiId)));
                 }
             }
 

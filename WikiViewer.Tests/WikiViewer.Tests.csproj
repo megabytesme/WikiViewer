@@ -21,6 +21,12 @@
     <Compile Include="..\WikiViewer.Core\Services\ResolverConfigurationService.cs" Link="Services\ResolverConfigurationService.cs" />
     <Compile Include="..\WikiViewer.Core\Services\ResolverRequestService.cs" Link="Services\ResolverRequestService.cs" />
     <Compile Include="..\WikiViewer.Core\Services\NetworkOperationTimeout.cs" Link="Services\NetworkOperationTimeout.cs" />
+    <Compile Include="..\WikiViewer.Core\Services\AsyncRequestCoordinator.cs" Link="Services\AsyncRequestCoordinator.cs" />
+    <Compile Include="..\WikiViewer.Core\Services\CacheKeyService.cs" Link="Services\CacheKeyService.cs" />
+    <Compile Include="..\WikiViewer.Core\Services\WikiResourceCache.cs" Link="Services\WikiResourceCache.cs" />
+    <Compile Include="..\WikiViewer.Core\Services\ArticleLoadCoordinator.cs" Link="Services\ArticleLoadCoordinator.cs" />
+    <Compile Include="..\WikiViewer.Core\Services\ArticleLoadMetrics.cs" Link="Services\ArticleLoadMetrics.cs" />
+    <Compile Include="..\WikiViewer.Core\Services\NativeDocumentCache.cs" Link="Services\NativeDocumentCache.cs" />
     <Compile Include="..\WikiViewer.Core\Services\WikiPathDetectorService.cs" Link="Services\WikiPathDetectorService.cs" />
     <Compile Include="..\WikiViewer.Core\Services\CloudflareDetector.cs" Link="Services\CloudflareDetector.cs" />
     <Compile Include="..\WikiViewer.Core\Models\WikiInstance.cs" Link="Models\WikiInstance.cs" />

@@ -348,6 +348,7 @@ namespace WikiViewer.Shared.Uwp.Pages
             var button = sender as Button;
             button.IsEnabled = false;
             await ArticleCacheManager.ClearCacheAsync();
+            await MediaCacheService.ClearMappingsAsync();
             await UpdateCacheSizeAsync();
             button.IsEnabled = true;
         }

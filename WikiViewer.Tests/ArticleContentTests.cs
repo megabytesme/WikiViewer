@@ -6,6 +6,7 @@ using Xunit;
 
 namespace WikiViewer.Tests;
 
+[Collection("ArticleCache")]
 public class ArticleContentTests
 {
     [Theory]
@@ -64,6 +65,9 @@ public class ArticleContentTests
         await ArticleCacheManager.SaveArticleContentAsync("Page", id, new ArticleContent { HtmlContent = "legacy", RawWikitext = "raw", RevisionId = 1 }, DateTime.UtcNow);
         string pair = storage.Files.Keys.Single(k => k.EndsWith(".article.json"));
         storage.Files[pair] = "{interrupted";
+        // Simulate reopening the app: recovery must be checked against disk, without the warm memory copy.
+        ArticleCacheManager.StorageProvider = null;
+        ArticleCacheManager.StorageProvider = storage;
         var cached = await ArticleCacheManager.GetCachedArticleContentAsync("Page", id);
         Assert.Equal("legacy", cached.HtmlContent);
         Assert.Null(cached.RawWikitext);

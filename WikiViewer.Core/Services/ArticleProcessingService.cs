@@ -17,6 +17,74 @@ namespace WikiViewer.Core.Services
 {
     public static class ArticleProcessingService
     {
+        public static IApiWorkerFactory ApiWorkerFactory { get; set; }
+        private static readonly ArticleLoadCoordinator Loads = new ArticleLoadCoordinator();
+        private static readonly AsyncRequestCoordinator<ArticleContent> Validations = new AsyncRequestCoordinator<ArticleContent>();
+        private static readonly AsyncRequestCoordinator<ArticleContent> Enrichments = new AsyncRequestCoordinator<ArticleContent>();
+
+        public static Task<ArticleContent> LoadAsync(string title, WikiInstance wiki, bool forceRefresh = false)
+            => Loads.LoadAsync(CacheKeyService.Article(wiki.Id, title),
+                () => AppSettings.IsCachingEnabled ? ArticleCacheManager.GetCachedArticleContentAsync(title, wiki.Id) : Task.FromResult<ArticleContent>(null),
+                async () =>
+                {
+                    using (var worker = await ApiWorkerFactory.CreateApiWorkerAsync(wiki))
+                    {
+                        await worker.InitializeAsync(wiki.BaseUrl);
+                        return await FetchArticleContentAsync(title, Stopwatch.StartNew(), worker, wiki, true);
+                    }
+                }, forceRefresh);
+
+        public static Task<ArticleContent> RevalidateAsync(string title, WikiInstance wiki, ArticleContent cached)
+            => Validations.RunAsync(CacheKeyService.Article(wiki.Id, title), async () =>
+            {
+                var metadata = await ArticleCacheManager.GetCacheMetadataAsync(title, wiki.Id);
+                if (!ArticleLoadCoordinator.NeedsValidation(metadata, DateTime.UtcNow) && cached.HasRawSource && cached.NativeFormatVersion >= ArticleContent.CurrentNativeFormatVersion) return cached;
+                if (!NetworkInterface.GetIsNetworkAvailable()) return cached;
+                using (var worker = await ApiWorkerFactory.CreateApiWorkerAsync(wiki))
+                {
+                    await worker.InitializeAsync(wiki.BaseUrl);
+                    string url = wiki.ApiEndpoint + "?action=query&prop=revisions&titles=" + Uri.EscapeDataString(title) + "&rvprop=ids%7Ctimestamp&rvlimit=1&format=json";
+                    var root = JObject.Parse(await worker.GetJsonFromApiAsync(url));
+                    var page = (root["query"]?["pages"] as JObject)?.Properties().FirstOrDefault()?.Value;
+                    var revision = page?["revisions"]?.FirstOrDefault();
+                    long? id = (long?)revision?["revid"];
+                    if (!id.HasValue) throw new InvalidOperationException("The wiki could not confirm the saved page revision.");
+                    if (ArticleLoadCoordinator.NeedsExpansion(metadata, cached, id.Value, DateTime.UtcNow)) return await LoadAsync(title, wiki, true);
+                    await ArticleCacheManager.MarkCheckedAsync(title, wiki.Id, DateTime.UtcNow);
+                    var checkedContent = cached.Copy(); checkedContent.SourceModifiedUtc = (DateTime?)revision?["timestamp"]; return checkedContent;
+                }
+            });
+
+        public static Task<ArticleContent> EnrichAsync(string title, WikiInstance wiki, ArticleContent source)
+            => Enrichments.RunAsync(CacheKeyService.Article(wiki.Id, title) + ":" + source.RevisionId + ":" + CacheKeyService.Hash(source.HtmlContent), async () =>
+            {
+                if (source.ResourcesResolved || source.ResourcesCheckedUtc.HasValue && DateTime.UtcNow - source.ResourcesCheckedUtc.Value < TimeSpan.FromMinutes(5)) return source;
+                var result = source.Copy();
+                var styleUrls = ArticleStyleResourceService.GetStyleUrls(result, new Uri(wiki.GetWikiPageUrl(title)), wiki.ScriptPath);
+                if (styleUrls.Count == source.ResolvedStyleSheets.Count && WikiResourceCache.Shared != null)
+                {
+                    var metadata = await ArticleCacheManager.GetCacheMetadataAsync(title, wiki.Id);
+                    for (int i = 0; i < styleUrls.Count; i++) WikiResourceCache.Shared.Seed(styleUrls[i].AbsoluteUri, source.ResolvedStyleSheets[i], metadata?.LastUpdated.ToUniversalTime() ?? DateTime.UtcNow.AddDays(-2));
+                }
+                if (!NetworkInterface.GetIsNetworkAvailable()) return result;
+                var worker = new Lazy<Task<IApiWorker>>(async () =>
+                {
+                    var value = await ApiWorkerFactory.CreateApiWorkerAsync(wiki);
+                    try { await value.InitializeAsync(wiki.BaseUrl); return value; }
+                    catch { value.Dispose(); throw; }
+                }, true);
+                try
+                {
+                    var syntax = WikiSyntaxService.GetAsync(wiki.ApiEndpoint, async url => await (await worker.Value).GetJsonFromApiAsync(url));
+                    var styles = ArticleStyleResourceService.ResolveAsync(result, new Uri(wiki.GetWikiPageUrl(title)), wiki.ScriptPath,
+                        async url => await (await worker.Value).GetRawHtmlFromUrlAsync(url));
+                    await Task.WhenAll(syntax, styles); var resolvedSyntax = await syntax; result.Syntax = resolvedSyntax.Language != null ? resolvedSyntax : source.Syntax ?? resolvedSyntax; result.ResourcesCheckedUtc = DateTime.UtcNow;
+                    result.ResourcesResolved = result.Syntax?.Language != null && result.ResolvedStyleSheets.Count == ArticleStyleResourceService.GetStyleUrls(result, new Uri(wiki.GetWikiPageUrl(title)), wiki.ScriptPath).Count;
+                    await ArticleCacheManager.UpdateResourcesIfCurrentAsync(title, wiki.Id, source, result);
+                    return result;
+                }
+                finally { if (worker.IsValueCreated && worker.Value.Status == TaskStatus.RanToCompletion) worker.Value.Result.Dispose(); }
+            });
         public static async Task<(string HtmlContent, string ResolvedTitle)> FetchAndProcessArticleAsync(
             string pageTitle, Stopwatch stopwatch, IApiWorker worker, WikiInstance wiki,
             bool forceRefresh = false, SemaphoreSlim semaphore = null)
@@ -55,34 +123,8 @@ namespace WikiViewer.Core.Services
 
             if (AppSettings.IsCachingEnabled && !forceRefresh)
             {
-                var cachedMetadata = await ArticleCacheManager.GetCacheMetadataAsync(
-                    resolvedTitle,
-                    wiki.Id
-                );
-                if (cachedMetadata != null)
-                {
-                    DateTime? remoteTimestamp = isConnected
-                        ? await FetchLastUpdatedTimestampAsync(resolvedTitle, worker, wiki)
-                        : null;
-                    if (
-                        !isConnected
-                        || (
-                            remoteTimestamp.HasValue
-                            && cachedMetadata.LastUpdated.ToUniversalTime()
-                                >= remoteTimestamp.Value.ToUniversalTime()
-                        )
-                    )
-                    {
-                        var cached = await ArticleCacheManager.GetCachedArticleContentAsync(
-                            resolvedTitle,
-                            wiki.Id
-                        );
-                        if (cached?.HtmlContent != null && (!isConnected || cached.HasRawSource && cached.NativeFormatVersion >= ArticleContent.CurrentNativeFormatVersion))
-                        {
-                            return cached;
-                        }
-                    }
-                }
+                var cached = await ArticleCacheManager.GetCachedArticleContentAsync(resolvedTitle, wiki.Id);
+                if (cached?.HtmlContent != null) return cached;
             }
 
             if (!isConnected)
@@ -94,8 +136,12 @@ namespace WikiViewer.Core.Services
             {
                 string json = await worker.GetJsonFromApiAsync(ArticleContentResponse.BuildUrl(wiki.ApiEndpoint, resolvedTitle));
                 var content = ArticleContentResponse.Parse(json, resolvedTitle);
-                content.Syntax = await WikiSyntaxService.GetAsync(wiki.ApiEndpoint, worker.GetJsonFromApiAsync);
-                await ArticleStyleResourceService.ResolveAsync(content, new Uri(wiki.GetWikiPageUrl(resolvedTitle)), wiki.ScriptPath, worker.GetRawHtmlFromUrlAsync);
+                var prior = await ArticleCacheManager.GetCachedArticleContentAsync(resolvedTitle, wiki.Id);
+                content.Syntax = await WikiSyntaxService.GetCachedAsync(wiki.ApiEndpoint) ?? prior?.Syntax;
+                var pageUri = new Uri(wiki.GetWikiPageUrl(resolvedTitle));
+                if (prior != null && ArticleStyleResourceService.GetStyleUrls(prior, pageUri, wiki.ScriptPath).SequenceEqual(ArticleStyleResourceService.GetStyleUrls(content, pageUri, wiki.ScriptPath)))
+                    content.ResolvedStyleSheets = new List<string>(prior.ResolvedStyleSheets);
+                await ArticleStyleResourceService.ResolveCachedAsync(content, new Uri(wiki.GetWikiPageUrl(resolvedTitle)), wiki.ScriptPath);
                 await ArticleCacheManager.SaveArticleContentAsync(
                     resolvedTitle,
                     wiki.Id,

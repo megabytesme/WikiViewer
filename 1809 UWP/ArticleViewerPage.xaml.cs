@@ -16,6 +16,11 @@ namespace _1809_UWP.Pages
     public sealed partial class ArticleViewerPage
     {
         private bool _isVirtualHostMappingSet = false;
+        private bool _webHandlersAttached;
+        private bool _platformActive;
+        protected override bool UsesNativeReader => NativeReaderButton.IsChecked == true;
+        protected override Task<bool> TryUpdateNativeStylesAsync(ArticleContent content)
+            => UsesNativeReader ? NativeReader.TryUpdateStylesAsync(content) : Task.FromResult(false);
 
         public ArticleViewerPage()
         {
@@ -45,7 +50,7 @@ namespace _1809_UWP.Pages
             try
             {
             var wiki = _pageWikiContext;
-            await NativeReader.ShowArticleAsync(content, new Uri(wiki.GetWikiPageUrl(_pageTitleToFetch)), async uri =>
+            return await NativeReader.ShowArticleAsync(content, new Uri(wiki.GetWikiPageUrl(_pageTitleToFetch)), async uri =>
             {
                 var target = WikiManager.GetWikiByHost(uri.Host);
                 string prefix = "/" + (target?.ArticlePath ?? "").Trim('/');
@@ -53,8 +58,7 @@ namespace _1809_UWP.Pages
                 if (target != null && uri.AbsolutePath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
                     HandleValidPageNavigation(uri.AbsolutePath.Substring(prefix.Length), target, uri);
                 else await ShowWikiDetectionPromptAsync(uri);
-            }, url => MediaCacheService.GetLocalUriAsync(url, wiki));
-            return true;
+            }, (url, token) => MediaCacheService.GetLocalUriAsync(url, wiki, cancellationToken: token));
             }
             catch (Exception ex)
             {
@@ -104,8 +108,8 @@ namespace _1809_UWP.Pages
 
         protected override async Task DisplayProcessedHtmlAsync(string html)
         {
-            if (ArticleDisplayWebView.CoreWebView2 == null)
-                await ArticleDisplayWebView.EnsureCoreWebView2Async();
+            await InitializeWebView2Async();
+            if (!_platformActive) return;
 
             if (!_isVirtualHostMappingSet && _pageWikiContext != null)
             {
@@ -210,6 +214,7 @@ namespace _1809_UWP.Pages
 
         protected override void InitializePlatformControls()
         {
+            _platformActive = true;
             if (AppSettings.IsCustomThemingEnabled)
             {
                 Environment.SetEnvironmentVariable("WEBVIEW2_DEFAULT_BACKGROUND_COLOR", "00FFFFFF");
@@ -219,11 +224,11 @@ namespace _1809_UWP.Pages
                 Environment.SetEnvironmentVariable("WEBVIEW2_DEFAULT_BACKGROUND_COLOR", "FFFFFFFF");
             }
 
-            _ = InitializeWebView2Async();
         }
 
         protected override void UninitializePlatformControls()
         {
+            _platformActive = false;
             NativeReader.ClearArticle();
             if (ArticleDisplayWebView?.CoreWebView2 != null)
                 ArticleDisplayWebView.CoreWebView2.NavigationStarting -=
@@ -234,9 +239,11 @@ namespace _1809_UWP.Pages
 
         private async Task InitializeWebView2Async()
         {
-            await ArticleDisplayWebView.EnsureCoreWebView2Async();
+            if (ArticleDisplayWebView.CoreWebView2 == null) await ArticleDisplayWebView.EnsureCoreWebView2Async();
+            if (!_platformActive || _webHandlersAttached) return;
             ArticleDisplayWebView.CoreWebView2.NavigationStarting +=
                 ArticleDisplayWebView_NavigationStarting;
+            _webHandlersAttached = true;
         }
 
         private async void ArticleDisplayWebView_NavigationStarting(

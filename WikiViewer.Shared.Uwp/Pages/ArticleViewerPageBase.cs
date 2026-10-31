@@ -8,6 +8,9 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
+using WikiViewer.Core;
+using WikiViewer.Core.Managers;
+using System.Net.NetworkInformation;
 using WikiViewer.Shared.Uwp.Controls;
 using WikiViewer.Shared.Uwp.Services;
 using Windows.ApplicationModel.DataTransfer;
@@ -26,6 +29,12 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected bool _isInitialized = false;
         protected readonly Stack<string> _articleHistory = new Stack<string>();
         private int _articleRequestVersion;
+        private ArticleContent _displayedContent;
+        private ArticleContent _pendingUpdate;
+        private bool _stylesWaiting;
+        private bool _checkingUpdates;
+        private bool _loadingResources;
+        private string _pageStatus;
         public bool CanGoBackInPage => _articleHistory.Count > 1;
         protected abstract AppBarButton RefreshAppBarButton { get; }
         protected abstract Type GetArticleViewerPageType();
@@ -40,6 +49,8 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected abstract void HideLoadingOverlay();
         protected abstract Task DisplayProcessedHtmlAsync(string html);
         protected virtual Task<bool> TryDisplayNativeArticleAsync(ArticleContent content) => Task.FromResult(false);
+        protected virtual Task<bool> TryUpdateNativeStylesAsync(ArticleContent content) => Task.FromResult(false);
+        protected virtual bool UsesNativeReader => false;
         protected abstract void ShowVerificationPanel(string url);
         protected abstract void InitializePlatformControls();
         protected abstract void UninitializePlatformControls();
@@ -300,7 +311,7 @@ namespace WikiViewer.Shared.Uwp.Pages
             UninitializePlatformControls();
         }
 
-        protected async void StartArticleFetch()
+        protected async void StartArticleFetch(bool forceRefresh = false)
         {
             if (!string.IsNullOrEmpty(_verificationUrl))
             {
@@ -352,8 +363,12 @@ namespace WikiViewer.Shared.Uwp.Pages
             }
 
             var fetchStopwatch = Stopwatch.StartNew();
-            ShowLoadingOverlay();
-            LastUpdatedTextBlock.Visibility = Visibility.Collapsed;
+            string title = _pageTitleToFetch; var wiki = _pageWikiContext;
+            bool keepVisible = forceRefresh && _displayedContent != null;
+            if (!keepVisible) _displayedContent = null;
+            _pendingUpdate = null; _stylesWaiting = false; _checkingUpdates = false; _loadingResources = false;
+            if (!keepVisible) { ShowLoadingOverlay(); LastUpdatedTextBlock.Visibility = Visibility.Collapsed; }
+            else { _pageStatus = "Refreshing page…"; RefreshPageStatus(); }
 
             var mainPage = this.FindParent<MainPageBase>();
             var displayTitle = _pageTitleToFetch.Replace('_', ' ');
@@ -366,19 +381,9 @@ namespace WikiViewer.Shared.Uwp.Pages
 
             try
             {
-                using (
-                    var worker = await App.ApiWorkerFactory.CreateApiWorkerAsync(_pageWikiContext)
-                )
-                {
-                    await worker.InitializeAsync(_pageWikiContext.BaseUrl);
-
-                    var articleContent =
-                        await ArticleProcessingService.FetchArticleContentAsync(
-                            _pageTitleToFetch,
-                            fetchStopwatch,
-                            worker,
-                            _pageWikiContext
-                        );
+                    var cached = !forceRefresh && AppSettings.IsCachingEnabled && !title.StartsWith("Special:", StringComparison.OrdinalIgnoreCase)
+                        ? await ArticleCacheManager.GetCachedArticleContentAsync(title, wiki.Id) : null;
+                    var articleContent = cached ?? await ArticleProcessingService.LoadAsync(title, wiki, forceRefresh);
                     if (requestVersion != _articleRequestVersion) return;
                     string htmlContent = articleContent.HtmlContent;
                     string resolvedTitle = articleContent.Title;
@@ -416,6 +421,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                         UpdateSystemBackButton();
                         ArticleTitleTextBlock.Text = resolvedTitle;
                         mainPage?.SetPageTitle(resolvedTitle);
+                        title = _pageTitleToFetch;
                     }
 
                     bool displayedNative = await TryDisplayNativeArticleAsync(articleContent);
@@ -431,24 +437,19 @@ namespace WikiViewer.Shared.Uwp.Pages
                         await DisplayProcessedHtmlAsync(processedHtml);
                         EnhanceDisplayedHtmlWithCachedMediaAsync(htmlContent);
                     }
-                    await UpdateEditButtonForPageAsync();
-
-                    var lastUpdated = await ArticleProcessingService.FetchLastUpdatedTimestampAsync(
-                        _pageTitleToFetch,
-                        worker,
-                        _pageWikiContext
-                    );
-                    if (lastUpdated.HasValue)
-                    {
-                        LastUpdatedTextBlock.Text =
-                            $"Last updated: {lastUpdated.Value.ToLocalTime():g}";
-                        LastUpdatedTextBlock.Visibility = Visibility.Visible;
-                    }
-                }
+                    _displayedContent = articleContent;
+                    _pageStatus = cached != null ? "Saved page" : "Page loaded";
+                    RefreshPageStatus();
+                    if (!keepVisible) HideLoadingOverlay();
+                    ArticleLoadMetrics.Record(cached != null ? "cached-visible" : "network-visible", fetchStopwatch.ElapsedMilliseconds);
+                    _ = UpdateEditButtonForPageAsync(requestVersion);
+                    _ = CompleteResourcesAsync(title, wiki, articleContent, requestVersion);
+                    if (cached != null) _ = CheckCachedPageAsync(title, wiki, articleContent, requestVersion);
             }
             catch (NeedsUserVerificationException ex)
             {
                 if (requestVersion != _articleRequestVersion) return;
+                if (keepVisible) { _pageStatus = "Saved page · Verification required to refresh"; RefreshPageStatus(); return; }
 #if UWP_1809
                 ShowVerificationPanel(ex.Url);
 #else
@@ -467,15 +468,68 @@ namespace WikiViewer.Shared.Uwp.Pages
             catch (Exception ex)
             {
                 if (requestVersion != _articleRequestVersion) return;
-                ArticleTitleTextBlock.Text = "An error occurred";
+                if (!keepVisible) ArticleTitleTextBlock.Text = "An error occurred";
                 LoadingTextBlock.Text = ex.Message;
+                _pageStatus = ex.Message; RefreshPageStatus();
             }
             finally
             {
-                if (requestVersion == _articleRequestVersion) HideLoadingOverlay();
+                if (requestVersion == _articleRequestVersion && !keepVisible && _displayedContent == null) HideLoadingOverlay();
                 UpdateFavoriteButton();
             }
         }
+
+        private void RefreshPageStatus()
+        {
+            LastUpdatedTextBlock.Text = _pendingUpdate != null ? "Newer page available · Select Reload page" : _stylesWaiting ? "Layout ready · Select Reload page to apply" :
+                _pageStatus + (_checkingUpdates ? " · Checking for updates…" : "") + (_loadingResources ? " · Loading page styles…" : "");
+            LastUpdatedTextBlock.Visibility = Visibility.Visible;
+        }
+
+        private async Task CheckCachedPageAsync(string title, WikiInstance wiki, ArticleContent source, int version)
+        {
+            _checkingUpdates = true; RefreshPageStatus();
+            try
+            {
+                var updated = await ArticleProcessingService.RevalidateAsync(title, wiki, source);
+                if (version != _articleRequestVersion) return;
+                if (updated.RevisionId != source.RevisionId || updated.HtmlContent != source.HtmlContent)
+                {
+                    _pendingUpdate = updated;
+                    _ = CacheUpdatedResourcesAsync(title, wiki, updated);
+                }
+                else _pageStatus = NetworkInterface.GetIsNetworkAvailable() ? "Saved page · Up to date" : "Saved page · Offline";
+            }
+            catch (Exception) { if (version == _articleRequestVersion) _pageStatus = "Saved page · Could not check for updates"; }
+            finally { if (version == _articleRequestVersion) { _checkingUpdates = false; RefreshPageStatus(); } }
+        }
+
+        private static async Task CacheUpdatedResourcesAsync(string title, WikiInstance wiki, ArticleContent content)
+        { try { await ArticleProcessingService.EnrichAsync(title, wiki, content); } catch (Exception) { } }
+
+        private async Task CompleteResourcesAsync(string title, WikiInstance wiki, ArticleContent source, int version)
+        {
+            if (source.ResourcesResolved) return;
+            _loadingResources = true; RefreshPageStatus();
+            try
+            {
+                var ready = await ArticleProcessingService.EnrichAsync(title, wiki, source);
+                if (version != _articleRequestVersion) return;
+                bool stylesChanged = !source.ResolvedStyleSheets.SequenceEqual(ready.ResolvedStyleSheets) || source.Syntax == null && ready.Syntax != null;
+                if (stylesChanged && _pendingUpdate == null && UsesNativeReader)
+                {
+                    bool applied = await TryUpdateNativeStylesAsync(ready);
+                    if (version != _articleRequestVersion) return;
+                    if (applied) _displayedContent = ready;
+                    else _stylesWaiting = true;
+                }
+            }
+            catch (Exception) { /* Text remains usable when an optional resource is unavailable. */ }
+            finally { if (version == _articleRequestVersion) { _loadingResources = false; RefreshPageStatus(); } }
+        }
+
+        protected void ReloadPageButton_Click(object sender, RoutedEventArgs e)
+            => StartArticleFetch(_pendingUpdate == null && !_stylesWaiting && NetworkInterface.GetIsNetworkAvailable());
 
         protected async void RefreshButton_Click(object sender, RoutedEventArgs e)
         {
@@ -598,7 +652,7 @@ namespace WikiViewer.Shared.Uwp.Pages
             }
         }
 
-        private async Task UpdateEditButtonForPageAsync()
+        private async Task UpdateEditButtonForPageAsync(int requestVersion)
         {
             Debug.WriteLine(
                 $"[EditCheck] Starting for '{_pageTitleToFetch}' on wiki '{_pageWikiContext?.Id}'"
@@ -686,6 +740,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                         Windows.UI.Core.CoreDispatcherPriority.Normal,
                         () =>
                         {
+                            if (requestVersion != _articleRequestVersion) return;
                             EditAppBarButton.Visibility = canEdit
                                 ? Visibility.Visible
                                 : Visibility.Collapsed;
@@ -705,6 +760,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                     Windows.UI.Core.CoreDispatcherPriority.Normal,
                     () =>
                     {
+                        if (requestVersion != _articleRequestVersion) return;
                         EditAppBarButton.Visibility = Visibility.Collapsed;
                         EditAppBarButton.IsEnabled = false;
                     }

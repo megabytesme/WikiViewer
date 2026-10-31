@@ -84,6 +84,9 @@ namespace WikiViewer.Shared.Uwp
                 foreach (var wiki in WikiManager.GetWikis() ?? new System.Collections.Generic.List<WikiViewer.Core.Models.WikiInstance>()) wiki.ResolvedConnectionMethod = null;
             };
             ArticleCacheManager.StorageProvider = storageProvider;
+            WikiResourceCache.Shared = new WikiResourceCache(storageProvider);
+            ArticleProcessingService.ApiWorkerFactory = ApiWorkerFactory;
+            ArticleLoadMetrics.StorageProvider = storageProvider;
             AccountManager.StorageProvider = storageProvider;
             AccountManager.CredentialService = credentialService;
             WikiManager.StorageProvider = storageProvider;

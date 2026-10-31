@@ -53,6 +53,7 @@
                           Icon="ReShare"
                           Label="Share"
                           Click="ShareButton_Click"/>
+            <AppBarButton x:Name="ReloadPageButton" Icon="Refresh" Label="Reload page" Click="ReloadPageButton_Click"/>
             <AppBarButton x:Name="RefreshButton" Icon="Refresh" Label="Refresh Theme" Click="RefreshButton_Click"/>
         </CommandBar>
 
@@ -67,15 +68,12 @@
                            Text="Loading..."
                            HorizontalAlignment="Center"
                            Foreground="{ThemeResource SystemControlForegroundBaseHighBrush}"/>
-                <TextBlock x:Name="LastUpdatedText"
-                           Style="{ThemeResource BodyTextBlockStyle}"
-                           Opacity="0.7"
-                           Visibility="Collapsed"
-                           Margin="0,4,0,0"
-                           Foreground="{ThemeResource SystemControlForegroundBaseHighBrush}"/>
             </StackPanel>
         </Grid>
 
+        <Border Grid.Row="0" VerticalAlignment="Bottom" Margin="20,0,20,4" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Padding="4">
+            <TextBlock x:Name="LastUpdatedText" FontSize="12" Opacity="0.8" TextWrapping="Wrap" Visibility="Collapsed"/>
+        </Border>
         <Grid x:Name="VerificationPanel"
               Grid.RowSpan="2"
               Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"

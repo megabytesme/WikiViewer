@@ -21,6 +21,12 @@
     <Compile Include="$(MSBuildThisFileDirectory)Services\ResolverConfigurationService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\ResolverRequestService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\NetworkOperationTimeout.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Services\AsyncRequestCoordinator.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Services\CacheKeyService.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Services\WikiResourceCache.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Services\ArticleLoadCoordinator.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Services\ArticleLoadMetrics.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Services\NativeDocumentCache.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\ResolverConfiguration.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\ArticleSectionService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\NativeArticleStyle.cs" />

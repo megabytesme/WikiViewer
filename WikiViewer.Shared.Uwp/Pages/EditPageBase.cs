@@ -281,7 +281,7 @@ namespace WikiViewer.Shared.Uwp.Pages
                 {
                     await NativePreviewHost.ShowArticleAsync(preview.Content, new Uri(_pageWikiContext.GetWikiPageUrl(_pageTitle)),
                         async uri => { await Windows.System.Launcher.LaunchUriAsync(uri); },
-                        url => MediaCacheService.GetLocalUriAsync(url, _pageWikiContext));
+                        (url, token) => MediaCacheService.GetLocalUriAsync(url, _pageWikiContext, cancellationToken: token));
                     return;
                 }
                 catch (Exception ex)

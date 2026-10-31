@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
+using System.Threading;
 using HtmlAgilityPack;
 using WikiViewer.Core.Models;
 
@@ -44,18 +45,34 @@ namespace WikiViewer.Core.Services
 
         public static async Task ResolveAsync(ArticleContent content, Uri pageUri, string scriptPath, Func<string, Task<string>> fetch)
         {
-            content.ResolvedStyleSheets = new List<string>();
-            int size = 0;
-            foreach (var uri in GetStyleUrls(content, pageUri, scriptPath))
+            using (var concurrency = new SemaphoreSlim(3))
             {
-                try
+                var tasks = GetStyleUrls(content, pageUri, scriptPath).Select(async uri =>
                 {
-                    string css = NormalizeResponse(await fetch(uri.AbsoluteUri));
-                    if (css == null || css.Length > 1000000 || size + css.Length > 2000000) continue;
-                    size += css.Length; content.ResolvedStyleSheets.Add(css);
-                }
-                catch (Exception) { /* A stylesheet failure must not discard usable article content. */ }
+                    await concurrency.WaitAsync();
+                    try { return WikiResourceCache.Shared != null ? await WikiResourceCache.Shared.GetAsync(uri.AbsoluteUri, async () => NormalizeResponse(await fetch(uri.AbsoluteUri))) : NormalizeResponse(await fetch(uri.AbsoluteUri)); }
+                    catch (Exception) { return null; }
+                    finally { concurrency.Release(); }
+                });
+                // Task.WhenAll retains source order, which matters for the CSS cascade.
+                var sheets = Bound(await Task.WhenAll(tasks));
+                if (sheets.Count >= (content.ResolvedStyleSheets?.Count ?? 0)) content.ResolvedStyleSheets = sheets;
             }
+        }
+
+        public static async Task ResolveCachedAsync(ArticleContent content, Uri pageUri, string scriptPath)
+        {
+            if (WikiResourceCache.Shared == null) return;
+            var sheets = await Task.WhenAll(GetStyleUrls(content, pageUri, scriptPath).Select(uri => WikiResourceCache.Shared.TryReadAsync(uri.AbsoluteUri)));
+            var cached = Bound(sheets);
+            if (cached.Count >= (content.ResolvedStyleSheets?.Count ?? 0)) content.ResolvedStyleSheets = cached;
+        }
+        private static List<string> Bound(IEnumerable<string> sheets)
+        {
+            var result = new List<string>(); int size = 0;
+            foreach (string css in sheets)
+            { if (css != null && css.Length <= 1000000 && size + css.Length <= 2000000) { result.Add(css); size += css.Length; } }
+            return result;
         }
     }
 }

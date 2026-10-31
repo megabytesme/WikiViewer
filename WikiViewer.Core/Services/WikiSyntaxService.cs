@@ -11,19 +11,19 @@ namespace WikiViewer.Core.Services
 {
     public static class WikiSyntaxService
     {
-        private sealed class Entry { public DateTime Created = DateTime.UtcNow; public Task<WikiSyntaxConfiguration> Value; }
-        private static readonly ConcurrentDictionary<string, Entry> Cache = new ConcurrentDictionary<string, Entry>();
+        private static readonly WikiResourceCache FallbackCache = new WikiResourceCache(null);
+        private static string Url(string endpoint) => endpoint + "?action=query&meta=siteinfo&siprop=general%7Cnamespaces%7Cnamespacealiases%7Cmagicwords&format=json";
+        public static async Task<WikiSyntaxConfiguration> GetCachedAsync(string endpoint)
+        {
+            try { string json = await (WikiResourceCache.Shared ?? FallbackCache).TryReadAsync(Url(endpoint)); return json != null ? Parse(json) : null; }
+            catch (Exception) { return null; }
+        }
 
         public static async Task<WikiSyntaxConfiguration> GetAsync(string endpoint, Func<string, Task<string>> fetch)
         {
-            Entry prior;
-            if (Cache.TryGetValue(endpoint, out prior) && DateTime.UtcNow - prior.Created > TimeSpan.FromDays(1)) Cache.TryRemove(endpoint, out prior);
-            var entry = Cache.GetOrAdd(endpoint, key => new Entry { Value = ReadAsync(key, fetch) });
-            try { return await entry.Value; }
-            catch (Exception) { Cache.TryRemove(endpoint, out prior); return new WikiSyntaxConfiguration { UsesFallbackLinkTrail = true }; }
+            try { string url = Url(endpoint); return Parse(await (WikiResourceCache.Shared ?? FallbackCache).GetAsync(url, async () => { string json = await fetch(url); Parse(json); return json; })); }
+            catch (Exception) { return new WikiSyntaxConfiguration { UsesFallbackLinkTrail = true }; }
         }
-        private static async Task<WikiSyntaxConfiguration> ReadAsync(string endpoint, Func<string, Task<string>> fetch) => Parse(await fetch(endpoint +
-            "?action=query&meta=siteinfo&siprop=general%7Cnamespaces%7Cnamespacealiases%7Cmagicwords&format=json"));
 
         public static WikiSyntaxConfiguration Parse(string json)
         {
