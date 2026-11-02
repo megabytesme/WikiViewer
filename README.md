@@ -45,7 +45,7 @@ Unsupported containers retain their readable children, and unsupported content r
 
 The portable article-model tests run with `dotnet test WikiViewer.Tests/WikiViewer.Tests.csproj -c Release`. Validate XAML and the native control using both browser builds of the UWP project on Windows too.
 
-The editor's **Preview renderer** switch selects native or Web preview, initially following the configured default reader preference. Native preview updates after typing pauses, with one server expansion at a time and no client page-size cap. Web preview stays manual and retains its 2 MB limit. Both capture the exact unsaved text and expand it on the originating wiki; switching renderers reuses the matching result. Draft previews never enter the published-article cache, and late responses for older drafts are discarded. Native uses the shared article renderer. On a native rendering error, Web remains an explicit preview option. Server expansion limits still apply.
+The editor's **Preview renderer** switch selects native or Web preview, initially following the configured default reader preference. Native preview updates ordinary text in existing XAML runs and reparses edited paragraph/heading groups on a worker thread. It keeps unchanged expanded content, citation targets and wiki styling in place. Server expansion catches up after typing pauses, replacing only changed rendered sections where possible. Edits that require wiki context use that server result. Native has no client page-size cap. Web preview stays manual and retains its 2 MB limit. Both capture the exact unsaved text; switching renderers reuses the matching result. Draft previews never enter the published-article cache, and late responses for older drafts are discarded. Native uses the shared article renderer. Web remains an explicit preview option, and server expansion limits still apply.
 
 ### Building with WikitextParser
 
@@ -86,9 +86,13 @@ Use MSBuild from Visual Studio with UWP targets installed. The version property 
 1. In the Solution Explorer, right-click `WikiViewer.Uwp` and select **"Set as Startup Project"**.
 2. Press `F5` or select `Debug > Start Debugging` to build and run.
 
-**Settings > Appearance > App style** offers Automatic, Windows 10 Fluent and Windows 11. The Fluent resources follow [LibreSpotUWP](https://github.com/megabytesme/LibreSpotUWP/tree/master/LibreSpotUWP/Themes), with acrylic on supported Windows versions and solid colours on 15063. Light, dark and high contrast colours follow Windows. Changing the style keeps the current page and unsaved editor text.
+**Settings > Appearance > App style** offers **Windows 10** (15063+, plain UWP), **Windows 10 (Fluent)** (16299+, extensive acrylic), and **Windows 11 (Sun Valley)** (22000+, Mica and WinUI styling with in-app acrylic command bars). Unsupported choices are disabled. Automatic selects the newest supported style, following [LibreSpotUWP's appearance selection](https://github.com/megabytesme/LibreSpotUWP/blob/master/LibreSpotUWP/Services/AppearanceService.cs). Light, dark and high contrast colours follow Windows. Changing the style keeps the current page and unsaved editor text.
 
-Article status appears at the left of the bottom command bar. Select a favourite card to open its article; hold a card or Ctrl-click to select several, while the Article and Talk buttons remain available.
+**Apply app style to native articles** extends the selected appearance to article panels and image frames. Wiki colours supply Fluent surface tints; native layout, spacing, borders, reading order and text formatting stay intact. Sun Valley uses rounded outer surfaces and image frames. High contrast uses system colours, and unsupported material/geometry APIs use a compatible fallback. Turning the option off retains the wiki's native presentation with theme-aware text colours.
+
+Article status appears at the left of the bottom command bar. Select a favourite card to open its article; hold a card or Ctrl-click to select several, while the Article and Talk buttons remain available. Right-click a card for Select/Deselect and Delete, including deletion of talk-only favourites.
+
+Native audio/video uses a single Windows transport bar. Saved media is checked before opening a network stream. Source preparation and buffering are bounded; failures offer retry and the original media-file link. Alternate sources and downloaded copies provide recovery where available. Playback starts only when requested. [Sound](https://en.wikipedia.org/wiki/Sound) and [Apollo 11](https://en.wikipedia.org/wiki/Apollo_11) contain both audio and video for checking playback.
 
 **Print** in the article command bar menu reflows the complete expanded article for paper, including off-screen sections. Complex layouts may be simplified; unavailable images retain labels and audio/video retain links. Images are decoded before pagination. The clicked image preview also offers **Print** for the image itself.
 
