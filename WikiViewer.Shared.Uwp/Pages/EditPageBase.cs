@@ -31,6 +31,11 @@ namespace WikiViewer.Shared.Uwp.Pages
         private bool _changingPreviewMode;
         private int _previewRenderVersion;
         private bool _editorAttached;
+        private readonly DispatcherTimer _previewTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(800) };
+        private bool _previewBusy;
+        private bool _previewQueued;
+        private bool _previewActive;
+        private bool _sourceLoaded;
         private bool isDragging = false;
         private double initialX;
         private GridLength leftColInitialWidth;
@@ -215,13 +220,13 @@ namespace WikiViewer.Shared.Uwp.Pages
         public EditPageBase()
         {
             SizeChanged += Page_SizeChanged;
-            Loaded += (s, e) => { if (_previewControlsReady) { ResetPreviewPaneVisually(); SetPreviewLayout(false); } };
+            _previewTimer.Tick += async (s, e) => { _previewTimer.Stop(); await GeneratePreviewAsync(true); };
+            Loaded += (s, e) => { if (_previewControlsReady) { SetPreviewLayout(false); QueueNativePreview(); } };
         }
 
         private void Page_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             if (!_previewControlsReady || (e.PreviousSize.Width < NarrowStateWidthTrigger) == (e.NewSize.Width < NarrowStateWidthTrigger)) return;
-            if (e.NewSize.Width < NarrowStateWidthTrigger) ResetPreviewPaneVisually();
             SetPreviewLayout(false);
         }
 
@@ -240,7 +245,7 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         private void ResetPreviewPaneVisually()
         {
-            HidePreview("Click 'Preview' to see a rendering of your changes.");
+            if (!PreviewModeControl.IsOn) HidePreview("Click 'Preview' to see a rendering of your changes.");
         }
 
         protected void InitializePreviewControls()
@@ -263,15 +268,29 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         protected async void PreviewMode_Toggled(object sender, RoutedEventArgs e)
         {
-            if (!_previewControlsReady || _changingPreviewMode || _previewSession.Current == null) return;
-            await RenderPreviewAsync(_previewSession.Current);
+            if (!_previewControlsReady || _changingPreviewMode) return;
+            _previewTimer.Stop();
+            _previewQueued = false;
+            _previewSession.InvalidateRequests();
+            if (PreviewModeControl.IsOn) QueueNativePreview();
+            if (_previewSession.Current != null) await RenderPreviewAsync(_previewSession.Current);
+            else HidePreview(PreviewModeControl.IsOn ? "Preparing live preview..." : "Click Preview to generate a Web preview.");
+        }
+
+        private void QueueNativePreview()
+        {
+            if (!_previewControlsReady || !_previewActive || !_sourceLoaded || !PreviewModeControl.IsOn) return;
+            _previewQueued = true;
+            _previewTimer.Stop();
+            _previewTimer.Start();
+            PreviewStatusControl.Text = "Live preview will update after typing pauses.";
         }
 
         private async Task RenderPreviewAsync(ArticlePreview preview)
         {
             int version = ++_previewRenderVersion;
             PreviewPlaceholderControl.Visibility = Visibility.Collapsed;
-            PreviewStatusControl.Text = _previewSession.IsStale ? "Preview is out of date. Click Preview to update it." : "Preview of your unsaved text";
+            PreviewStatusControl.Text = _previewSession.IsStale ? (PreviewModeControl.IsOn ? "Updating live preview..." : "Preview is out of date. Click Preview to update it.") : "Preview of your unsaved text";
             NativePreviewHost.ClearArticle();
             if (PreviewModeControl.IsOn)
             {
@@ -287,10 +306,8 @@ namespace WikiViewer.Shared.Uwp.Pages
                 catch (Exception ex)
                 {
                     if (version != _previewRenderVersion) return;
-                    _changingPreviewMode = true;
-                    PreviewModeControl.IsOn = false;
-                    _changingPreviewMode = false;
-                    PreviewStatusControl.Text = "Native preview could not display this content. Showing Web preview. " + ex.Message;
+                    HidePreview("Native preview could not display this content: " + ex.Message + ". Web preview is available using Preview.");
+                    return;
                 }
             }
             if (version != _previewRenderVersion) return;
@@ -303,6 +320,7 @@ namespace WikiViewer.Shared.Uwp.Pages
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
+            _previewActive = true;
             ArticleNavigationParameter navParam = null;
             if (e.Parameter is string jsonParam)
             {
@@ -377,6 +395,8 @@ namespace WikiViewer.Shared.Uwp.Pages
                 LoadingOverlayGrid.Visibility = Visibility.Collapsed;
                 AttachEditorFunctionality();
                 UpdateBracketHighlighting();
+                _sourceLoaded = !WikitextEditorTextBox.IsReadOnly;
+                QueueNativePreview();
             }
         }
 
@@ -400,6 +420,9 @@ namespace WikiViewer.Shared.Uwp.Pages
         {
             base.OnNavigatingFrom(e);
             if (e.Cancel) return;
+            _previewActive = false;
+            _previewQueued = false;
+            _previewTimer.Stop();
             _previewSession.Clear();
             _previewRenderVersion++;
             NativePreviewHost.ClearArticle();
@@ -662,6 +685,7 @@ namespace WikiViewer.Shared.Uwp.Pages
             WikitextEditorTextBox.Document.GetText(TextGetOptions.None, out var previewSource);
             _previewSession.SourceChanged(previewSource);
             if (_previewSession.IsStale) PreviewStatusControl.Text = "Preview is out of date. Click Preview to update it.";
+            QueueNativePreview();
             if (_isUpdatingText)
             {
                 _isUpdatingText = false;
@@ -1029,15 +1053,31 @@ namespace WikiViewer.Shared.Uwp.Pages
             WikitextEditorTextBox.Document.GetText(TextGetOptions.None, out var source);
             _previewSession.SourceChanged(source);
             SetPreviewLayout(true);
+            if (PreviewModeControl.IsOn)
+            {
+                await GeneratePreviewAsync(true);
+                return;
+            }
+            await GeneratePreviewAsync(false);
+        }
+
+        private async Task GeneratePreviewAsync(bool native)
+        {
+            if (!_previewActive || !_sourceLoaded || PreviewModeControl.IsOn != native) return;
+            if (_previewBusy) { if (native) _previewQueued = true; return; }
+            _previewTimer.Stop();
+            _previewQueued = false;
+            WikitextEditorTextBox.Document.GetText(TextGetOptions.None, out var source);
+            _previewSession.SourceChanged(source);
             if (_previewSession.Current != null && !_previewSession.IsStale)
             {
                 await RenderPreviewAsync(_previewSession.Current);
                 return;
             }
             var request = _previewSession.Begin(source, _pageTitle);
-            PreviewAppBarButton.IsEnabled = false;
-            PreviewModeControl.IsEnabled = false;
-            HidePreview("Generating preview...");
+            _previewBusy = true;
+            if (!native) PreviewAppBarButton.IsEnabled = false;
+            PreviewStatusControl.Text = native ? "Updating live preview..." : "Generating Web preview...";
 
             try
             {
@@ -1059,24 +1099,21 @@ namespace WikiViewer.Shared.Uwp.Pages
                     _pageWikiContext,
                     worker
                 );
-                if (_previewSession.Accept(request, preview)) await RenderPreviewAsync(preview);
-                else if (_previewSession.IsLatest(request)) HidePreview("Text changed while the preview was generated. Click Preview again.");
+                if (_previewActive && PreviewModeControl.IsOn == native && _previewSession.Accept(request, preview)) await RenderPreviewAsync(preview);
+                else if (_previewSession.IsLatest(request) && !native) PreviewStatusControl.Text = "Text changed while the preview was generated. Click Preview again.";
             }
             catch (Exception ex)
             {
                 if (_previewSession.IsLatest(request))
                 {
-                    HidePreview($"Failed to generate preview: {ex.Message}");
-                    SetPreviewLayout(false);
+                    PreviewStatusControl.Text = $"Preview could not update: {ex.Message}";
                 }
             }
             finally
             {
-                if (_previewSession.IsLatest(request))
-                {
-                    PreviewAppBarButton.IsEnabled = true;
-                    PreviewModeControl.IsEnabled = true;
-                }
+                _previewBusy = false;
+                if (_previewActive) PreviewAppBarButton.IsEnabled = true;
+                if (_previewQueued) QueueNativePreview();
             }
         }
 

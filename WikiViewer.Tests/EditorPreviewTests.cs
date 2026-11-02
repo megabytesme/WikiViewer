@@ -6,6 +6,19 @@ namespace WikiViewer.Tests;
 
 public class EditorPreviewTests
 {
+    [Fact]
+    public void SwitchingModeRejectsPendingExpansionWithoutDiscardingTheDraftSnapshot()
+    {
+        var session = new EditorPreviewSession();
+        var saved = session.Begin("draft", "Page");
+        Assert.True(session.Accept(saved, Preview("draft")));
+        var pending = session.Begin("new text", "Page");
+        session.InvalidateRequests();
+        Assert.False(session.Accept(pending, Preview("new text")));
+        Assert.Equal("draft", session.Current.Content.RawWikitext);
+        Assert.True(session.IsStale);
+    }
+
     [Theory]
     [InlineData("{\"parse\":{\"text\":{\"*\":\"<p>expanded</p>\"},\"wikitext\":{\"*\":\"transformed\"},\"revid\":123,\"headhtml\":\"<html><head></head><body>\",\"modules\":[\"ext.cite\"],\"modulestyles\":[\"ext.cite\"]}}")]
     [InlineData("{\"parse\":{\"text\":\"<p>expanded</p>\",\"headhtml\":\"<html><head></head><body>\",\"modules\":[\"ext.cite\"]}}")]

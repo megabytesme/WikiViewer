@@ -17,6 +17,7 @@ namespace WikiViewer.Core.Services
             return new EditorPreviewRequest(++_request, _source, title);
         }
         public bool IsLatest(EditorPreviewRequest request) => request.Id == _request;
+        public void InvalidateRequests() { _request++; }
         public bool Accept(EditorPreviewRequest request, ArticlePreview result)
         {
             if (!IsLatest(request) || !string.Equals(request.Source, _source, StringComparison.Ordinal) ||
