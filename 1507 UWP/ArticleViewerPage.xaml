@@ -39,6 +39,9 @@
         <CommandBar Grid.Row="1"
                     VerticalAlignment="Bottom"
                     HorizontalAlignment="Stretch">
+            <CommandBar.Content>
+                <TextBlock x:Name="LastUpdatedText" Margin="12,0" VerticalAlignment="Center" FontSize="12" Opacity="0.8" TextTrimming="CharacterEllipsis" Visibility="Collapsed" ToolTipService.ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+            </CommandBar.Content>
             <AppBarToggleButton x:Name="NativeReaderButton" Icon="Read" Label="Native reader (Preview)" Click="NativeReaderButton_Click"/>
             <AppBarButton x:Name="EditButton"
                           Icon="Edit"
@@ -71,9 +74,6 @@
             </StackPanel>
         </Grid>
 
-        <Border Grid.Row="0" VerticalAlignment="Bottom" Margin="20,0,20,4" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Padding="4">
-            <TextBlock x:Name="LastUpdatedText" FontSize="12" Opacity="0.8" TextWrapping="Wrap" Visibility="Collapsed"/>
-        </Border>
         <Grid x:Name="VerificationPanel"
               Grid.RowSpan="2"
               Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
