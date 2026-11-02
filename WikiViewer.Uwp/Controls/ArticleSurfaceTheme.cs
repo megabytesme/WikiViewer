@@ -56,7 +56,7 @@ namespace WikiViewer.Uwp.Controls
         private static void ClipModern(Image image)
         {
             var visual = ElementCompositionPreview.GetElementVisual(image);
-            double radius = Math.Min(Radius, Math.Min(image.ActualWidth, image.ActualHeight) / 2);
+            double radius = image.ActualWidth < 48 || image.ActualHeight < 48 ? 0 : Math.Min(Radius, Math.Min(image.ActualWidth, image.ActualHeight) / 2);
             if (radius <= 0) { visual.Clip = null; return; }
             var geometry = visual.Compositor.CreateRoundedRectangleGeometry();
             geometry.Size = new Vector2((float)image.ActualWidth, (float)image.ActualHeight);
