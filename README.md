@@ -31,7 +31,7 @@ Raw source, expanded markup, attributes and resolved styles remain available in 
 
 The native reader renders static SVG, including the wiki's SVG math fallback images. Inline SVG retains static shapes and removes active elements/external references. Audio/video preserve source choices, posters and surrounding captions/fallback text, and play through Windows media controls when requested. External timed subtitle tracks are not yet connected to native playback. Codec availability depends on Windows; another source, the media-file link or Web view remains available. Interactive maps, charts and JavaScript widgets keep using Web view.
 
-Both heads render common presentation MathML constructs: fractions, roots, scripts, limits, fences and matrices. Native math font metrics approximate browser typesetting. Relative image containers can place absolute markers/labels using offsets, percentages, translations and stacking order. Ordinary paragraphs flow through native text-overflow regions beside floats and return to full width below them.
+The native reader renders common presentation MathML constructs: fractions, roots, scripts, limits, fences and matrices. Native math font metrics approximate browser typesetting. Relative image containers can place absolute markers/labels using offsets, percentages, translations and stacking order. Ordinary paragraphs flow through native text-overflow regions beside floats and return to full width below them.
 
 Large pages with section headings use a virtualized section list, releasing controls and media when sections are recycled; individual large tables/sections still render as a unit. Article and draft model parsing runs off the UI thread, and obsolete results are discarded. Links to unrealized anchors bring their section into view.
 
@@ -56,7 +56,7 @@ dotnet pack C:\path\to\WikitextParser\WikitextParser\WikitextParser.csproj -c Re
 MSBuild "WikiViewer.Uwp\WikiViewer.Uwp.csproj" /restore /p:Configuration=Release /p:Platform=ARM64 /p:WikitextParserVersion=0.2.0 /p:RestoreAdditionalProjectSources=C:\path\to\parser-feed
 ```
 
-Use MSBuild from Visual Studio with UWP targets installed. The version property defaults to the existing published `0.0.1` package until the expanded package is published. Selecting 0.2.0 enables localized raw-source parsing; 0.1.0 retains the earlier traversal path; the published version retains a compatible traversal path. The expanded parser adds local syntax coverage and compatibility diagnostics; it does not implement the entire MediaWiki runtime. Server expansion remains necessary for full wiki-specific content.
+Use MSBuild from Visual Studio with UWP targets installed. The version property defaults to `0.2.0`, which must be available in the supplied local feed until that version is published. This enables localized raw-source parsing. The expanded parser adds local syntax coverage and compatibility diagnostics; it does not implement the entire MediaWiki runtime. Server expansion remains necessary for full wiki-specific content.
 
 ## Download
 
