@@ -1,0 +1,36 @@
+<local:LoginPageBase
+    x:Class="WikiViewer.Uwp.LoginPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:WikiViewer.Uwp.Pages"
+    xmlns:browser="using:WikiViewer.Uwp.Controls"
+    xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
+    Background="Transparent">
+    <Grid>
+        <StackPanel x:Name="LoginFormPanel" VerticalAlignment="Center" HorizontalAlignment="Center" Width="320" Spacing="12">
+            <TextBlock x:Name="LoginTitle" Text="Log In" Style="{ThemeResource TitleTextBlockStyle}" HorizontalAlignment="Center"/>
+            <TextBox x:Name="UsernameBox" Header="Username" AutomationProperties.Name="Username"/>
+            <PasswordBox x:Name="PasswordBox" Header="Password" AutomationProperties.Name="Password"/>
+            <CheckBox x:Name="RememberMeCheckBox" Content="Remember me" IsChecked="True" Margin="0,12"/>
+            <Button x:Name="LoginButton" Content="Log In" HorizontalAlignment="Stretch" Click="LoginButton_Click"/>
+            <HyperlinkButton Content="Don't have an account? Create one." 
+                             HorizontalAlignment="Center" 
+                             Click="CreateAccountButton_Click"
+                             Margin="0,8,0,0"/>
+            <ProgressRing x:Name="LoadingRing" IsActive="False"/>
+            <TextBlock x:Name="ErrorTextBlock" Foreground="Red" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <Grid x:Name="InteractiveLoginPanel" Background="Transparent" Visibility="Collapsed">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <StackPanel Margin="12" Spacing="8">
+                <TextBlock Text="Additional step required" Style="{ThemeResource TitleTextBlockStyle}"/>
+                <TextBlock Text="Please complete the login process below. The app will continue automatically when you are successfully logged in." Style="{ThemeResource BodyTextBlockStyle}" TextWrapping="Wrap"/>
+            </StackPanel>
+            <browser:WikiBrowser x:Name="InteractiveWebView" Grid.Row="1" />
+        </Grid>
+    </Grid>
+</local:LoginPageBase>

@@ -1,0 +1,559 @@
+using System;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.Linq;
+using System.Threading.Tasks;
+using WikiViewer.Core;
+using WikiViewer.Core.Enums;
+using WikiViewer.Core.Managers;
+using WikiViewer.Core.Models;
+using WikiViewer.Core.Services;
+using WikiViewer.Uwp.Services;
+using Windows.Storage;
+using Windows.Storage.Pickers;
+using Newtonsoft.Json.Linq;
+using Windows.UI.Xaml;
+using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Documents;
+
+namespace WikiViewer.Uwp.Pages
+{
+    public abstract class SettingsPageBase : Page
+    {
+        protected readonly ObservableCollection<WikiInstance> Wikis =
+            new ObservableCollection<WikiInstance>();
+
+        protected abstract ComboBox DefaultConnectionMethodComboBoxControl { get; }
+        protected abstract ToggleSwitch CachingToggleControl { get; }
+        protected abstract ComboBox ConcurrencyComboBoxControl { get; }
+        protected abstract TextBlock CacheSizeTextControl { get; }
+        protected abstract Button ClearCacheButtonControl { get; }
+        protected abstract ListView WikiListViewControl { get; }
+        protected abstract TextBlock ConcurrencyDescriptionTextControl { get; }
+        protected abstract ToggleSwitch EnableCustomThemingToggleControl { get; }
+        protected abstract ToggleSwitch ShowCssRefreshButtonToggleControl { get; }
+        protected abstract ToggleSwitch NativeReaderDefaultToggleControl { get; }
+        protected abstract TextBox ResolverUrlControl { get; }
+        protected abstract TextBox ResolverUsernameControl { get; }
+        protected abstract PasswordBox ResolverPasswordControl { get; }
+        protected abstract TextBlock ResolverStatusControl { get; }
+        private bool _isLoaded;
+
+        public SettingsPageBase()
+        {
+            this.Loaded += OnLoaded;
+            this.Unloaded += OnUnloaded;
+        }
+
+        private async void OnLoaded(object sender, RoutedEventArgs e)
+        {
+            if (_isLoaded) return;
+            _isLoaded = true;
+            PopulateConcurrencyComboBox();
+            PopulateDefaultConnectionMethodComboBox();
+            LoadResolverControls();
+
+            var savedLevel = AppSettings.DownloadConcurrencyLevel;
+
+            var match = ConcurrencyComboBoxControl
+                .Items.OfType<ComboBoxItem>()
+                .FirstOrDefault(i => Equals(i.Tag, (int)savedLevel));
+
+            if (match != null)
+            {
+                ConcurrencyComboBoxControl.SelectedItem = match;
+                UpdateConcurrencyDescription(savedLevel);
+            }
+
+            var savedMethod = AppSettings.DefaultConnectionMethod;
+            var methodMatch = DefaultConnectionMethodComboBoxControl
+                .Items.OfType<ComboBoxItem>()
+                .FirstOrDefault(i => Equals(i.Tag, (int)savedMethod));
+            if (methodMatch != null)
+            {
+                DefaultConnectionMethodComboBoxControl.SelectedItem = methodMatch;
+            }
+
+            CachingToggleControl.IsOn = AppSettings.IsCachingEnabled;
+            NativeReaderDefaultToggleControl.IsOn = AppSettings.UseNativeReaderByDefault;
+            EnableCustomThemingToggleControl.IsOn = AppSettings.IsCustomThemingEnabled;
+            ShowCssRefreshButtonToggleControl.IsOn = AppSettings.ShowCssRefreshButton;
+
+            LoadWikis();
+            WikiListViewControl.ItemsSource = Wikis;
+            WikiManager.WikisChanged += OnWikisChanged;
+
+            try
+            {
+                CacheSizeTextControl.Text = "Calculating...";
+                await UpdateCacheSizeAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to update cache size: {ex.Message}");
+                CacheSizeTextControl.Text = "Error";
+            }
+        }
+
+        private void OnUnloaded(object sender, RoutedEventArgs e)
+        {
+            _isLoaded = false;
+            ResolverPasswordControl.Password = "";
+            WikiManager.WikisChanged -= OnWikisChanged;
+        }
+
+        private void LoadResolverControls()
+        {
+            var configuration = ResolverConfigurationService.Current?.Load();
+            ResolverUrlControl.Text = configuration?.Endpoint.AbsoluteUri ?? "";
+            ResolverUsernameControl.Text = configuration?.Username ?? "";
+            ResolverPasswordControl.Password = "";
+            ResolverStatusControl.Text = configuration != null ? "Resolver configured. Proxy is available across the app. Leave the password blank to keep it." : "Configure a resolver to enable Proxy. Credentials are stored in Windows Credential Locker.";
+        }
+
+        private void RefreshProxyChoice()
+        {
+            bool enabled = ResolverConfigurationService.Current?.Load() != null;
+            var item = DefaultConnectionMethodComboBoxControl.Items.OfType<ComboBoxItem>().FirstOrDefault(i => Equals(i.Tag, (int)ConnectionMethod.HttpClientProxy));
+            if (item != null) item.IsEnabled = enabled;
+            if (!enabled && AppSettings.DefaultConnectionMethod == ConnectionMethod.HttpClientProxy)
+            {
+                AppSettings.DefaultConnectionMethod = ConnectionMethod.Auto;
+                DefaultConnectionMethodComboBoxControl.SelectedItem = DefaultConnectionMethodComboBoxControl.Items.OfType<ComboBoxItem>().FirstOrDefault(i => Equals(i.Tag, (int)ConnectionMethod.Auto));
+            }
+        }
+
+        protected void SaveResolverButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                ResolverConfigurationService.Current.Save(ResolverUrlControl.Text, ResolverUsernameControl.Text, ResolverPasswordControl.Password);
+                LoadResolverControls(); RefreshProxyChoice();
+            }
+            catch (ArgumentException ex) { ResolverStatusControl.Text = ex.Message; }
+            catch (Exception) { ResolverStatusControl.Text = "Windows could not save the resolver credentials. Your existing configuration has been kept."; }
+        }
+
+        protected void RemoveResolverButton_Click(object sender, RoutedEventArgs e)
+        {
+            try { ResolverConfigurationService.Current.Clear(); LoadResolverControls(); RefreshProxyChoice(); }
+            catch (Exception) { ResolverStatusControl.Text = "Windows could not remove the resolver configuration. Try again."; }
+        }
+
+        protected async void ImportResolverButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary };
+                picker.FileTypeFilter.Add(".json");
+                var file = await picker.PickSingleFileAsync();
+                if (file == null) return;
+                var json = JObject.Parse(await FileIO.ReadTextAsync(file));
+                var resolver = json["Resolver"] as JObject ?? json;
+                string username = (string)resolver.GetValue("Username", StringComparison.OrdinalIgnoreCase);
+                string password = (string)resolver.GetValue("Password", StringComparison.OrdinalIgnoreCase);
+                if (string.IsNullOrWhiteSpace(username) || string.IsNullOrEmpty(password)) { ResolverStatusControl.Text = "The file must contain Username and Password, optionally inside a Resolver object."; return; }
+                string url = (string)(resolver.GetValue("Url", StringComparison.OrdinalIgnoreCase) ?? resolver.GetValue("Endpoint", StringComparison.OrdinalIgnoreCase));
+                if (!string.IsNullOrWhiteSpace(url)) ResolverUrlControl.Text = url;
+                ResolverUsernameControl.Text = username; ResolverPasswordControl.Password = password;
+                ResolverStatusControl.Text = "Credentials imported. Check the resolver URL and select Save resolver to enable Proxy.";
+            }
+            catch (Exception) { ResolverStatusControl.Text = "The resolver credentials could not be imported. Check the JSON file and try again."; }
+        }
+
+        protected void NativeReaderDefaultToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            AppSettings.UseNativeReaderByDefault = ((ToggleSwitch)sender).IsOn;
+        }
+
+        protected void EnableCustomThemingToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            var toggle = sender as ToggleSwitch;
+            AppSettings.IsCustomThemingEnabled = toggle.IsOn;
+        }
+
+        protected void ShowCssRefreshButtonToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            var toggle = sender as ToggleSwitch;
+            AppSettings.ShowCssRefreshButton = toggle.IsOn;
+        }
+
+        private void PopulateConcurrencyComboBox()
+        {
+            // Store primitive option values so selection does not depend on boxed-enum projection.
+            var mediumCores = Math.Max(2, Environment.ProcessorCount / 2);
+            var highCores = Math.Max(2, Environment.ProcessorCount);
+            var doubleCores = highCores * 2;
+
+            ConcurrencyComboBoxControl.Items.Clear();
+            ConcurrencyComboBoxControl.Items.Add(
+                new ComboBoxItem { Content = $"Low (2 downloads)", Tag = (int)ConcurrencyLevel.Low }
+            );
+            ConcurrencyComboBoxControl.Items.Add(
+                new ComboBoxItem
+                {
+                    Content = $"Medium ({mediumCores} downloads)",
+                    Tag = (int)ConcurrencyLevel.Medium,
+                }
+            );
+            ConcurrencyComboBoxControl.Items.Add(
+                new ComboBoxItem
+                {
+                    Content = $"High ({highCores} downloads)",
+                    Tag = (int)ConcurrencyLevel.High,
+                }
+            );
+            ConcurrencyComboBoxControl.Items.Add(
+                new ComboBoxItem
+                {
+                    Content = $"Double ({doubleCores} downloads)",
+                    Tag = (int)ConcurrencyLevel.Double,
+                }
+            );
+            ConcurrencyComboBoxControl.Items.Add(
+                new ComboBoxItem
+                {
+                    Content = $"Extreme (256 downloads)",
+                    Tag = (int)ConcurrencyLevel.Extreme,
+                }
+            );
+            ConcurrencyComboBoxControl.Items.Add(
+                new ComboBoxItem { Content = "Unlimited", Tag = (int)ConcurrencyLevel.Unlimited }
+            );
+
+        }
+
+        private void PopulateDefaultConnectionMethodComboBox()
+        {
+            DefaultConnectionMethodComboBoxControl.Items.Clear();
+            DefaultConnectionMethodComboBoxControl.Items.Add(
+                new ComboBoxItem { Content = "Auto (Recommended)", Tag = (int)ConnectionMethod.Auto }
+            );
+            DefaultConnectionMethodComboBoxControl.Items.Add(
+                new ComboBoxItem
+                {
+                    Content = "HttpClient (Recommended - Fastest)",
+                    Tag = (int)ConnectionMethod.HttpClient,
+                }
+            );
+            DefaultConnectionMethodComboBoxControl.Items.Add(
+                new ComboBoxItem
+                {
+#if UWP_1809
+                    Content = "WebView2 (Backup - Compatibility)",
+#else
+                    Content = "WebView (Backup - Compatibility)",
+#endif
+                    Tag = (int)ConnectionMethod.WebView,
+                }
+            );
+            DefaultConnectionMethodComboBoxControl.Items.Add(
+                new ComboBoxItem
+                {
+                    Content = "Proxy (Last Resort)",
+                    Tag = (int)ConnectionMethod.HttpClientProxy,
+                    IsEnabled = ResolverConfigurationService.Current?.Load() != null,
+                }
+            );
+        }
+
+        protected void DefaultConnectionMethodComboBox_SelectionChanged(
+            object sender,
+            SelectionChangedEventArgs e
+        )
+        {
+            if (
+                DefaultConnectionMethodComboBoxControl.SelectedItem is ComboBoxItem selectedItem
+                && selectedItem.Tag is int method
+            )
+            {
+                AppSettings.DefaultConnectionMethod = (ConnectionMethod)method;
+            }
+        }
+
+        private void UpdateConcurrencyDescription(ConcurrencyLevel level)
+        {
+            string description = "";
+            switch (level)
+            {
+                case ConcurrencyLevel.Low:
+                    description = "Recommended for slow or metered connections (2 threads).";
+                    break;
+                case ConcurrencyLevel.Medium:
+                    description =
+                        "Balanced performance. Recommended for most devices (1/2 CPU Core count).";
+                    break;
+                case ConcurrencyLevel.High:
+                    description =
+                        "Uses all available processor cores for faster loading on powerful devices (All CPU core count).";
+                    break;
+                case ConcurrencyLevel.Double:
+                    description =
+                        "Aggressive loading. May impact system responsiveness on some devices (Double core count).";
+                    break;
+                case ConcurrencyLevel.Extreme:
+                    description =
+                        "Warning: High values can lead to increased memory usage and may cause instability or rate-limiting by the wiki server (256 threads).";
+                    break;
+                case ConcurrencyLevel.Unlimited:
+                    description =
+                        "Warning: High values can lead to increased memory usage and may cause instability or rate-limiting by the wiki server (Unlimited).";
+                    break;
+            }
+            ConcurrencyDescriptionTextControl.Text = description;
+        }
+
+        private async Task OnWikisChanged()
+        {
+            _ = Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () => { if (_isLoaded) LoadWikis(); });
+        }
+
+        private void LoadWikis()
+        {
+            Wikis.Clear();
+            foreach (var wiki in WikiManager.GetWikis().OrderBy(w => w.Name))
+            {
+                Wikis.Add(wiki);
+            }
+        }
+
+        private async Task UpdateCacheSizeAsync()
+        {
+            var sizeInBytes = await ArticleCacheManager.GetCacheSizeAsync();
+            var sizeInMb = sizeInBytes / 1024.0 / 1024.0;
+            CacheSizeTextControl.Text = $"{sizeInMb:F2} MB used";
+        }
+
+        protected void CachingToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            var toggle = sender as ToggleSwitch;
+            AppSettings.IsCachingEnabled = toggle.IsOn;
+        }
+
+        protected void ConcurrencyComboBox_SelectionChanged(
+            object sender,
+            SelectionChangedEventArgs e
+        )
+        {
+            if (ConcurrencyComboBoxControl.SelectedItem is ComboBoxItem item && item.Tag is int value)
+            {
+                var level = (ConcurrencyLevel)value;
+                AppSettings.DownloadConcurrencyLevel = level;
+                UpdateConcurrencyDescription(level);
+            }
+        }
+
+        protected async void ClearCacheButton_Click(object sender, RoutedEventArgs e)
+        {
+            var button = sender as Button;
+            button.IsEnabled = false;
+            await ArticleCacheManager.ClearCacheAsync();
+            await MediaCacheService.ClearMappingsAsync();
+            await UpdateCacheSizeAsync();
+            button.IsEnabled = true;
+        }
+
+        protected async void AboutButton_Click(object sender, RoutedEventArgs e)
+        {
+            var reviewButton = new Button
+            {
+                Content = "Rate and Review This App",
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Margin = new Thickness(0, 8, 0, 0)
+            };
+            reviewButton.Click += ReviewButton_Click;
+
+            var scrollContent = new ScrollViewer()
+            {
+                Content = new TextBlock()
+                {
+                    Inlines =
+                        {
+                            new Run() { Text = "WikiViewer" },
+                            new LineBreak(),
+                            new Run() { Text = $"Version {GetAppVersion()} ({GetAppName()})" },
+                            new LineBreak(),
+                            new Run() { Text = "Copyright © 2025 MegaBytesMe" },
+                            new LineBreak(),
+                            new LineBreak(),
+                            new Run() { Text = "Source code available on " },
+                            new Hyperlink()
+                            {
+                                NavigateUri = new Uri("https://github.com/megabytesme/WikiViewer"),
+                                Inlines = { new Run() { Text = "GitHub" } },
+                            },
+                            new LineBreak(),
+                            new Run() { Text = "Anything wrong? Let me know: " },
+                            new Hyperlink()
+                            {
+                                NavigateUri = new Uri(
+                                    "https://github.com/megabytesme/WikiViewer/issues"
+                                ),
+                                Inlines = { new Run() { Text = "Support" } },
+                            },
+                            new LineBreak(),
+                            new Run() { Text = "Privacy Policy: " },
+                            new Hyperlink()
+                            {
+                                NavigateUri = new Uri(
+                                    "https://github.com/megabytesme/WikiViewer/blob/master/PRIVACYPOLICY.md"
+                                ),
+                                Inlines = { new Run() { Text = "Privacy Policy" } },
+                            },
+                            new LineBreak(),
+                            new LineBreak(),
+                            new Run() { Text = "Like what you see? View my " },
+                            new Hyperlink()
+                            {
+                                NavigateUri = new Uri("https://github.com/megabytesme"),
+                                Inlines = { new Run() { Text = "GitHub" } },
+                            },
+                            new Run() { Text = " and maybe my " },
+                            new Hyperlink()
+                            {
+                                NavigateUri = new Uri(
+                                    "https://apps.microsoft.com/search?query=megabytesme"
+                                ),
+                                Inlines = { new Run() { Text = "Other Apps," } },
+                            },
+                            new Run()
+                            {
+                                Text = " or consider buying me a coffee (supporting me) on ",
+                            },
+                            new Hyperlink()
+                            {
+                                NavigateUri = new Uri("https://ko-fi.com/megabytesme"),
+                                Inlines = { new Run() { Text = "Ko-fi! :-)" } },
+                            },
+                            new LineBreak(),
+                            new LineBreak(),
+                            new Run()
+                            {
+                                Text =
+                                    "WikiViewer is a client for browsing MediaWiki-based wikis without your web browser, online and offline (after caching).",
+                            },
+                        },
+                    TextWrapping = TextWrapping.Wrap,
+                },
+            };
+
+            var dialogContent = new StackPanel();
+            dialogContent.Children.Add(scrollContent);
+            dialogContent.Children.Add(reviewButton);
+
+            var dialog = new ContentDialog
+            {
+                Title = "About WikiViewer",
+                Content = dialogContent,
+                PrimaryButtonText = "OK"
+            };
+
+            var result = await dialog.ShowAsync();
+        }
+
+        private void ReviewButton_Click(object sender, RoutedEventArgs e)
+        {
+            ReviewRequestService.RequestReview();
+        }
+
+        protected async void DisclaimerButton_Click(object sender, RoutedEventArgs e)
+        {
+            var wikis = WikiManager.GetWikis();
+            var hostsList = string.Join(", ", wikis.Select(w => w.Host));
+
+            var textBlock = new TextBlock { TextWrapping = TextWrapping.Wrap };
+
+            textBlock.Inlines.Add(
+                new Run
+                {
+                    Text =
+                        "This is an unofficial, third-party client for browsing MediaWiki sites. This app was created by ",
+                }
+            );
+            textBlock.Inlines.Add(
+                new Hyperlink
+                {
+                    NavigateUri = new Uri("https://github.com/megabytesme"),
+                    Inlines = { new Run { Text = "MegaBytesMe" } },
+                }
+            );
+            textBlock.Inlines.Add(
+                new Run
+                {
+                    Text =
+                        " and is not affiliated with, endorsed, or sponsored by the operators of any wiki.",
+                }
+            );
+            textBlock.Inlines.Add(new LineBreak());
+            textBlock.Inlines.Add(new LineBreak());
+            textBlock.Inlines.Add(
+                new Run
+                {
+                    Text =
+                        $"All article data, content, and trademarks presented from the configured wikis ({hostsList}) are the property of those sites and their respective contributors. This app simply provides a native viewing experience for publicly available content.",
+                }
+            );
+
+            var dialog = new ContentDialog
+            {
+                Title = "Disclaimer",
+                Content = new ScrollViewer { Content = textBlock },
+                PrimaryButtonText = "OK",
+            };
+            await dialog.ShowAsync();
+        }
+
+        protected abstract Type GetWikiDetailPageType();
+
+        protected void WikiListView_ItemClick(object sender, ItemClickEventArgs e)
+        {
+            if (e.ClickedItem is WikiInstance wiki)
+            {
+                Frame.Navigate(GetWikiDetailPageType(), wiki.Id);
+            }
+        }
+
+        protected void AddWikiButton_Click(object sender, RoutedEventArgs e)
+        {
+            Frame.Navigate(GetWikiDetailPageType(), true);
+        }
+
+        private string GetAppName() => "WikiViewer";
+
+        private string GetAppVersion()
+        {
+            var version = Windows.ApplicationModel.Package.Current.Id.Version;
+            return $"{version.Major}.{version.Minor}.{version.Build}.{version.Revision}";
+        }
+
+        protected async void EditThemeButton_Click(object sender, RoutedEventArgs e)
+        {
+            await ThemeManager.GetThemeCssAsync();
+            var file = await ApplicationData.Current.LocalFolder.GetFileAsync(
+                ThemeManager.ThemeCssFileName
+            );
+            if (file != null)
+            {
+                await Windows.System.Launcher.LaunchFileAsync(file);
+            }
+        }
+
+        protected async void ResetThemeButton_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new ContentDialog
+            {
+                Title = "Reset Theme?",
+                Content =
+                    "This will restore the default article appearance. Your custom CSS will be overwritten. Are you sure?",
+                PrimaryButtonText = "Reset Theme",
+                SecondaryButtonText = "Cancel",
+            };
+
+            var result = await dialog.ShowAsync();
+            if (result == ContentDialogResult.Primary)
+            {
+                await ThemeManager.ResetThemeToDefaultAsync();
+            }
+        }
+    }
+}

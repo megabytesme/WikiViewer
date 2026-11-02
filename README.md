@@ -53,7 +53,7 @@ The parser fork is maintained at [megabytesme/WikitextParser](https://github.com
 
 ```powershell
 dotnet pack C:\path\to\WikitextParser\WikitextParser\WikitextParser.csproj -c Release -o C:\path\to\parser-feed
-MSBuild "1809 UWP\1809 UWP.csproj" /restore /p:Configuration=Release /p:Platform=ARM64 /p:WikitextParserVersion=0.2.0 /p:RestoreAdditionalProjectSources=C:\path\to\parser-feed
+MSBuild "WikiViewer.Uwp\WikiViewer.Uwp.csproj" /restore /p:Configuration=Release /p:Platform=ARM64 /p:WikitextParserVersion=0.2.0 /p:RestoreAdditionalProjectSources=C:\path\to\parser-feed
 ```
 
 Use MSBuild from Visual Studio with UWP targets installed. The version property defaults to the existing published `0.0.1` package until the expanded package is published. Selecting 0.2.0 enables localized raw-source parsing; 0.1.0 retains the earlier traversal path; the published version retains a compatible traversal path. The expanded parser adds local syntax coverage and compatibility diagnostics; it does not implement the entire MediaWiki runtime. Server expansion remains necessary for full wiki-specific content.
@@ -83,18 +83,21 @@ Use MSBuild from Visual Studio with UWP targets installed. The version property 
 
 ### Running the Application
 
-1. In the Solution Explorer, right-click the desired project (`1809 UWP` is recommended) and select **"Set as Startup Project"**.
+1. In the Solution Explorer, right-click `WikiViewer.Uwp` and select **"Set as Startup Project"**.
 2. Press `F5` or select `Debug > Start Debugging` to build and run.
 
 ## Architectural Overview
 
-This project utilizes a **Shared UI Logic (MVVM-like)** architecture to support multiple Windows versions from a single, reusable codebase. This design separates core logic, UI logic, and platform-specific views.
+The solution has one Windows app, a portable core library and portable tests.
 
-* **`WikiViewer.Core` (Model/Services):** Contains all platform-agnostic business logic, data models and API services. It has no dependency on any UI framework and as a result is highly reusable.
-* **`WikiViewer.Shared.Uwp` (Shared UI Logic):** Contains abstract `PageBase` classes that act as a combination of View-Model and Controller. They define the UI state, event handling, and a contract of abstract properties that the concrete Views must implement.
-* **`1507 UWP`:** The UWP head for Windows 10 Version 1507 and newer. It implements the UI using the original `WebView` (EdgeHTML) and legacy controls for maximum compatibility on older platforms. Recommended for Windows 10 Mobile users.
-* **`1809 UWP`:** The UWP head for Windows 10 Version 1809 and newer. It implements the UI using **WinUI 2**, including the modern `WebView2` (Chromium) for the best performance and user experience. Recommended for most users.
-* **`App Assets`:** Holds shared assets used for store listings and branding.
+* **`WikiViewer.Core`:** A .NET Standard 2.0 library containing article parsing, native layout models, API services, caching and favourites. Clients supply storage, credential, settings, local asset URI and presentation providers. It has no Windows or UI framework references and can be used from a console app, MAUI or another client.
+* **`WikiViewer.Uwp`:** The Windows app, including WinUI pages, native controls, printing, secure credentials, storage and browser implementations.
+* **`WikiViewer.Tests`:** Tests the compiled core library, including rendering, caching and preview freshness.
+* **`App Assets`:** Store listings and branding.
+
+The default app build uses WinUI **2.8.7** and WebView2, requiring Windows 10 **17763** or later. Set the MSBuild property **`UseWebView2=false`** for a WinUI **2.7.3** and classic WebView build. This compiles against **16299** for .NET Standard 2.0 and packages with a **15063** minimum, following [LibreSpotUWP's setup](https://github.com/megabytesme/LibreSpotUWP/commit/526a099b0a91804a14b4fc97e9dda3f28acb03f6). ARM64 packages require **17763** in either build. Both builds use the same pages and native renderer; browser dependencies are selected at build time because WinUI 2.8 itself cannot run on 15063.
+
+The core requires the extended **WikitextParser 0.2.0** package. Build and pack the [parser fork](https://github.com/megabytesme/WikitextParser/tree/netstandard1.4), then supply its package folder with `/p:RestoreAdditionalProjectSources=<package-folder>` when restoring/building or running tests. A client can reference `WikiViewer.Core.csproj` directly.
 
 ## Contributing
 
