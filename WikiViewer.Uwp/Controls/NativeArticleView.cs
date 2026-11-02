@@ -31,7 +31,7 @@ namespace WikiViewer.Uwp.Controls
         private bool _themeSubscribed;
         private readonly Dictionary<string, FrameworkElement> _anchors = new Dictionary<string, FrameworkElement>(StringComparer.Ordinal);
         private readonly List<Image> _images = new List<Image>();
-        private readonly List<MediaElement> _media = new List<MediaElement>();
+        private readonly List<ArticleMediaView> _media = new List<ArticleMediaView>();
         private readonly Dictionary<string, NativeArticleSection> _anchorSections = new Dictionary<string, NativeArticleSection>(StringComparer.Ordinal);
         private readonly List<RenderScope> _scopes = new List<RenderScope>();
         private RenderScope _scope;
@@ -42,7 +42,7 @@ namespace WikiViewer.Uwp.Controls
             public bool Active = true;
             public readonly CancellationTokenSource Cancellation = new CancellationTokenSource();
             public readonly List<Image> Images = new List<Image>();
-            public readonly List<MediaElement> Media = new List<MediaElement>();
+            public readonly List<ArticleMediaView> Media = new List<ArticleMediaView>();
             public readonly Dictionary<string, FrameworkElement> Anchors = new Dictionary<string, FrameworkElement>();
         }
         private Func<Uri, Task> _navigate;
@@ -228,7 +228,7 @@ namespace WikiViewer.Uwp.Controls
             scope.Active = false;
             scope.Cancellation.Cancel(); scope.Cancellation.Dispose();
             foreach (var image in scope.Images) { _images.Remove(image); image.Source = null; }
-            foreach (var media in scope.Media) { _media.Remove(media); media.Stop(); media.Source = null; }
+            foreach (var media in scope.Media) { _media.Remove(media); media.Dispose(); }
             foreach (var anchor in scope.Anchors) { FrameworkElement current; if (_anchors.TryGetValue(anchor.Key, out current) && current == anchor.Value) _anchors.Remove(anchor.Key); }
             _scopes.Remove(scope);
         }
@@ -251,7 +251,7 @@ namespace WikiViewer.Uwp.Controls
             foreach (var scope in _scopes.ToArray()) ReleaseScope(scope);
             _scope = null; _anchorSections.Clear();
             if (_sections != null) { _sections.ItemsSource = null; _sections = null; Content = _scroll; }
-            foreach (var media in _media) { media.Stop(); media.Source = null; }
+            foreach (var media in _media) { media.Dispose(); }
             _media.Clear();
             _root.Children.Clear();
             _anchors.Clear();
@@ -560,93 +560,16 @@ namespace WikiViewer.Uwp.Controls
         private FrameworkElement Media(NativeArticleNode node)
         {
             var panel = new StackPanel { Margin = new Thickness(0, 8, 0, 8) };
-            if (node.PosterUri != null) panel.Children.Add(Image(new NativeArticleNode { Kind = NativeArticleNodeKind.Image, Uri = node.PosterUri, Text = "Video poster", ImageWidth = 480 }));
-            var sources = NativeMediaService.PlaybackSources(node.MediaSources);
-            if (sources.Count > 0)
+            if (node.MediaSources.Count > 0)
             {
-                var media = new MediaElement { AutoPlay = false, AreTransportControlsEnabled = true, MaxHeight = node.TagName == "audio" ? 80 : 480, MinHeight = 64, Stretch = Stretch.Uniform };
-                var choices = new ComboBox { ItemsSource = sources, DisplayMemberPath = "Label", SelectedIndex = 0, HorizontalAlignment = HorizontalAlignment.Stretch };
-                if (sources.Count > 1) panel.Children.Add(choices);
-                var load = new Button { Content = node.TagName == "audio" ? "Play audio" : "Play video" };
-                var status = new TextBlock { TextWrapping = TextWrapping.Wrap };
-                var buffering = new ProgressBar { IsIndeterminate = true, Visibility = Visibility.Collapsed, MaxWidth = 480, Height = 4 };
-                Windows.UI.Xaml.Automation.AutomationProperties.SetName(buffering, "Loading media");
-                int version = _version;
-                var scope = _scope;
-                var cancellationToken = scope?.Cancellation.Token ?? _assetCancellation.Token;
-                var attempted = new HashSet<Uri>();
-                bool cached = false, changingChoice = false, playing = false;
-                int request = 0;
-                var resolveMedia = _resolveImage;
-                var open = new HyperlinkButton { Content = "Open media file", NavigateUri = sources[0].Uri };
-                Action start = () =>
-                {
-                    var selected = choices.SelectedItem as NativeMediaSource;
-                    if (selected == null || version != _version || scope?.Active == false) return;
-                    request++; cached = false; playing = true; attempted.Add(selected.Uri);
-                    status.Text = "Loading " + selected.Label + "…"; open.NavigateUri = selected.Uri;
-                    buffering.IsIndeterminate = true; buffering.Visibility = Visibility.Visible;
-                    media.Source = selected.Uri;
-                };
-                media.MediaOpened += (s, e) =>
-                {
-                    if (version != _version || scope?.Active == false || !playing) return;
-                    status.Text = ""; buffering.Visibility = Visibility.Collapsed; media.Play();
-                };
-                media.BufferingProgressChanged += (s, e) =>
-                {
-                    if (version != _version || scope?.Active == false || !playing) return;
-                    double value = media.BufferingProgress;
-                    buffering.IsIndeterminate = value <= 0; buffering.Value = value * 100;
-                    buffering.Visibility = value < 1 ? Visibility.Visible : Visibility.Collapsed;
-                };
-                media.MediaFailed += async (s, e) =>
-                {
-                    if (version != _version || scope?.Active == false || !playing) return;
-                    var selected = choices.SelectedItem as NativeMediaSource;
-                    if (selected == null) return;
-                    int current = request;
-                    if (!cached && resolveMedia != null)
-                    {
-                        cached = true;
-                        status.Text = "Trying a downloaded copy…";
-                        buffering.IsIndeterminate = true; buffering.Visibility = Visibility.Visible;
-                        string local = null;
-                        try { local = await resolveMedia(selected.Uri.AbsoluteUri, cancellationToken); }
-                        catch (Exception ex) { System.Diagnostics.Debug.WriteLine("Native media cache: " + ex.Message); }
-                        if (version != _version || scope?.Active == false || current != request) return;
-                        Uri uri;
-                        if (Uri.TryCreate(local, UriKind.Absolute, out uri) && uri != selected.Uri) { media.Source = uri; return; }
-                    }
-                    // Leave the failing routed event before replacing its media source.
-                    await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Low, () =>
-                    {
-                        if (version != _version || scope?.Active == false || current != request) return;
-                        int next = sources.FindIndex(source => !attempted.Contains(source.Uri));
-                        if (next >= 0)
-                        {
-                            changingChoice = true; choices.SelectedIndex = next; changingChoice = false; start();
-                        }
-                        else { playing = false; buffering.Visibility = Visibility.Collapsed; status.Text = "Windows could not play the available sources. " + e.ErrorMessage + " Use Open media file or Web view."; }
-                    });
-                };
-                load.Click += (s, e) => { attempted.Clear(); start(); };
-                choices.SelectionChanged += (s, e) =>
-                {
-                    if (changingChoice) return;
-                    request++; playing = false; media.Stop(); media.Source = null; status.Text = "";
-                    buffering.Visibility = Visibility.Collapsed;
-                    var selected = choices.SelectedItem as NativeMediaSource; if (selected != null) open.NavigateUri = selected.Uri;
-                };
-                _media.Add(media); _scope?.Media.Add(media); panel.Children.Add(media); panel.Children.Add(load); panel.Children.Add(status);
-                panel.Children.Add(buffering);
-                panel.Children.Add(open);
+                var poster = node.PosterUri != null ? Image(new NativeArticleNode { Kind = NativeArticleNodeKind.Image, Uri = node.PosterUri, Text = "Video poster", ImageWidth = 480 }) : null;
+                var media = new ArticleMediaView(node, _resolveImage, _scope?.Cancellation.Token ?? _assetCancellation.Token, poster);
+                _media.Add(media); _scope?.Media.Add(media); panel.Children.Add(media);
             }
             else panel.Children.Add(new TextBlock { Text = "Media available in Web view.", TextWrapping = TextWrapping.Wrap });
             AppendBlocks(panel, node.Children, node);
             return panel;
         }
-
         private static bool IsSvg(Uri uri) => uri != null && (uri.AbsolutePath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase) ||
             uri.AbsolutePath.IndexOf("/math/render/svg/", StringComparison.OrdinalIgnoreCase) >= 0 || uri.AbsolutePath.IndexOf("/math/render/svg", StringComparison.OrdinalIgnoreCase) >= 0);
 
