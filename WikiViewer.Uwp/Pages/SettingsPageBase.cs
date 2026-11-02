@@ -56,7 +56,11 @@ namespace WikiViewer.Uwp.Pages
             if (selected == null || !Enum.TryParse(selected.Tag as string, out appearance) || !AppearanceService.IsSupported(appearance)) return;
             AppSettings.Appearance = appearance;
             AppearanceService.Apply();
+            UpdateAppearanceRestartNote();
         }
+
+        private void UpdateAppearanceRestartNote() => ((TextBlock)FindName("AppearanceRestartNote")).Visibility =
+            AppearanceService.RequiresRestart ? Visibility.Visible : Visibility.Collapsed;
 
         public SettingsPageBase()
         {
@@ -69,7 +73,7 @@ namespace WikiViewer.Uwp.Pages
             if (_isLoaded) return;
             _isLoaded = true;
             _appearanceReady = false;
-            var desired = AppSettings.Appearance == AppAppearance.Automatic ? AppAppearance.Automatic : AppearanceService.Current;
+            var desired = AppearanceService.IsSupported(AppSettings.Appearance) ? AppSettings.Appearance : AppearanceService.Current;
             foreach (ComboBoxItem item in AppearanceComboBox.Items)
             {
                 AppAppearance appearance;
@@ -79,6 +83,7 @@ namespace WikiViewer.Uwp.Pages
                 if (appearance == desired && item.IsEnabled) AppearanceComboBox.SelectedItem = item;
             }
             ((ToggleSwitch)FindName("NativeArticleThemeToggle")).IsOn = AppSettings.ThemeNativeArticles;
+            UpdateAppearanceRestartNote();
             _appearanceReady = true;
             PopulateConcurrencyComboBox();
             PopulateDefaultConnectionMethodComboBox();
