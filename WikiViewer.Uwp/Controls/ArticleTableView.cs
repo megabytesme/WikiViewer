@@ -15,6 +15,7 @@ namespace WikiViewer.Uwp.Controls
         private readonly ScrollViewer _scroll;
         private double _columnWidth = double.NaN;
         private int _cellCount = -1;
+        internal void InvalidateContentMeasure() { _cellCount = -1; InvalidateMeasure(); }
         public ArticleTableView(Grid grid)
         {
             _grid = grid;

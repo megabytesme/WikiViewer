@@ -30,7 +30,12 @@ namespace WikiViewer.Uwp.Pages
         private bool _previewControlsReady;
         private int _previewRenderVersion;
         private bool _editorAttached;
-        private readonly DispatcherTimer _previewTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(800) };
+        private readonly DispatcherTimer _previewTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+        private readonly DispatcherTimer _localPreviewTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(25) };
+        private bool _localPreviewBusy;
+        private string _previewResourceKey;
+        private long _localPreviewInput;
+        private EventHandler<object> _previewFrameHandler;
         private bool _previewBusy;
         private bool _previewQueued;
         private bool _previewActive;
@@ -221,6 +226,7 @@ namespace WikiViewer.Uwp.Pages
         {
             SizeChanged += Page_SizeChanged;
             _previewTimer.Tick += async (s, e) => { _previewTimer.Stop(); await GeneratePreviewAsync(true); };
+            _localPreviewTimer.Tick += async (s, e) => { _localPreviewTimer.Stop(); await UpdateLocalPreviewAsync(); };
             Loaded += (s, e) => { if (_previewControlsReady) { SetPreviewLayout(false); QueueNativePreview(); } };
         }
 
@@ -286,21 +292,50 @@ namespace WikiViewer.Uwp.Pages
             PreviewStatusControl.Text = "Live preview will update after typing pauses.";
         }
 
+        private async Task UpdateLocalPreviewAsync()
+        {
+            if (_localPreviewBusy || !_previewActive || !_sourceLoaded || !PreviewModeControl.IsOn) return;
+            _localPreviewBusy = true;
+            string source = _lastPreviewSource;
+            long input = _localPreviewInput;
+            try
+            {
+                if (await NativePreviewHost.TryApplyDraftTextAsync(source, () => _previewActive && PreviewModeControl.IsOn && source == _lastPreviewSource))
+                {
+                    PreviewStatusControl.Text = "Local preview updated · checking server expansion…";
+                    if (_previewFrameHandler != null) Windows.UI.Xaml.Media.CompositionTarget.Rendering -= _previewFrameHandler;
+                    _previewFrameHandler = (s, args) =>
+                    {
+                        Windows.UI.Xaml.Media.CompositionTarget.Rendering -= _previewFrameHandler; _previewFrameHandler = null;
+                        if (_previewActive && source == _lastPreviewSource && input != 0)
+                            ArticleLoadMetrics.Record("editor-input-to-frame", (long)((Stopwatch.GetTimestamp() - input) * 1000.0 / Stopwatch.Frequency));
+                    };
+                    Windows.UI.Xaml.Media.CompositionTarget.Rendering += _previewFrameHandler;
+                }
+            }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine("Local preview: " + ex.Message); }
+            finally
+            {
+                _localPreviewBusy = false;
+                if (_previewActive && source != _lastPreviewSource) _localPreviewTimer.Start();
+            }
+        }
+
         private async Task RenderPreviewAsync(ArticlePreview preview)
         {
             int version = ++_previewRenderVersion;
             PreviewPlaceholderControl.Visibility = Visibility.Collapsed;
             PreviewStatusControl.Text = _previewSession.IsStale ? (PreviewModeControl.IsOn ? "Updating live preview..." : "Preview is out of date. Click Preview to update it.") : "Preview of your unsaved text";
-            NativePreviewHost.ClearArticle();
             if (PreviewModeControl.IsOn)
             {
                 NativePreviewHost.Visibility = Visibility.Visible;
                 WebPreviewHost.Visibility = Visibility.Collapsed;
                 try
                 {
-                    await NativePreviewHost.ShowArticleAsync(preview.Content, new Uri(_pageWikiContext.GetWikiPageUrl(_pageTitle)),
+                    await NativePreviewHost.ShowPreviewAsync(preview.Content, new Uri(_pageWikiContext.GetWikiPageUrl(_pageTitle)),
                         async uri => { await Windows.System.Launcher.LaunchUriAsync(uri); },
-                        (url, token) => MediaCacheService.GetLocalUriAsync(url, _pageWikiContext, cancellationToken: token));
+                        (url, token) => MediaCacheService.GetLocalUriAsync(url, _pageWikiContext, cancellationToken: token),
+                        () => _previewActive && version == _previewRenderVersion && PreviewModeControl.IsOn && preview.Content.RawWikitext == _lastPreviewSource);
                     return;
                 }
                 catch (Exception ex)
@@ -312,6 +347,7 @@ namespace WikiViewer.Uwp.Pages
             }
             if (version != _previewRenderVersion) return;
             NativePreviewHost.Visibility = Visibility.Collapsed;
+            NativePreviewHost.ClearArticle();
             WebPreviewHost.Visibility = Visibility.Visible;
             try
             {
@@ -434,6 +470,8 @@ namespace WikiViewer.Uwp.Pages
             _previewQueued = false;
             _previewTimer.Stop();
             _previewSession.Clear();
+            _localPreviewTimer.Stop();
+            if (_previewFrameHandler != null) { Windows.UI.Xaml.Media.CompositionTarget.Rendering -= _previewFrameHandler; _previewFrameHandler = null; }
             _previewRenderVersion++;
             NativePreviewHost.ClearArticle();
             _highlightDebounceTimer?.Stop();
@@ -698,6 +736,8 @@ namespace WikiViewer.Uwp.Pages
             if (!string.Equals(_lastPreviewSource, previewSource, StringComparison.Ordinal))
             {
                 _lastPreviewSource = previewSource;
+                _localPreviewInput = Stopwatch.GetTimestamp();
+                _localPreviewTimer.Stop(); _localPreviewTimer.Start();
                 QueueNativePreview();
             }
             if (_isUpdatingText)
@@ -1112,9 +1152,14 @@ namespace WikiViewer.Uwp.Pages
                     request.Title,
                     _pageWikiContext,
                     worker,
-                    buildWebHtml: !native
+                    buildWebHtml: !native,
+                    resolveRemoteResources: !native
                 );
-                if (_previewActive && PreviewModeControl.IsOn == native && _previewSession.Accept(request, preview)) await RenderPreviewAsync(preview);
+                if (_previewActive && PreviewModeControl.IsOn == native && _previewSession.Accept(request, preview))
+                {
+                    await RenderPreviewAsync(preview);
+                    if (native) _ = EnrichNativePreviewAsync(preview, worker);
+                }
                 else if (_previewSession.IsLatest(request) && !native) PreviewStatusControl.Text = "Text changed while the preview was generated. Click Preview again.";
             }
             catch (Exception ex)
@@ -1128,8 +1173,30 @@ namespace WikiViewer.Uwp.Pages
             {
                 _previewBusy = false;
                 if (_previewActive) PreviewAppBarButton.IsEnabled = true;
-                if (_previewQueued) QueueNativePreview();
+                if (_previewQueued && _previewActive && PreviewModeControl.IsOn) await GeneratePreviewAsync(true);
             }
+        }
+
+        private async Task EnrichNativePreviewAsync(ArticlePreview preview, IApiWorker sourceWorker)
+        {
+            var wiki = _pageWikiContext; string title = _pageTitle;
+            string key = wiki.ApiEndpoint + ":" + string.Join("|", ArticleStyleResourceService.GetStyleUrls(preview.Content, new Uri(wiki.GetWikiPageUrl(title)), wiki.ScriptPath));
+            if (_previewResourceKey == key) return;
+            _previewResourceKey = key;
+            try
+            {
+                var enriched = new ArticlePreview { Content = preview.Content.Copy(), HeadHtml = preview.HeadHtml };
+                enriched.StyleModules.AddRange(preview.StyleModules);
+                using (var worker = App.ApiWorkerFactory.CreateApiWorker(wiki))
+                {
+                    await worker.InitializeAsync(wiki.BaseUrl);
+                    await worker.CopyApiCookiesFromAsync(sourceWorker);
+                    await WikitextParsingService.ResolveEditorPreviewResourcesAsync(enriched, title, wiki, worker);
+                }
+                if (_previewActive && PreviewModeControl.IsOn && enriched.Content.RawWikitext == _lastPreviewSource)
+                    await RenderPreviewAsync(enriched);
+            }
+            catch (Exception ex) { _previewResourceKey = null; System.Diagnostics.Debug.WriteLine("Optional preview resources: " + ex.Message); }
         }
 
         protected async void SaveButton_Click(object sender, RoutedEventArgs e)

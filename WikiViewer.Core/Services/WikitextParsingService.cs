@@ -134,16 +134,26 @@ namespace WikiViewer.Core.Services
             }
         }
 
-        public static async Task<ArticlePreview> ParseEditorPreviewAsync(string wikitext, string pageTitle, WikiInstance wikiContext, IApiWorker worker, bool buildWebHtml = true)
+        public static async Task<ArticlePreview> ParseEditorPreviewAsync(string wikitext, string pageTitle, WikiInstance wikiContext, IApiWorker worker, bool buildWebHtml = true, bool resolveRemoteResources = true)
         {
             if (wikiContext == null) throw new ArgumentNullException(nameof(wikiContext));
             if (worker == null) throw new ArgumentNullException(nameof(worker));
             string json = await worker.PostAndGetJsonFromApiAsync(wikiContext.ApiEndpoint, EditorPreviewResponse.BuildRequest(wikitext, pageTitle));
-            var preview = EditorPreviewResponse.Parse(json, wikitext, pageTitle);
-            preview.Content.Syntax = await WikiSyntaxService.GetAsync(wikiContext.ApiEndpoint, worker.GetJsonFromApiAsync);
-            await ArticleStyleResourceService.ResolveAsync(preview.Content, new Uri(wikiContext.GetWikiPageUrl(pageTitle)), wikiContext.ScriptPath, worker.GetRawHtmlFromUrlAsync);
+            var preview = await Task.Run(() => EditorPreviewResponse.Parse(json, wikitext, pageTitle));
+            if (resolveRemoteResources) await ResolveEditorPreviewResourcesAsync(preview, pageTitle, wikiContext, worker);
+            else
+            {
+                preview.Content.Syntax = await WikiSyntaxService.GetCachedAsync(wikiContext.ApiEndpoint);
+                await ArticleStyleResourceService.ResolveCachedAsync(preview.Content, new Uri(wikiContext.GetWikiPageUrl(pageTitle)), wikiContext.ScriptPath);
+            }
             if (buildWebHtml) await BuildWebPreviewHtmlAsync(preview, pageTitle, wikiContext);
             return preview;
+        }
+
+        public static async Task ResolveEditorPreviewResourcesAsync(ArticlePreview preview, string pageTitle, WikiInstance wikiContext, IApiWorker worker)
+        {
+            preview.Content.Syntax = await WikiSyntaxService.GetAsync(wikiContext.ApiEndpoint, worker.GetJsonFromApiAsync);
+            await ArticleStyleResourceService.ResolveAsync(preview.Content, new Uri(wikiContext.GetWikiPageUrl(pageTitle)), wikiContext.ScriptPath, worker.GetRawHtmlFromUrlAsync);
         }
 
         public static async Task BuildWebPreviewHtmlAsync(ArticlePreview preview, string pageTitle, WikiInstance wikiContext)

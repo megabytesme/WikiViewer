@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Threading;
@@ -32,6 +33,12 @@ namespace WikiViewer.Uwp.Controls
         private readonly Dictionary<string, FrameworkElement> _anchors = new Dictionary<string, FrameworkElement>(StringComparer.Ordinal);
         private readonly List<Image> _images = new List<Image>();
         private NativeArticleDocument _document;
+        private readonly Dictionary<NativeArticleNode, List<WeakReference<Run>>> _draftRuns = new Dictionary<NativeArticleNode, List<WeakReference<Run>>>();
+        private readonly Dictionary<NativeArticleNode, WeakReference<FrameworkElement>> _draftTextOwners = new Dictionary<NativeArticleNode, WeakReference<FrameworkElement>>();
+        private sealed class DraftBlock { public WeakReference<FrameworkElement> Element; public RenderScope Scope; }
+        private readonly Dictionary<NativeArticleNode, DraftBlock> _draftBlocks = new Dictionary<NativeArticleNode, DraftBlock>();
+        private List<NativeArticleSection> _sectionGroups;
+        private ObservableCollection<NativeArticleSection> _visibleGroups;
         private readonly List<ArticleMediaView> _media = new List<ArticleMediaView>();
         private readonly Dictionary<string, NativeArticleSection> _anchorSections = new Dictionary<string, NativeArticleSection>(StringComparer.Ordinal);
         private readonly List<RenderScope> _scopes = new List<RenderScope>();
@@ -149,6 +156,122 @@ namespace WikiViewer.Uwp.Controls
             return true;
         }
 
+        public async Task<bool> TryApplyDraftTextAsync(string source, Func<bool> isCurrent = null)
+        {
+            var document = _document;
+            if (document == null) return false;
+            int version = _version;
+            var elapsed = System.Diagnostics.Stopwatch.StartNew();
+            var page = _pageUri;
+            var changes = await Task.Run(() =>
+            {
+                var text = NativeDraftTextPatch.TryCreate(document, source);
+                return Tuple.Create(text, text == null ? NativeDraftBlockPatch.TryCreate(document, source, page) : null);
+            });
+            if (version != _version || document != _document || isCurrent != null && !isCurrent()) return false;
+            var patch = changes.Item1;
+            if (patch == null)
+            {
+                if (changes.Item2 == null || !ApplyDraftBlock(changes.Item2)) return false;
+                document.RawWikitext = source;
+                ArticleLoadMetrics.Record("editor-local-group", elapsed.ElapsedMilliseconds);
+                return true;
+            }
+            patch.Node.Text = patch.Text;
+            document.RawWikitext = source;
+            List<WeakReference<Run>> runs;
+            if (_draftRuns.TryGetValue(patch.Node, out runs))
+            {
+                foreach (var reference in runs)
+                {
+                    Run run; if (!reference.TryGetTarget(out run)) continue;
+                    run.Text = patch.Text;
+                }
+                WeakReference<FrameworkElement> textOwner; FrameworkElement host;
+                if (_draftTextOwners.TryGetValue(patch.Node, out textOwner) && textOwner.TryGetTarget(out host))
+                    for (DependencyObject owner = host; owner != null; owner = VisualTreeHelper.GetParent(owner))
+                        if (owner is ArticleTableView table) { table.InvalidateContentMeasure(); break; }
+                runs.RemoveAll(reference => { Run run; return !reference.TryGetTarget(out run); });
+            }
+            ArticleLoadMetrics.Record("editor-local-text", elapsed.ElapsedMilliseconds);
+            return true;
+        }
+
+        public async Task<bool> ShowPreviewAsync(ArticleContent content, Uri page, Func<Uri, Task> navigate,
+            Func<string, CancellationToken, Task<string>> resolve, Func<bool> isCurrent)
+        {
+            int version = _version;
+            var elapsed = System.Diagnostics.Stopwatch.StartNew();
+            double? width = ActualWidth > 0 ? (double?)ActualWidth : null;
+            var document = await NativeDocumentCache.GetAsync(content, page, width);
+            if (version != _version || !isCurrent()) return false;
+            var next = ArticleSectionService.Split(document.Nodes);
+            var previous = _sectionGroups?.ToArray();
+            if (previous != null && _visibleGroups != null && previous.Length == next.Count &&
+                previous.Select(s => s.Title).SequenceEqual(next.Select(s => s.Title)) && _document.Background == document.Background && _document.Foreground == document.Foreground)
+            {
+                bool[] equal;
+                try { equal = await Task.Run(() => previous.Zip(next, (a, b) => NativeSectionSignature.Get(a) == NativeSectionSignature.Get(b)).ToArray()); }
+                catch (InvalidOperationException) { return false; } // A newer local group edit wins.
+                if (version != _version || !isCurrent()) return false;
+                var merged = next.Select((group, i) => equal[i] ? previous[i] : group).ToList();
+                _sectionGroups = merged;
+                _document.Nodes.Clear(); _document.Nodes.AddRange(merged.SelectMany(s => s.Nodes));
+                _document.RawWikitext = content.RawWikitext; _document.Syntax = document.Syntax;
+                _anchorSections.Clear();
+                foreach (var group in merged) foreach (string id in group.Anchors) _anchorSections[id] = group;
+                for (int i = 0; i < merged.Count; i++) if (!equal[i]) _visibleGroups[i] = merged[i];
+                ArticleLoadMetrics.Record("editor-group-merge", elapsed.ElapsedMilliseconds);
+                return true;
+            }
+            ClearArticle();
+            RenderDocument(document, page, navigate, resolve);
+            return true;
+        }
+
+        private bool ApplyDraftBlock(NativeDraftBlockPatch patch)
+        {
+            DraftBlock location; FrameworkElement element = null; Panel panel = null; int visualIndex = -1;
+            if (_draftBlocks.TryGetValue(patch.Original, out location) && (location.Scope == null || location.Scope.Active) && location.Element.TryGetTarget(out element))
+            {
+                panel = element.Parent as Panel;
+                if (panel == null) return false;
+                visualIndex = panel.Children.IndexOf(element);
+            }
+            int index = patch.Parent.IndexOf(patch.Original);
+            if (index < 0) return false;
+            patch.Parent.RemoveAt(index); patch.Parent.InsertRange(index, patch.Replacements);
+            if (_sectionGroups != null) foreach (var group in _sectionGroups)
+            {
+                if (patch.Original.Kind == NativeArticleNodeKind.Heading && patch.Original.Id != null && group.Anchors.Contains(patch.Original.Id))
+                    group.Title = string.Concat(patch.Replacements.Select(PlainText)).Trim();
+                int at = group.Nodes.IndexOf(patch.Original);
+                if (at >= 0) { group.Nodes.RemoveAt(at); group.Nodes.InsertRange(at, patch.Replacements); }
+            }
+            ForgetDraftBlock(patch.Original);
+            if (panel != null && visualIndex >= 0)
+            {
+                var previous = _scope; _scope = location.Scope;
+                try
+                {
+                    panel.Children.RemoveAt(visualIndex);
+                    foreach (var node in patch.Replacements)
+                    {
+                        var replacement = RenderBlock(node); Register(node.Id, replacement);
+                        panel.Children.Insert(visualIndex++, replacement);
+                    }
+                }
+                finally { _scope = previous; }
+            }
+            return true;
+        }
+
+        private void ForgetDraftBlock(NativeArticleNode node)
+        {
+            _draftRuns.Remove(node); _draftBlocks.Remove(node); _draftTextOwners.Remove(node);
+            foreach (var child in node.Children) ForgetDraftBlock(child);
+        }
+
         private void RenderDocument(NativeArticleDocument document, Uri pageUri, Func<Uri, Task> navigate, Func<string, CancellationToken, Task<string>> resolveImage)
         {
             _document = document;
@@ -177,6 +300,7 @@ namespace WikiViewer.Uwp.Controls
 
         private void ShowSections(List<NativeArticleSection> sections, bool unsupported)
         {
+            _sectionGroups = sections;
             foreach (var section in sections) foreach (string id in section.Anchors) if (!_anchorSections.ContainsKey(id)) _anchorSections[id] = section;
             _sections = new ListView { SelectionMode = ListViewSelectionMode.None, IsItemClickEnabled = false,
                 HorizontalContentAlignment = HorizontalAlignment.Stretch, IsTabStop = false };
@@ -196,7 +320,8 @@ namespace WikiViewer.Uwp.Controls
                     args.RegisterUpdateCallback((list, next) => RenderSection(next, sections.Count));
                 else RenderSection(args, sections.Count);
             };
-            _sections.ItemsSource = sections;
+            _visibleGroups = new ObservableCollection<NativeArticleSection>(sections);
+            _sections.ItemsSource = _visibleGroups;
             Content = _sections;
         }
 
@@ -256,7 +381,7 @@ namespace WikiViewer.Uwp.Controls
 
         public void ClearArticle()
         {
-            _document = null;
+            _document = null; _draftRuns.Clear(); _draftBlocks.Clear(); _draftTextOwners.Clear(); _sectionGroups = null; _visibleGroups = null;
             _assetCancellation.Cancel(); _assetCancellation.Dispose(); _assetCancellation = new CancellationTokenSource();
             _interacted = false;
             _version++;
@@ -301,7 +426,9 @@ namespace WikiViewer.Uwp.Controls
         private FrameworkElement RenderBlock(NativeArticleNode node)
         {
             var content = node.Style.Collapsible ? Collapsible(node) : RenderBlockCore(node);
-            return ArticleVisualStyle.Block(content, node, _palette);
+            var result = ArticleVisualStyle.Block(content, node, _palette);
+            _draftBlocks[node] = new DraftBlock { Element = new WeakReference<FrameworkElement>(result), Scope = _scope };
+            return result;
         }
 
         private FrameworkElement Collapsible(NativeArticleNode node)
@@ -420,7 +547,13 @@ namespace WikiViewer.Uwp.Controls
         {
             if (node.Style.Hidden) return;
             Register(node.Id, anchor);
-            if (node.Kind == NativeArticleNodeKind.Text) { inlines.Add(new Run { Text = node.Text ?? "" }); return; }
+            if (node.Kind == NativeArticleNodeKind.Text)
+            {
+                var run = new Run { Text = node.Text ?? "" };
+                List<WeakReference<Run>> runs;
+                if (!_draftRuns.TryGetValue(node, out runs)) _draftRuns[node] = runs = new List<WeakReference<Run>>();
+                runs.Add(new WeakReference<Run>(run)); _draftTextOwners[node] = new WeakReference<FrameworkElement>(anchor); inlines.Add(run); return;
+            }
             if (node.Kind == NativeArticleNodeKind.LineBreak) { inlines.Add(new LineBreak()); return; }
             if (node.Kind == NativeArticleNodeKind.Image) { inlines.Add(new InlineUIContainer { Child = Image(node) }); return; }
             if (node.Kind == NativeArticleNodeKind.Media) { inlines.Add(new InlineUIContainer { Child = Media(node) }); return; }
