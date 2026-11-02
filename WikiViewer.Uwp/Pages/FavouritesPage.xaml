@@ -18,7 +18,7 @@
     <Grid>
 
         <ScrollViewer x:Name="GridViewScrollViewerControl" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Visible">
-            <GridView x:Name="FavouritesGridViewControl" Padding="24,52,24,48" IsItemClickEnabled="True" SelectionMode="None" ItemClick="Favourite_ItemClick" Holding="Favourite_Holding" SelectionChanged="FavouritesGridView_SelectionChanged" HorizontalAlignment="Center" ContainerContentChanging="FavouritesControl_ContainerContentChanging">
+            <GridView x:Name="FavouritesGridViewControl" Padding="24,52,24,48" IsItemClickEnabled="True" SelectionMode="None" ItemClick="Favourite_ItemClick" Holding="Favourite_Holding" RightTapped="Favourite_RightTapped" SelectionChanged="FavouritesGridView_SelectionChanged" HorizontalAlignment="Center" ContainerContentChanging="FavouritesControl_ContainerContentChanging">
                 <GridView.ItemContainerStyle>
                     <Style TargetType="GridViewItem">
                         <Setter Property="Margin" Value="8"/>
@@ -60,7 +60,7 @@
             </GridView>
         </ScrollViewer>
         <ScrollViewer x:Name="ListViewScrollViewerControl" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Visible" Visibility="Collapsed">
-            <ListView x:Name="FavouritesListViewControl" Padding="12,52,12,48" IsItemClickEnabled="True" SelectionMode="None" ItemClick="Favourite_ItemClick" Holding="Favourite_Holding" SelectionChanged="FavouritesListView_SelectionChanged" ContainerContentChanging="FavouritesControl_ContainerContentChanging">
+            <ListView x:Name="FavouritesListViewControl" Padding="12,52,12,48" IsItemClickEnabled="True" SelectionMode="None" ItemClick="Favourite_ItemClick" Holding="Favourite_Holding" RightTapped="Favourite_RightTapped" SelectionChanged="FavouritesListView_SelectionChanged" ContainerContentChanging="FavouritesControl_ContainerContentChanging">
                 <ListView.ItemContainerStyle>
                     <Style TargetType="ListViewItem">
                         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -95,7 +95,7 @@
             </ListView>
         </ScrollViewer>
         <TextBlock x:Name="NoFavouritesTextBlockControl" Text="You haven't added any Favourites yet." Style="{ThemeResource SubtitleTextBlockStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
-        <CommandBar Background="{ThemeResource PageTitleBarAcrylicBrush}"
+        <CommandBar VerticalAlignment="Top" Background="{ThemeResource PageTitleBarAcrylicBrush}"
             DefaultLabelPosition="Right"
             IsDynamicOverflowEnabled="True">
             <CommandBar.Content>

@@ -97,6 +97,30 @@ namespace WikiViewer.Uwp.Pages
             e.Handled = true;
         }
 
+        protected void Favourite_RightTapped(object sender, RightTappedRoutedEventArgs e)
+        {
+            var view = (ListViewBase)sender;
+            var container = e.OriginalSource as DependencyObject;
+            while (container != null && container != view && !(container is SelectorItem)) container = VisualTreeHelper.GetParent(container);
+            var item = container == null ? null : view.ItemFromContainer(container) as FavouriteItem;
+            if (item == null) return;
+            var menu = new MenuFlyout();
+            bool selected = view.SelectedItems.Contains(item);
+            var select = new MenuFlyoutItem { Text = selected ? "Deselect" : "Select", Icon = new SymbolIcon(Symbol.SelectAll) };
+            select.Click += (s, args) =>
+            {
+                if (view.SelectedItems.Contains(item)) view.SelectedItems.Remove(item);
+                else { view.SelectionMode = ListViewSelectionMode.Multiple; view.SelectedItems.Add(item); }
+            };
+            menu.Items.Add(select);
+            var targets = selected ? view.SelectedItems.Cast<FavouriteItem>().ToList() : new List<FavouriteItem> { item };
+            var delete = new MenuFlyoutItem { Text = targets.Count > 1 ? "Delete selected favourites" : "Delete", Icon = new SymbolIcon(Symbol.Delete) };
+            delete.Click += async (s, args) => await DeleteFavouritesAsync(targets);
+            menu.Items.Add(delete);
+            menu.ShowAt(view, e.GetPosition(view));
+            e.Handled = true;
+        }
+
         protected void Favourite_ItemClick(object sender, ItemClickEventArgs e)
         {
             var view = (ListViewBase)sender;
@@ -581,6 +605,11 @@ namespace WikiViewer.Uwp.Pages
             )
                 .Cast<FavouriteItem>()
                 .ToList();
+            await DeleteFavouritesAsync(itemsToDelete);
+        }
+
+        private async Task DeleteFavouritesAsync(IEnumerable<FavouriteItem> itemsToDelete)
+        {
             var itemsByWiki = itemsToDelete.GroupBy(item => item.WikiId);
 
             foreach (var group in itemsByWiki)
@@ -595,8 +624,9 @@ namespace WikiViewer.Uwp.Pages
                         ? new AuthenticationService(account, wiki, App.ApiWorkerFactory)
                         : null;
                 var titlesToRemove = group
-                    .Select(item => item.ArticlePageTitle)
+                    .SelectMany(item => new[] { item.ArticlePageTitle, item.TalkPageTitle })
                     .Where(t => !string.IsNullOrEmpty(t))
+                    .Distinct(StringComparer.Ordinal)
                     .ToList();
                 if (titlesToRemove.Any())
                 {
