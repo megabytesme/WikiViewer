@@ -6,6 +6,7 @@ using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
 using Windows.Foundation;
 using Windows.Graphics.Printing;
+using Windows.Storage;
 using Windows.UI;
 using Windows.UI.Text;
 using Windows.UI.Xaml;
@@ -47,6 +48,7 @@ namespace WikiViewer.Uwp.Services
         {
             _title = title;
             var model = await Task.Run(() => NativeArticleDocumentService.Parse(content, page));
+            if (_disposed) return;
             _text = new RichTextBlock { FontSize = 12, Foreground = new SolidColorBrush(Colors.Black), IsTextSelectionEnabled = false };
             var heading = new Paragraph { FontSize = 22, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 12) };
             heading.Inlines.Add(new Run { Text = title });
@@ -60,6 +62,7 @@ namespace WikiViewer.Uwp.Services
 
         private async Task AddBlockAsync(NativeArticleNode node, Func<string, Task<string>> resolve)
         {
+            if (_disposed) return;
             if (node.Kind == NativeArticleNodeKind.List)
             {
                 int number = node.ListStart;
@@ -69,7 +72,7 @@ namespace WikiViewer.Uwp.Services
                     p.Inlines.Add(new Run { Text = node.Ordered ? (item.ListValue ?? number) + ". " : "• " });
                     number = (item.ListValue ?? number) + 1;
                     foreach (var child in item.Children) await AddInlineAsync(p.Inlines, child, resolve);
-                    _text.Blocks.Add(p);
+                    _text?.Blocks.Add(p);
                 }
                 return;
             }
@@ -80,7 +83,7 @@ namespace WikiViewer.Uwp.Services
             }
             var paragraph = NewParagraph(node);
             await AddInlineAsync(paragraph.Inlines, node, resolve);
-            _text.Blocks.Add(paragraph);
+            _text?.Blocks.Add(paragraph);
         }
 
         private static Paragraph NewParagraph(NativeArticleNode node) => new Paragraph
@@ -101,8 +104,23 @@ namespace WikiViewer.Uwp.Services
                     var local = await resolve(node.Uri.AbsoluteUri);
                     if (Uri.TryCreate(local, UriKind.Absolute, out var uri))
                     {
-                        ImageSource source = uri.AbsolutePath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase)
-                            ? (ImageSource)new SvgImageSource(uri) : new BitmapImage(uri);
+                        ImageSource source;
+                        var file = await StorageFile.GetFileFromApplicationUriAsync(uri);
+                        using (var stream = await file.OpenReadAsync())
+                        {
+                            if (uri.AbsolutePath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
+                            {
+                                var svg = new SvgImageSource();
+                                if (await svg.SetSourceAsync(stream) != SvgImageSourceLoadStatus.Success) throw new InvalidOperationException("Image could not be decoded.");
+                                source = svg;
+                            }
+                            else
+                            {
+                                var bitmap = new BitmapImage { DecodePixelWidth = node.ImageWidth > 0 ? Math.Min(840, node.ImageWidth * 2) : 840 };
+                                await bitmap.SetSourceAsync(stream); source = bitmap;
+                            }
+                        }
+                        if (_disposed) return;
                         target.Add(new InlineUIContainer { Child = new Image { Source = source, MaxWidth = 420, MaxHeight = 250, Stretch = Stretch.Uniform } });
                         return;
                     }
@@ -114,6 +132,11 @@ namespace WikiViewer.Uwp.Services
             if (node.Kind == NativeArticleNodeKind.Media)
             {
                 target.Add(new Run { Text = "[Media: " + (node.Uri?.AbsoluteUri ?? node.Text ?? "available on the wiki") + "]" });
+                return;
+            }
+            if (node.Kind == NativeArticleNodeKind.Math && !string.IsNullOrWhiteSpace(node.Text))
+            {
+                target.Add(new Run { Text = node.Text });
                 return;
             }
             Span span = node.Kind == NativeArticleNodeKind.Strong ? new Bold() : node.Kind == NativeArticleNodeKind.Emphasis ? (Span)new Italic() : new Span();
@@ -145,7 +168,7 @@ namespace WikiViewer.Uwp.Services
             var task = e.Request.CreatePrintTask(_title ?? "Wiki page", args => args.SetSource(_source));
             task.Completed += async (s, args) => await _host.Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
             {
-                if (args.Completion == PrintTaskCompletion.Failed) Failed?.Invoke(this, "The print job failed. Check the selected printer and try again.");
+                if (!_disposed && args.Completion == PrintTaskCompletion.Failed) Failed?.Invoke(this, "The print job failed. Check the selected printer and try again.");
                 Dispose();
             });
         }

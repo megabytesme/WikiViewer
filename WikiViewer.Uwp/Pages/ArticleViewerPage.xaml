@@ -31,7 +31,7 @@
             <AppBarButton x:Name="ReloadPageButton" Icon="Refresh" Label="Reload page" Click="ReloadPageButton_Click"/>
             <AppBarButton x:Name="RefreshButton" Icon="Refresh" Label="Refresh Theme" Click="RefreshButton_Click"/>
             <CommandBar.SecondaryCommands>
-                <AppBarButton x:Name="PrintButton" Icon="Print" Label="Print" Click="PrintButton_Click"/>
+                <AppBarButton x:Name="PrintButton" Icon="Print" Label="Print" Click="PrintButton_Click" IsEnabled="False"/>
             </CommandBar.SecondaryCommands>
         </CommandBar>
         <Grid x:Name="LoadingOverlay" Opacity="0" IsHitTestVisible="False" Background="{ThemeResource PageTitleBarAcrylicBrush}">

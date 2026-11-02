@@ -23,10 +23,14 @@ namespace WikiViewer.Uwp.Pages
     public abstract class ArticleViewerPageBase : Page
     {
         private WikiViewer.Uwp.Services.ArticlePrintService _printing;
+        private bool _preparingPrint;
 
         protected async void PrintButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_displayedContent == null || _pageWikiContext == null) return;
+            if (_preparingPrint || _displayedContent == null || _pageWikiContext == null) return;
+            _preparingPrint = true;
+            var button = sender as AppBarButton;
+            if (button != null) { button.IsEnabled = false; button.Label = "Preparing print…"; }
             try
             {
                 _printing?.Dispose();
@@ -39,7 +43,12 @@ namespace WikiViewer.Uwp.Pages
             catch (Exception ex)
             {
                 _printing?.Dispose();
-                await new ContentDialog { Title = "Could not print", Content = ex.Message, PrimaryButtonText = "Close" }.ShowAsync();
+                if (Frame?.Content == this) await new ContentDialog { Title = "Could not print", Content = ex.Message, PrimaryButtonText = "Close" }.ShowAsync();
+            }
+            finally
+            {
+                _preparingPrint = false;
+                if (button != null) { button.Label = "Print"; button.IsEnabled = _displayedContent != null; }
             }
         }
         protected bool _isVerificationOnlyFlow = false;
@@ -386,7 +395,11 @@ namespace WikiViewer.Uwp.Pages
             var fetchStopwatch = Stopwatch.StartNew();
             string title = _pageTitleToFetch; var wiki = _pageWikiContext;
             bool keepVisible = forceRefresh && _displayedContent != null;
-            if (!keepVisible) _displayedContent = null;
+            if (!keepVisible)
+            {
+                _displayedContent = null;
+                if (FindName("PrintButton") is AppBarButton print) print.IsEnabled = false;
+            }
             _pendingUpdate = null; _stylesWaiting = false; _checkingUpdates = false; _loadingResources = false;
             if (!keepVisible) { ShowLoadingOverlay(); LastUpdatedTextBlock.Visibility = Visibility.Collapsed; }
             else { _pageStatus = "Refreshing page…"; RefreshPageStatus(); }
@@ -502,6 +515,7 @@ namespace WikiViewer.Uwp.Pages
 
         private void RefreshPageStatus()
         {
+            if (FindName("PrintButton") is AppBarButton print) print.IsEnabled = !_preparingPrint && _displayedContent != null;
             LastUpdatedTextBlock.Text = _pendingUpdate != null ? "Newer page available · Select Reload page" : _stylesWaiting ? "Layout ready · Select Reload page to apply" :
                 _pageStatus + (_checkingUpdates ? " · Checking for updates…" : "") + (_loadingResources ? " · Loading page styles…" : "");
             LastUpdatedTextBlock.Visibility = Visibility.Visible;
