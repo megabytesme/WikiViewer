@@ -13,6 +13,8 @@ namespace WikiViewer.Shared.Uwp.Controls
     {
         private readonly Grid _grid;
         private readonly ScrollViewer _scroll;
+        private double _columnWidth = double.NaN;
+        private int _cellCount = -1;
         public ArticleTableView(Grid grid)
         {
             _grid = grid;
@@ -24,6 +26,8 @@ namespace WikiViewer.Shared.Uwp.Controls
         protected override Size MeasureOverride(Size availableSize)
         {
             double width = double.IsInfinity(availableSize.Width) ? 960 : Math.Max(1, availableSize.Width);
+            if (_columnWidth != width || _cellCount != _grid.Children.Count)
+            {
             var preferred = Enumerable.Repeat(40d, _grid.ColumnDefinitions.Count).ToArray();
             foreach (FrameworkElement cell in _grid.Children)
             {
@@ -33,7 +37,13 @@ namespace WikiViewer.Shared.Uwp.Controls
                 for (int i = column; i < Math.Min(preferred.Length, column + span); i++) preferred[i] = Math.Max(preferred[i], desired);
             }
             var columns = NativeResponsiveLayout.TableColumns(width, preferred);
-            for (int i = 0; i < columns.Length; i++) _grid.ColumnDefinitions[i].Width = new GridLength(columns[i]);
+            for (int i = 0; i < columns.Length; i++)
+            {
+                var length = new GridLength(columns[i]);
+                if (!_grid.ColumnDefinitions[i].Width.Equals(length)) _grid.ColumnDefinitions[i].Width = length;
+            }
+            _columnWidth = width; _cellCount = _grid.Children.Count;
+            }
             _scroll.Measure(new Size(width, availableSize.Height));
             return new Size(width, _scroll.DesiredSize.Height);
         }

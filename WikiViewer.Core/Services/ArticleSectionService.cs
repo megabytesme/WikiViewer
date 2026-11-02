@@ -15,6 +15,11 @@ namespace WikiViewer.Core.Services
 
     public static class ArticleSectionService
     {
+        public static bool ShouldVirtualize(ICollection<NativeArticleNode> nodes, ICollection<NativeArticleSection> sections)
+            => sections.Count > 1 && (nodes.Count >= 40 || Count(nodes) >= 300);
+
+        private static int Count(IEnumerable<NativeArticleNode> nodes) => nodes.Sum(n => 1 + Count(n.Children));
+
         /// <summary>Split at section headings, retaining floats and source order inside each section.</summary>
         public static List<NativeArticleSection> Split(IEnumerable<NativeArticleNode> nodes)
         {

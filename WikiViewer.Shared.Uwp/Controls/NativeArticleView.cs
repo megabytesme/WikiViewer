@@ -38,6 +38,7 @@ namespace WikiViewer.Shared.Uwp.Controls
         private ListView _sections;
         private sealed class RenderScope
         {
+            public NativeArticleSection Section;
             public bool Active = true;
             public readonly CancellationTokenSource Cancellation = new CancellationTokenSource();
             public readonly List<Image> Images = new List<Image>();
@@ -149,7 +150,7 @@ namespace WikiViewer.Shared.Uwp.Controls
             if (foreground != null) { Foreground = foreground; _scroll.Foreground = foreground; }
             else { ClearValue(Control.ForegroundProperty); _scroll.ClearValue(Control.ForegroundProperty); }
             var sections = ArticleSectionService.Split(document.Nodes);
-            if (document.Nodes.Count >= 100 && sections.Count >= 4)
+            if (ArticleSectionService.ShouldVirtualize(document.Nodes, sections))
             {
                 ShowSections(sections, document.UnsupportedFeatures.Count > 0);
                 _sections.Background = _palette.Get(document.Background, ArticleColorRole.Background);
@@ -193,6 +194,11 @@ namespace WikiViewer.Shared.Uwp.Controls
             var host = args.ItemContainer.ContentTemplateRoot as ContentControl;
             if (host == null) return;
             var previous = host.Tag as RenderScope;
+            if (!args.InRecycleQueue && previous != null && previous.Active && ReferenceEquals(previous.Section, args.Item))
+            {
+                args.Handled = true;
+                return;
+            }
             if (previous != null) ReleaseScope(previous);
             host.Content = null; host.Tag = null;
             args.Handled = true;
@@ -200,7 +206,7 @@ namespace WikiViewer.Shared.Uwp.Controls
             var section = args.Item as NativeArticleSection;
             if (section == null) return;
             Windows.UI.Xaml.Automation.AutomationProperties.SetName(args.ItemContainer, section.Title);
-            var scope = new RenderScope(); _scopes.Add(scope); _scope = scope; host.Tag = scope;
+            var scope = new RenderScope { Section = section }; _scopes.Add(scope); _scope = scope; host.Tag = scope;
             try
             {
                 var margin = ContentMargin;
