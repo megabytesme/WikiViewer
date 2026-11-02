@@ -1,6 +1,7 @@
 <local:ArticleViewerPageBase
     x:Class="WikiViewer.Uwp.Pages.ArticleViewerPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:appearance="using:WikiViewer.Uwp.Services"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:layout="using:WikiViewer.Uwp.Controls"
     xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
@@ -21,7 +22,7 @@
         <Grid x:Name="TitleBarBackground" VerticalAlignment="Top" Style="{StaticResource PageTitleBarGridStyle}" Margin="0,0,15,0">
             <TextBlock x:Name="ArticleTitle" Style="{StaticResource PageTitleBarTextStyle}" TextWrapping="Wrap"/>
         </Grid>
-        <CommandBar VerticalAlignment="Bottom" Background="{ThemeResource PageTitleBarAcrylicBrush}" Margin="0,0,15,0">
+        <CommandBar VerticalAlignment="Bottom" appearance:AppearanceSurface.ResourceKey="PageTitleBarAcrylicBrush" Margin="0,0,15,0">
             <CommandBar.Content>
                 <TextBlock x:Name="LastUpdatedText" Margin="12,0" VerticalAlignment="Center" FontSize="12" Opacity="0.8" TextTrimming="CharacterEllipsis" Visibility="Collapsed" ToolTipService.ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
             </CommandBar.Content>
@@ -35,7 +36,7 @@
                 <AppBarButton x:Name="PrintButton" Icon="Print" Label="Print" Click="PrintButton_Click" IsEnabled="False"/>
             </CommandBar.SecondaryCommands>
         </CommandBar>
-        <Grid x:Name="LoadingOverlay" Opacity="0" IsHitTestVisible="False" Background="{ThemeResource PageTitleBarAcrylicBrush}">
+        <Grid x:Name="LoadingOverlay" Opacity="0" IsHitTestVisible="False" appearance:AppearanceSurface.ResourceKey="PageTitleBarAcrylicBrush">
             <layout:SpacedPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
                 <ProgressRing IsActive="True" Width="60" Height="60"/>
                 <TextBlock x:Name="LoadingText" Text="Loading..." HorizontalAlignment="Center"/>

@@ -2,14 +2,20 @@
     <ResourceDictionary.ThemeDictionaries>
         <ResourceDictionary x:Key="Light">
             <SolidColorBrush x:Key="AppBackgroundBrush" Color="Transparent"/>
+            <SolidColorBrush x:Key="CardBackgroundFillColorDefaultBrush" Color="#FFFFFF"/>
+            <SolidColorBrush x:Key="CardBackgroundFillColorSecondaryBrush" Color="#F9F9F9"/>
             <AcrylicBrush x:Key="PageTitleBarAcrylicBrush" BackgroundSource="Backdrop" TintColor="{ThemeResource SystemAltHighColor}" TintOpacity="0.4" FallbackColor="{ThemeResource SystemAltHighColor}"/>
         </ResourceDictionary>
         <ResourceDictionary x:Key="Dark">
             <SolidColorBrush x:Key="AppBackgroundBrush" Color="Transparent"/>
+            <SolidColorBrush x:Key="CardBackgroundFillColorDefaultBrush" Color="#2C2C2C"/>
+            <SolidColorBrush x:Key="CardBackgroundFillColorSecondaryBrush" Color="#272727"/>
             <AcrylicBrush x:Key="PageTitleBarAcrylicBrush" BackgroundSource="Backdrop" TintColor="{ThemeResource SystemAltHighColor}" TintOpacity="0.4" FallbackColor="{ThemeResource SystemAltHighColor}"/>
         </ResourceDictionary>
         <ResourceDictionary x:Key="HighContrast">
             <SolidColorBrush x:Key="AppBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}"/>
+            <SolidColorBrush x:Key="CardBackgroundFillColorDefaultBrush" Color="{ThemeResource SystemColorWindowColor}"/>
+            <SolidColorBrush x:Key="CardBackgroundFillColorSecondaryBrush" Color="{ThemeResource SystemColorWindowColor}"/>
             <SolidColorBrush x:Key="PageTitleBarAcrylicBrush" Color="{ThemeResource SystemColorWindowColor}"/>
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>

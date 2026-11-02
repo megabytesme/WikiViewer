@@ -1,6 +1,7 @@
 <local:SettingsPageBase
     x:Class="WikiViewer.Uwp.Pages.SettingsPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:appearance="using:WikiViewer.Uwp.Services"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:layout="using:WikiViewer.Uwp.Controls"
     xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
@@ -14,14 +15,14 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <Grid Style="{StaticResource PageTitleBarGridStyle}" Background="{ThemeResource PageTitleBarAcrylicBrush}">
+        <Grid Style="{StaticResource PageTitleBarGridStyle}" appearance:AppearanceSurface.ResourceKey="PageTitleBarAcrylicBrush">
             <TextBlock Text="Settings" Style="{StaticResource PageTitleBarTextStyle}"/>
         </Grid>
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <layout:SpacedPanel MaxWidth="800" Spacing="24" HorizontalAlignment="Center" Margin="24">
 
-                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="{ThemeResource CardCornerRadius}" Padding="16">
+                <Border appearance:AppearanceSurface.ResourceKey="CardBackgroundFillColorDefaultBrush" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="{ThemeResource CardCornerRadius}" Padding="16">
                     <layout:SpacedPanel Spacing="12">
                         <TextBlock Text="Manage Wikis" Style="{ThemeResource SubtitleTextBlockStyle}"/>
                         <TextBlock Text="Add, remove, or edit the MediaWiki sites this app connects to." Opacity="0.7" TextWrapping="WrapWholeWords"/>
@@ -40,7 +41,7 @@
                     </layout:SpacedPanel>
                 </Border>
 
-                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="{ThemeResource CardCornerRadius}" Padding="16">
+                <Border appearance:AppearanceSurface.ResourceKey="CardBackgroundFillColorDefaultBrush" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="{ThemeResource CardCornerRadius}" Padding="16">
                     <layout:SpacedPanel Spacing="12">
                         <TextBlock Text="Appearance" Style="{ThemeResource SubtitleTextBlockStyle}"/>
                         <ComboBox x:Name="AppAppearanceComboBox" Header="App style" SelectionChanged="AppAppearance_SelectionChanged">
@@ -49,13 +50,13 @@
                             <ComboBoxItem Content="Windows 10 (Fluent)" Tag="Windows10Fluent"/>
                             <ComboBoxItem Content="Windows 11 (Sun Valley)" Tag="Windows11SunValley"/>
                         </ComboBox>
-                        <TextBlock x:Name="AppearanceRestartNote" Text="Restart the app to apply this style. Your current page and unsaved editor text are kept open until then." TextWrapping="Wrap" Visibility="Collapsed"/>
+                        <TextBlock x:Name="AppearanceRestartNote" Text="Colours and materials have updated. Restart the app to finish applying the control styles." TextWrapping="Wrap" Visibility="Collapsed"/>
                         <ToggleSwitch x:Name="NativeArticleThemeToggle" Header="Apply app style to native articles" Toggled="NativeArticleTheme_Toggled"/>
                         <TextBlock Text="Automatic matches your Windows version. The app follows your light, dark and high contrast settings." TextWrapping="Wrap" Opacity="0.7"/>
                     </layout:SpacedPanel>
                 </Border>
 
-                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="{ThemeResource CardCornerRadius}" Padding="16">
+                <Border appearance:AppearanceSurface.ResourceKey="CardBackgroundFillColorDefaultBrush" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="{ThemeResource CardCornerRadius}" Padding="16">
                     <layout:SpacedPanel Spacing="12">
                         <TextBlock Text="Reading" Style="{ThemeResource SubtitleTextBlockStyle}"/>
                         <ToggleSwitch x:Name="NativeReaderDefaultToggle"
@@ -66,7 +67,7 @@
                     </layout:SpacedPanel>
                 </Border>
 
-                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="{ThemeResource CardCornerRadius}" Padding="16">
+                <Border appearance:AppearanceSurface.ResourceKey="CardBackgroundFillColorDefaultBrush" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="{ThemeResource CardCornerRadius}" Padding="16">
                     <layout:SpacedPanel Spacing="12">
                         <TextBlock Text="Connection" Style="{ThemeResource SubtitleTextBlockStyle}"/>
                         <TextBox x:Name="ResolverUrl" Header="Resolver URL" PlaceholderText="https://your-resolver.example"/>
@@ -94,7 +95,7 @@
                     </layout:SpacedPanel>
                 </Border>
 
-                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="{ThemeResource CardCornerRadius}" Padding="16">
+                <Border appearance:AppearanceSurface.ResourceKey="CardBackgroundFillColorDefaultBrush" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="{ThemeResource CardCornerRadius}" Padding="16">
                     <layout:SpacedPanel Spacing="12">
                         <TextBlock Text="Storage" Style="{ThemeResource SubtitleTextBlockStyle}"/>
                         <Grid VerticalAlignment="Center">
@@ -118,7 +119,7 @@
                     </layout:SpacedPanel>
                 </Border>
 
-                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                <Border appearance:AppearanceSurface.ResourceKey="CardBackgroundFillColorDefaultBrush"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                         BorderThickness="1"
                         CornerRadius="{ThemeResource CardCornerRadius}"
@@ -182,7 +183,7 @@
                     </layout:SpacedPanel>
                 </Border>
 
-                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="{ThemeResource CardCornerRadius}" Padding="16">
+                <Border appearance:AppearanceSurface.ResourceKey="CardBackgroundFillColorDefaultBrush" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="{ThemeResource CardCornerRadius}" Padding="16">
                     <layout:SpacedPanel Spacing="12">
                         <TextBlock Text="About" Style="{ThemeResource SubtitleTextBlockStyle}"/>
                         <layout:SpacedPanel Orientation="Horizontal" HorizontalAlignment="Left" Spacing="12">

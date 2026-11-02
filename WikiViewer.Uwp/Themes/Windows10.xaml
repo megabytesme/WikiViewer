@@ -3,14 +3,20 @@
         <ResourceDictionary x:Key="Light">
             <SolidColorBrush x:Key="AppBackgroundBrush" Color="#F2F2F2"/>
             <SolidColorBrush x:Key="PageTitleBarAcrylicBrush" Color="#F2F2F2"/>
+            <SolidColorBrush x:Key="CardBackgroundFillColorDefaultBrush" Color="#FFFFFF"/>
+            <SolidColorBrush x:Key="CardBackgroundFillColorSecondaryBrush" Color="#F2F2F2"/>
         </ResourceDictionary>
         <ResourceDictionary x:Key="Dark">
             <SolidColorBrush x:Key="AppBackgroundBrush" Color="#202020"/>
             <SolidColorBrush x:Key="PageTitleBarAcrylicBrush" Color="#202020"/>
+            <SolidColorBrush x:Key="CardBackgroundFillColorDefaultBrush" Color="#282828"/>
+            <SolidColorBrush x:Key="CardBackgroundFillColorSecondaryBrush" Color="#202020"/>
         </ResourceDictionary>
         <ResourceDictionary x:Key="HighContrast">
             <SolidColorBrush x:Key="AppBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}"/>
             <SolidColorBrush x:Key="PageTitleBarAcrylicBrush" Color="{ThemeResource SystemColorWindowColor}"/>
+            <SolidColorBrush x:Key="CardBackgroundFillColorDefaultBrush" Color="{ThemeResource SystemColorWindowColor}"/>
+            <SolidColorBrush x:Key="CardBackgroundFillColorSecondaryBrush" Color="{ThemeResource SystemColorWindowColor}"/>
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
     <CornerRadius x:Key="ControlCornerRadius">0</CornerRadius>

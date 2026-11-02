@@ -2,4 +2,5 @@
     <SolidColorBrush x:Key="AppBackgroundBrush" Color="{ThemeResource SystemAltHighColor}"/>
     <SolidColorBrush x:Key="PageTitleBarAcrylicBrush" Color="{ThemeResource SystemChromeMediumColor}"/>
     <CornerRadius x:Key="CardCornerRadius">8</CornerRadius>
+    <SolidColorBrush x:Key="AppContentBackgroundBrush" Color="Transparent"/>
 </ResourceDictionary>
