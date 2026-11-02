@@ -1,4 +1,4 @@
-﻿<local:FavouritesPageBase
+<local:FavouritesPageBase
     x:Class="_1507_UWP.Pages.FavouritesPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -21,7 +21,7 @@
         </Grid.RowDefinitions>
         <Grid Grid.Row="0">
             <ScrollViewer x:Name="GridViewScrollViewerControl" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Visible">
-                <GridView x:Name="FavouritesGridViewControl" Padding="24,0,24,48" IsItemClickEnabled="False" SelectionMode="Multiple" SelectionChanged="FavouritesGridView_SelectionChanged" HorizontalAlignment="Center" ContainerContentChanging="FavouritesControl_ContainerContentChanging">
+                <GridView x:Name="FavouritesGridViewControl" Padding="24,0,24,48" IsItemClickEnabled="True" SelectionMode="None" ItemClick="Favourite_ItemClick" Holding="Favourite_Holding" SelectionChanged="FavouritesGridView_SelectionChanged" HorizontalAlignment="Center" ContainerContentChanging="FavouritesControl_ContainerContentChanging">
                     <GridView.ItemContainerStyle>
                         <Style TargetType="GridViewItem">
                             <Setter Property="Margin" Value="8"/>
@@ -55,7 +55,7 @@
                 </GridView>
             </ScrollViewer>
             <ScrollViewer x:Name="ListViewScrollViewerControl" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Visible" Visibility="Collapsed">
-                <ListView x:Name="FavouritesListViewControl" Padding="12,12,12,58" SelectionMode="Multiple" SelectionChanged="FavouritesListView_SelectionChanged" ContainerContentChanging="FavouritesControl_ContainerContentChanging">
+                <ListView x:Name="FavouritesListViewControl" Padding="12,12,12,58" IsItemClickEnabled="True" SelectionMode="None" ItemClick="Favourite_ItemClick" Holding="Favourite_Holding" SelectionChanged="FavouritesListView_SelectionChanged" ContainerContentChanging="FavouritesControl_ContainerContentChanging">
                     <ListView.ItemContainerStyle>
                         <Style TargetType="ListViewItem">
                             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>

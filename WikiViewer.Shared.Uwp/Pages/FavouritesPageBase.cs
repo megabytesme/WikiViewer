@@ -12,6 +12,9 @@ using WikiViewer.Shared.Uwp.Services;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Navigation;
+using Windows.UI.Xaml.Input;
+using Windows.UI.Xaml.Controls.Primitives;
+using Windows.UI.Xaml.Media;
 
 namespace WikiViewer.Shared.Uwp.Pages
 {
@@ -20,6 +23,7 @@ namespace WikiViewer.Shared.Uwp.Pages
         private readonly ObservableCollection<FavouriteItem> _unifiedFavourites =
             new ObservableCollection<FavouriteItem>();
         private bool _isGridView = true;
+        private bool _selectingCard;
         protected string _activeWikiFilter = "";
         protected string _activeSortTag = "TitleAsc";
         private string _searchQuery = "";
@@ -53,6 +57,57 @@ namespace WikiViewer.Shared.Uwp.Pages
         {
             FavouritesGridView.ItemsSource = _visibleFavourites;
             FavouritesListView.ItemsSource = _visibleFavourites;
+            foreach (var view in new ListViewBase[] { FavouritesGridView, FavouritesListView })
+            {
+                view.RemoveHandler(UIElement.PointerPressedEvent, new PointerEventHandler(Favourite_PointerPressed));
+                view.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler(Favourite_PointerPressed), true);
+            }
+        }
+
+        private static bool ControlPressed => (Window.Current.CoreWindow.GetKeyState(Windows.System.VirtualKey.Control) & Windows.UI.Core.CoreVirtualKeyStates.Down) != 0;
+
+        private static bool IsCardButton(DependencyObject source, ListViewBase view)
+        {
+            while (source != null && source != view)
+            {
+                if (source is ButtonBase) return true;
+                source = VisualTreeHelper.GetParent(source);
+            }
+            return false;
+        }
+
+        private void Favourite_PointerPressed(object sender, PointerRoutedEventArgs e)
+        {
+            var view = (ListViewBase)sender;
+            _selectingCard = !IsCardButton(e.OriginalSource as DependencyObject, view) && (ControlPressed || view.SelectionMode == ListViewSelectionMode.Multiple);
+            if (_selectingCard) view.SelectionMode = ListViewSelectionMode.Multiple;
+        }
+
+        protected void Favourite_Holding(object sender, HoldingRoutedEventArgs e)
+        {
+            var view = (ListViewBase)sender;
+            if (e.HoldingState != Windows.UI.Input.HoldingState.Started || IsCardButton(e.OriginalSource as DependencyObject, view)) return;
+            var container = e.OriginalSource as DependencyObject;
+            while (container != null && container != view && !(container is SelectorItem)) container = VisualTreeHelper.GetParent(container);
+            var item = container == null ? null : view.ItemFromContainer(container);
+            if (item == null) return;
+            _selectingCard = true;
+            view.SelectionMode = ListViewSelectionMode.Multiple;
+            if (!view.SelectedItems.Contains(item)) view.SelectedItems.Add(item);
+            e.Handled = true;
+        }
+
+        protected void Favourite_ItemClick(object sender, ItemClickEventArgs e)
+        {
+            var view = (ListViewBase)sender;
+            bool selecting = _selectingCard;
+            _selectingCard = false;
+            if (selecting || ControlPressed || view.SelectionMode == ListViewSelectionMode.Multiple) return;
+            if (e.ClickedItem is FavouriteItem item)
+            {
+                var wiki = WikiManager.GetWikiById(item.WikiId);
+                if (wiki != null) NavigateToArticleIfItExists(item.ArticlePageTitle, wiki);
+            }
         }
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -511,6 +566,8 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         private void UpdateSelection()
         {
+            foreach (var view in new ListViewBase[] { FavouritesGridView, FavouritesListView })
+                if (view.SelectedItems.Count == 0) view.SelectionMode = ListViewSelectionMode.None;
             DeleteButton.Visibility =
                 (FavouritesGridView.SelectedItems.Any() || FavouritesListView.SelectedItems.Any())
                     ? Visibility.Visible
