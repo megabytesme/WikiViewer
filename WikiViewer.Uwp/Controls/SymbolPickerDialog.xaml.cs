@@ -34,7 +34,7 @@ namespace WikiViewer.Uwp.Controls
                 var parentScrollViewer = VisualTreeHelper.GetParent(scrollViewer) as ScrollViewer;
                 if (parentScrollViewer != null)
                 {
-                    parentScrollViewer.CornerRadius = new CornerRadius(WikiViewer.Uwp.Services.AppearanceService.UseFluent ? 2 : 4);
+                    parentScrollViewer.CornerRadius = new CornerRadius(WikiViewer.Uwp.Services.AppearanceService.ControlRadius);
                 }
             }
 
@@ -50,7 +50,7 @@ namespace WikiViewer.Uwp.Controls
             );
             itemStyle.Setters.Add(new Setter(GridViewItem.MarginProperty, new Thickness(2)));
             itemStyle.Setters.Add(
-                new Setter(GridViewItem.CornerRadiusProperty, new CornerRadius(WikiViewer.Uwp.Services.AppearanceService.UseFluent ? 2 : 4))
+                new Setter(GridViewItem.CornerRadiusProperty, new CornerRadius(WikiViewer.Uwp.Services.AppearanceService.ControlRadius))
             );
             SymbolGridView.ItemContainerStyle = itemStyle;
 #endif

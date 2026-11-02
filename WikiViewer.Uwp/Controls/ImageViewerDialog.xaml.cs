@@ -55,12 +55,12 @@ namespace WikiViewer.Uwp.Controls
 #if UWP_1809
             this.Background = (Brush)
                 Application.Current.Resources["PageTitleBarAcrylicBrush"];
-            this.CornerRadius = new CornerRadius(WikiViewer.Uwp.Services.AppearanceService.UseFluent ? 2 : 8);
+            this.CornerRadius = new CornerRadius(WikiViewer.Uwp.Services.AppearanceService.OverlayRadius);
 
             var buttonStyle = new Style(typeof(Button));
-            buttonStyle.Setters.Add(new Setter(Button.CornerRadiusProperty, new CornerRadius(WikiViewer.Uwp.Services.AppearanceService.UseFluent ? 2 : 4)));
+            buttonStyle.Setters.Add(new Setter(Button.CornerRadiusProperty, new CornerRadius(WikiViewer.Uwp.Services.AppearanceService.ControlRadius)));
 
-            ImageContainerBorder.CornerRadius = new CornerRadius(WikiViewer.Uwp.Services.AppearanceService.UseFluent ? 2 : 6);
+            ImageContainerBorder.CornerRadius = new CornerRadius(WikiViewer.Uwp.Services.AppearanceService.CardRadius);
 
             if (this.FindName("ShareButton") is Button shareButton)
             {

@@ -2,11 +2,11 @@
     <ResourceDictionary.ThemeDictionaries>
         <ResourceDictionary x:Key="Light">
             <SolidColorBrush x:Key="AppBackgroundBrush" Color="Transparent"/>
-            <SolidColorBrush x:Key="PageTitleBarAcrylicBrush" Color="#F3F3F3"/>
+            <AcrylicBrush x:Key="PageTitleBarAcrylicBrush" BackgroundSource="Backdrop" TintColor="{ThemeResource SystemAltHighColor}" TintOpacity="0.4" FallbackColor="{ThemeResource SystemAltHighColor}"/>
         </ResourceDictionary>
         <ResourceDictionary x:Key="Dark">
             <SolidColorBrush x:Key="AppBackgroundBrush" Color="Transparent"/>
-            <SolidColorBrush x:Key="PageTitleBarAcrylicBrush" Color="#202020"/>
+            <AcrylicBrush x:Key="PageTitleBarAcrylicBrush" BackgroundSource="Backdrop" TintColor="{ThemeResource SystemAltHighColor}" TintOpacity="0.4" FallbackColor="{ThemeResource SystemAltHighColor}"/>
         </ResourceDictionary>
         <ResourceDictionary x:Key="HighContrast">
             <SolidColorBrush x:Key="AppBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}"/>

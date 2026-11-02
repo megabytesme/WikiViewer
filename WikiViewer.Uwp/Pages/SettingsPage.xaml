@@ -44,10 +44,12 @@
                     <layout:SpacedPanel Spacing="12">
                         <TextBlock Text="Appearance" Style="{ThemeResource SubtitleTextBlockStyle}"/>
                         <ComboBox x:Name="AppAppearanceComboBox" Header="App style" SelectionChanged="AppAppearance_SelectionChanged">
-                            <ComboBoxItem Content="Automatic"/>
-                            <ComboBoxItem Content="Windows 10 Fluent"/>
-                            <ComboBoxItem Content="Windows 11"/>
+                            <ComboBoxItem Content="Automatic" Tag="Automatic"/>
+                            <ComboBoxItem Content="Windows 10" Tag="Windows10"/>
+                            <ComboBoxItem Content="Windows 10 (Fluent)" Tag="Windows10Fluent"/>
+                            <ComboBoxItem Content="Windows 11 (Sun Valley)" Tag="Windows11SunValley"/>
                         </ComboBox>
+                        <ToggleSwitch x:Name="NativeArticleThemeToggle" Header="Apply app style to native articles" Toggled="NativeArticleTheme_Toggled"/>
                         <TextBlock Text="Automatic matches your Windows version. The app follows your light, dark and high contrast settings." TextWrapping="Wrap" Opacity="0.7"/>
                     </layout:SpacedPanel>
                 </Border>

@@ -31,6 +31,7 @@ namespace WikiViewer.Uwp.Controls
         private bool _themeSubscribed;
         private readonly Dictionary<string, FrameworkElement> _anchors = new Dictionary<string, FrameworkElement>(StringComparer.Ordinal);
         private readonly List<Image> _images = new List<Image>();
+        private NativeArticleDocument _document;
         private readonly List<ArticleMediaView> _media = new List<ArticleMediaView>();
         private readonly Dictionary<string, NativeArticleSection> _anchorSections = new Dictionary<string, NativeArticleSection>(StringComparer.Ordinal);
         private readonly List<RenderScope> _scopes = new List<RenderScope>();
@@ -69,12 +70,14 @@ namespace WikiViewer.Uwp.Controls
                 _themeSubscribed = true;
                 _accessibility.HighContrastChanged += OnHighContrastChanged;
                 _uiSettings.ColorValuesChanged += OnSystemColorsChanged;
+                WikiViewer.Uwp.Services.AppearanceService.AppearanceChanged += OnAppearanceChanged;
             };
             Unloaded += (s, e) =>
             {
                 _themeSubscribed = false;
                 _accessibility.HighContrastChanged -= OnHighContrastChanged;
                 _uiSettings.ColorValuesChanged -= OnSystemColorsChanged;
+                WikiViewer.Uwp.Services.AppearanceService.AppearanceChanged -= OnAppearanceChanged;
                 ClearArticle();
             };
 #if UWP_1809
@@ -84,7 +87,14 @@ namespace WikiViewer.Uwp.Controls
             SizeChanged += (s, e) => { foreach (var image in _images.ToArray()) LimitImageWidth(image); };
         }
 
-        private void UpdatePalette() => _palette.Update(this, _accessibility.HighContrast, _uiSettings);
+        private void UpdatePalette()
+        {
+            _palette.Update(this, _accessibility.HighContrast, _uiSettings);
+            if (_document == null) return;
+            _scroll.Background = _palette.Canvas(_document.Background);
+            if (_sections != null) _sections.Background = _palette.Canvas(_document.Background);
+        }
+        private void OnAppearanceChanged(object sender, EventArgs args) => UpdatePalette();
         private async void OnHighContrastChanged(AccessibilitySettings sender, object args) => await RefreshPaletteAsync();
         private async void OnSystemColorsChanged(UISettings sender, object args) => await RefreshPaletteAsync();
         private async Task RefreshPaletteAsync()
@@ -141,11 +151,12 @@ namespace WikiViewer.Uwp.Controls
 
         private void RenderDocument(NativeArticleDocument document, Uri pageUri, Func<Uri, Task> navigate, Func<string, CancellationToken, Task<string>> resolveImage)
         {
+            _document = document;
             _navigate = navigate;
             _resolveImage = resolveImage;
             _pageUri = pageUri;
             UpdatePalette();
-            _scroll.Background = _palette.Get(document.Background, ArticleColorRole.Background);
+            _scroll.Background = _palette.Canvas(document.Background);
             var foreground = _palette.Get(document.Foreground, ArticleColorRole.Text, document.ColorContext);
             if (foreground != null) { Foreground = foreground; _scroll.Foreground = foreground; }
             else { ClearValue(Control.ForegroundProperty); _scroll.ClearValue(Control.ForegroundProperty); }
@@ -153,7 +164,7 @@ namespace WikiViewer.Uwp.Controls
             if (ArticleSectionService.ShouldVirtualize(document.Nodes, sections))
             {
                 ShowSections(sections, document.UnsupportedFeatures.Count > 0);
-                _sections.Background = _palette.Get(document.Background, ArticleColorRole.Background);
+                _sections.Background = _palette.Canvas(document.Background);
                 if (foreground != null) _sections.Foreground = foreground;
                 return;
             }
@@ -245,6 +256,7 @@ namespace WikiViewer.Uwp.Controls
 
         public void ClearArticle()
         {
+            _document = null;
             _assetCancellation.Cancel(); _assetCancellation.Dispose(); _assetCancellation = new CancellationTokenSource();
             _interacted = false;
             _version++;
@@ -460,6 +472,7 @@ namespace WikiViewer.Uwp.Controls
         {
             if (node.Uri == null && node.SvgContent == null) return new TextBlock { Text = node.Text ?? "[Image]", TextWrapping = TextWrapping.Wrap };
             var image = new Image { Width = node.ImageWidth > 0 ? node.ImageWidth : double.NaN, MaxWidth = Math.Max(80, _root.ActualWidth > 0 ? _root.ActualWidth - 40 : 320), MaxHeight = 600, Stretch = Stretch.Uniform, Margin = new Thickness(0, 8, 0, 8) };
+            if (node.SvgContent == null && (node.Uri == null || node.Uri.AbsolutePath.IndexOf("/math/render/", StringComparison.OrdinalIgnoreCase) < 0)) _palette.Decorate(image);
             var host = new Grid { MinHeight = Math.Min(32, node.ImageWidth > 0 ? node.ImageWidth : 32) }; host.Children.Add(image);
             double indicatorSize = Math.Min(32, node.ImageWidth > 0 ? node.ImageWidth : 32);
             var progress = new ProgressRing { Width = indicatorSize, Height = indicatorSize, IsActive = false, Visibility = Visibility.Collapsed, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };

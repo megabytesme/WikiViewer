@@ -13,7 +13,7 @@
             <SolidColorBrush x:Key="PageTitleBarAcrylicBrush" Color="{ThemeResource SystemColorWindowColor}"/>
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
-    <CornerRadius x:Key="ControlCornerRadius">2</CornerRadius>
-    <CornerRadius x:Key="OverlayCornerRadius">2</CornerRadius>
-    <CornerRadius x:Key="CardCornerRadius">2</CornerRadius>
+    <CornerRadius x:Key="ControlCornerRadius">0</CornerRadius>
+    <CornerRadius x:Key="OverlayCornerRadius">0</CornerRadius>
+    <CornerRadius x:Key="CardCornerRadius">0</CornerRadius>
 </ResourceDictionary>

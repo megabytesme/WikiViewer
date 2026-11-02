@@ -35,8 +35,11 @@ namespace WikiViewer.Uwp.Controls
             FrameworkElement result = content;
             if (decorated)
             {
-                result = new Border { Child = content, Padding = padding, Background = palette.Get(style.Background, ArticleColorRole.Background),
+                bool surface = node.Kind != NativeArticleNodeKind.TableCell && node.Kind != NativeArticleNodeKind.TableRow;
+                var frame = new Border { Child = content, Padding = padding, Background = surface ? palette.Surface(style.Background) : palette.Get(style.Background, ArticleColorRole.Background),
                     BorderThickness = new Thickness(Math.Min(12, border)), BorderBrush = palette.Get(style.BorderColor, ArticleColorRole.Border, style.ColorContext) };
+                if (surface) palette.Decorate(frame);
+                result = frame;
                 if (content is RichTextBlock) { result.Margin = content.Margin; content.Margin = new Thickness(0); }
             }
             result.Margin = Edges(style.Margin, result.Margin);

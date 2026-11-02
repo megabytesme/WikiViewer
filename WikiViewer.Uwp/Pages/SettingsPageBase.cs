@@ -41,10 +41,20 @@ namespace WikiViewer.Uwp.Pages
         private bool _appearanceReady;
         private ComboBox AppearanceComboBox => (ComboBox)FindName("AppAppearanceComboBox");
 
+        protected void NativeArticleTheme_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (!_appearanceReady) return;
+            AppSettings.ThemeNativeArticles = ((ToggleSwitch)sender).IsOn;
+            AppearanceService.Apply();
+        }
+
         protected void AppAppearance_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (!_appearanceReady || AppearanceComboBox.SelectedIndex < 0) return;
-            AppSettings.Appearance = (AppAppearance)AppearanceComboBox.SelectedIndex;
+            var selected = AppearanceComboBox.SelectedItem as ComboBoxItem;
+            AppAppearance appearance;
+            if (selected == null || !Enum.TryParse(selected.Tag as string, out appearance) || !AppearanceService.IsSupported(appearance)) return;
+            AppSettings.Appearance = appearance;
             AppearanceService.Apply();
         }
 
@@ -59,7 +69,16 @@ namespace WikiViewer.Uwp.Pages
             if (_isLoaded) return;
             _isLoaded = true;
             _appearanceReady = false;
-            AppearanceComboBox.SelectedIndex = Math.Max(0, Math.Min(2, (int)AppSettings.Appearance));
+            var desired = AppSettings.Appearance == AppAppearance.Automatic ? AppAppearance.Automatic : AppearanceService.Current;
+            foreach (ComboBoxItem item in AppearanceComboBox.Items)
+            {
+                AppAppearance appearance;
+                if (!Enum.TryParse(item.Tag as string, out appearance)) continue;
+                item.IsEnabled = AppearanceService.IsSupported(appearance);
+                if (!item.IsEnabled) ToolTipService.SetToolTip(item, "Requires Windows build " + AppThemeSupport.MinimumBuild(appearance) + " or later.");
+                if (appearance == desired && item.IsEnabled) AppearanceComboBox.SelectedItem = item;
+            }
+            ((ToggleSwitch)FindName("NativeArticleThemeToggle")).IsOn = AppSettings.ThemeNativeArticles;
             _appearanceReady = true;
             PopulateConcurrencyComboBox();
             PopulateDefaultConnectionMethodComboBox();

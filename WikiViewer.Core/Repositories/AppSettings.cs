@@ -1,12 +1,13 @@
 using System;
 using WikiViewer.Core.Enums;
 using WikiViewer.Core.Interfaces;
+using WikiViewer.Core.Services;
 
 
 namespace WikiViewer.Core
 {
     public enum EditorThemeMode { Default, Light, Dark }
-    public enum AppAppearance { Automatic, Windows10Fluent, Windows11 }
+    public enum AppAppearance { Automatic = 0, Windows10 = 1, Windows10Fluent = 2, Windows11SunValley = 3 }
 
     public enum ConcurrencyLevel
     {
@@ -20,10 +21,25 @@ namespace WikiViewer.Core
 
     public static class AppSettings
     {
+        public static bool ThemeNativeArticles
+        {
+            get => SettingsProvider.GetValue("ThemeNativeArticles", true);
+            set => SettingsProvider.SetValue("ThemeNativeArticles", value);
+        }
         public static AppAppearance Appearance
         {
-            get => (AppAppearance)SettingsProvider.GetValue("AppAppearance", (int)AppAppearance.Automatic);
-            set => SettingsProvider.SetValue("AppAppearance", (int)value);
+            get
+            {
+                int current = SettingsProvider.GetValue("AppAppearanceV2", -1);
+                if (current >= 0) return (AppAppearance)current;
+                var migrated = AppThemeSupport.FromLegacyValue(SettingsProvider.GetValue("AppAppearance", 0));
+                SettingsProvider.SetValue("AppAppearanceV2", (int)migrated);
+                return migrated;
+            }
+            set
+            {
+                SettingsProvider.SetValue("AppAppearanceV2", (int)value);
+            }
         }
         public static ISettingsProvider SettingsProvider { get; set; }
 
