@@ -694,7 +694,7 @@ namespace WikiViewer.Uwp.Pages
         {
             WikitextEditorTextBox.Document.GetText(TextGetOptions.None, out var previewSource);
             _previewSession.SourceChanged(previewSource);
-            if (_previewSession.IsStale) PreviewStatusControl.Text = "Preview is out of date. Click Preview to update it.";
+            if (_previewSession.IsStale) PreviewStatusControl.Text = PreviewModeControl.IsOn ? "Updating live preview..." : "Preview is out of date. Click Preview to update it.";
             if (!string.Equals(_lastPreviewSource, previewSource, StringComparison.Ordinal))
             {
                 _lastPreviewSource = previewSource;
