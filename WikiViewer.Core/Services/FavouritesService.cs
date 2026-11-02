@@ -5,12 +5,14 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using WikiViewer.Core.Models;
-using Windows.Storage;
+using WikiViewer.Core.Interfaces;
 
 namespace WikiViewer.Core.Services
 {
     public static class FavouritesService
     {
+        public static IStorageProvider StorageProvider { get; set; }
+
         private const string FavouritesFileName = "favourites.json";
         private const string PendingAddsFileName = "pending_adds.json";
         private const string PendingDeletesFileName = "pending_deletes.json";
@@ -26,6 +28,7 @@ namespace WikiViewer.Core.Services
         public static async Task InitializeAsync()
         {
             if (_isInitialized) return;
+            if (StorageProvider == null) throw new InvalidOperationException("A storage provider is required for favourites.");
             _favouritesByWiki = await LoadDictionaryFromFileAsync(FavouritesFileName);
             _pendingAddsByWiki = await LoadDictionaryFromFileAsync(PendingAddsFileName);
             _pendingDeletesByWiki = await LoadDictionaryFromFileAsync(PendingDeletesFileName);
@@ -36,10 +39,9 @@ namespace WikiViewer.Core.Services
         {
             try
             {
-                var file = await ApplicationData.Current.LocalFolder.TryGetItemAsync(fileName) as StorageFile;
-                if (file != null)
+                string json = await StorageProvider.ReadTextAsync(fileName);
+                if (!string.IsNullOrEmpty(json))
                 {
-                    string json = await FileIO.ReadTextAsync(file);
                     return JsonConvert.DeserializeObject<Dictionary<Guid, HashSet<string>>>(json) ?? new Dictionary<Guid, HashSet<string>>();
                 }
             }
@@ -60,9 +62,8 @@ namespace WikiViewer.Core.Services
 
         private static async Task SaveDictionaryToFileAsync(Dictionary<Guid, HashSet<string>> data, string fileName)
         {
-            var file = await ApplicationData.Current.LocalFolder.CreateFileAsync(fileName, CreationCollisionOption.ReplaceExisting);
             string json = JsonConvert.SerializeObject(data, Formatting.Indented);
-            await FileIO.WriteTextAsync(file, json);
+            await StorageProvider.WriteTextAsync(fileName, json);
         }
 
         public static List<string> GetFavourites(Guid wikiId)

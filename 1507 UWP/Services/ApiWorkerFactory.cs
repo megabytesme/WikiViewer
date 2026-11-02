@@ -32,7 +32,7 @@ namespace _1507_UWP.Services
             switch (methodToUse)
             {
                 case ConnectionMethod.HttpClient:
-                    return new HttpClientApiWorker();
+                    return new WikiViewer.Shared.Uwp.Services.UwpHttpClientApiWorker();
                 case ConnectionMethod.HttpClientProxy:
                     return new ProxyHttpClientApiWorker();
                 case ConnectionMethod.WebView:

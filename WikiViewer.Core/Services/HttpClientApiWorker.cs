@@ -6,26 +6,15 @@ using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
 using System.Linq;
 
-#if UWP_1507 || UWP_1809
-using Windows.Web.Http;
-using System.Runtime.InteropServices.WindowsRuntime;
-using Windows.Web.Http.Headers;
-#else
 using System.Net.Http;
-#endif
 
 namespace WikiViewer.Core.Services
 {
     public class HttpClientApiWorker : IApiWorker
     {
-#if UWP_1507 || UWP_1809
-        private static readonly HttpClient _sharedClient = new HttpClient();
-        private readonly HttpClient _client;
-#else
         private static readonly System.Net.Http.HttpClient _sharedClient =
             new System.Net.Http.HttpClient();
         private readonly System.Net.Http.HttpClient _client;
-#endif
 
         private readonly bool _isSharedClient;
         public bool IsInitialized { get; private set; }
@@ -33,45 +22,19 @@ namespace WikiViewer.Core.Services
 
         static HttpClientApiWorker()
         {
-#if UWP_1507
-            var userAgent =
-                "WikiViewer/1.0.1.0 (https://github.com/megabytesme/WikiViewer) UWP/1507 (Windows.Web.Http.HttpClient)";
-#elif UWP_1809
-            var userAgent =
-                "WikiViewer/2.0.1.0 (https://github.com/megabytesme/WikiViewer) UWP/1809 (Windows.Web.Http.HttpClient)";
-#else
-            var userAgent =
-                "WikiViewer (https://github.com/megabytesme/WikiViewer) (System.Net.Http.HttpClient)";
-#endif
+            const string userAgent = "WikiViewer (https://github.com/megabytesme/WikiViewer) (System.Net.Http.HttpClient)";
 
             _sharedClient.DefaultRequestHeaders.UserAgent.ParseAdd(userAgent);
 
-#if !(UWP_1507 || UWP_1809)
             _sharedClient.Timeout = TimeSpan.FromSeconds(30);
-#endif
         }
 
         public HttpClientApiWorker(bool useDedicatedClient)
         {
             if (useDedicatedClient)
             {
-#if UWP_1507
-                _client = new HttpClient();
-                var userAgent =
-                    "WikiViewer/1.0.1.0 (https://github.com/megabytesme/WikiViewer) UWP/1507 (Windows.Web.Http.HttpClient)";
-                _client.DefaultRequestHeaders.UserAgent.ParseAdd(userAgent);
-#elif UWP_1809
-                _client = new HttpClient();
-                var userAgent =
-                    "WikiViewer/2.0.1.0 (https://github.com/megabytesme/WikiViewer) UWP/1809 (Windows.Web.Http.HttpClient)";
-                _client.DefaultRequestHeaders.UserAgent.ParseAdd(userAgent);
-#else
-                _client = new System.Net.Http.HttpClient();
-                var userAgent =
-                    "WikiViewer (https://github.com/megabytesme/WikiViewer) (System.Net.Http.HttpClient)";
-                _client.DefaultRequestHeaders.UserAgent.ParseAdd(userAgent);
-                _client.Timeout = TimeSpan.FromSeconds(30);
-#endif
+                _client = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+                _client.DefaultRequestHeaders.UserAgent.ParseAdd("WikiViewer (https://github.com/megabytesme/WikiViewer) (System.Net.Http.HttpClient)");
                 _isSharedClient = false;
             }
             else
@@ -121,12 +84,7 @@ namespace WikiViewer.Core.Services
             Debug.WriteLine($"[HttpClientApiWorker] Attempting to GET BYTES for URL: {url}");
             try
             {
-#if UWP_1507 || UWP_1809
-                var buffer = await _client.GetBufferAsync(new Uri(url));
-                return buffer.ToArray();
-#else
                 return await _client.GetByteArrayAsync(url);
-#endif
             }
             catch (Exception ex)
             {
@@ -165,22 +123,12 @@ namespace WikiViewer.Core.Services
             );
             var encodedContent = string.Join("&", encodedItems);
 
-#if UWP_1507 || UWP_1809
-            using (var content = new Windows.Web.Http.HttpStringContent(encodedContent))
-            {
-                content.Headers.ContentType = new Windows.Web.Http.Headers.HttpMediaTypeHeaderValue("application/x-www-form-urlencoded");
-                var response = await _client.PostAsync(new Uri(url), content);
-                response.EnsureSuccessStatusCode();
-                return await response.Content.ReadAsStringAsync();
-            }
-#else
             using (var content = new System.Net.Http.StringContent(encodedContent, System.Text.Encoding.UTF8, "application/x-www-form-urlencoded"))
             {
                 var response = await _client.PostAsync(url, content);
                 response.EnsureSuccessStatusCode();
                 return await response.Content.ReadAsStringAsync();
             }
-#endif
         }
 
         public Task CopyApiCookiesFromAsync(IApiWorker source)

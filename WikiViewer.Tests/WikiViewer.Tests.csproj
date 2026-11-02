@@ -14,49 +14,6 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\WikiViewer.Core\Models\NativeArticleDocument.cs" Link="Models\NativeArticleDocument.cs" />
-    <Compile Include="..\WikiViewer.Core\Services\NativeFlowLayout.cs" Link="Services\NativeFlowLayout.cs" />
-    <Compile Include="..\WikiViewer.Core\Services\NativeResponsiveLayout.cs" Link="Services\NativeResponsiveLayout.cs" />
-    <Compile Include="..\WikiViewer.Core\Services\NativeMediaService.cs" Link="Services\NativeMediaService.cs" />
-    <Compile Include="..\WikiViewer.Core\Services\ResolverConfigurationService.cs" Link="Services\ResolverConfigurationService.cs" />
-    <Compile Include="..\WikiViewer.Core\Services\ResolverRequestService.cs" Link="Services\ResolverRequestService.cs" />
-    <Compile Include="..\WikiViewer.Core\Services\NetworkOperationTimeout.cs" Link="Services\NetworkOperationTimeout.cs" />
-    <Compile Include="..\WikiViewer.Core\Services\AsyncRequestCoordinator.cs" Link="Services\AsyncRequestCoordinator.cs" />
-    <Compile Include="..\WikiViewer.Core\Services\CacheKeyService.cs" Link="Services\CacheKeyService.cs" />
-    <Compile Include="..\WikiViewer.Core\Services\WikiResourceCache.cs" Link="Services\WikiResourceCache.cs" />
-    <Compile Include="..\WikiViewer.Core\Services\ArticleLoadCoordinator.cs" Link="Services\ArticleLoadCoordinator.cs" />
-    <Compile Include="..\WikiViewer.Core\Services\ArticleLoadMetrics.cs" Link="Services\ArticleLoadMetrics.cs" />
-    <Compile Include="..\WikiViewer.Core\Services\NativeDocumentCache.cs" Link="Services\NativeDocumentCache.cs" />
-    <Compile Include="..\WikiViewer.Core\Services\WikiPathDetectorService.cs" Link="Services\WikiPathDetectorService.cs" />
-    <Compile Include="..\WikiViewer.Core\Services\CloudflareDetector.cs" Link="Services\CloudflareDetector.cs" />
-    <Compile Include="..\WikiViewer.Core\Models\WikiInstance.cs" Link="Models\WikiInstance.cs" />
-    <Compile Include="..\WikiViewer.Core\Models\ApiModels.cs" Link="Models\ApiModels.cs" />
-    <Compile Include="..\WikiViewer.Core\Enums\ConnectionMethod.cs" Link="Enums\ConnectionMethod.cs" />
-    <Compile Include="..\WikiViewer.Core\Interfaces\IApiWorker.cs" Link="Interfaces\IApiWorker.cs" />
-    <Compile Include="..\WikiViewer.Core\Models\ResolverConfiguration.cs" Link="Models\ResolverConfiguration.cs" />
-    <Compile Include="..\WikiViewer.Core\Models\UserCredentials.cs" Link="Models\UserCredentials.cs" />
-    <Compile Include="..\WikiViewer.Core\Interfaces\ICredentialService.cs" Link="Interfaces\ICredentialService.cs" />
-    <Compile Include="..\WikiViewer.Core\Interfaces\ISettingsProvider.cs" Link="Interfaces\ISettingsProvider.cs" />
-    <Compile Include="..\WikiViewer.Core\Services\ArticleSectionService.cs" Link="Services\ArticleSectionService.cs" />
-    <Compile Include="..\WikiViewer.Core\Services\ArticleColor.cs" Link="Services\ArticleColor.cs" />
-    <Compile Include="..\WikiViewer.Core\Services\ArticleThemeService.cs" Link="Services\ArticleThemeService.cs" />
-    <Compile Include="..\WikiViewer.Core\Services\ArticleStyleSheet.cs" Link="Services\ArticleStyleSheet.cs" />
-    <Compile Include="..\WikiViewer.Core\Services\ArticleStyleResourceService.cs" Link="Services\ArticleStyleResourceService.cs" />
-    <Compile Include="..\WikiViewer.Core\Services\FaviconDiscoveryService.cs" Link="Services\FaviconDiscoveryService.cs" />
-    <Compile Include="..\WikiViewer.Core\Services\WikiSyntaxService.cs" Link="Services\WikiSyntaxService.cs" />
-    <Compile Include="..\WikiViewer.Core\Models\WikiSyntaxConfiguration.cs" Link="Models\WikiSyntaxConfiguration.cs" />
-    <Compile Include="..\WikiViewer.Core\Models\NativeArticleStyle.cs" Link="Models\NativeArticleStyle.cs" />
-    <Compile Include="..\WikiViewer.Core\Services\NativeArticleStyleService.cs" Link="Services\NativeArticleStyleService.cs" />
-    <Compile Include="..\WikiViewer.Core\Services\WikitextLayoutService.cs" Link="Services\WikitextLayoutService.cs" />
-    <Compile Include="..\WikiViewer.Core\Models\ArticleContent.cs" Link="Models\ArticleContent.cs" />
-    <Compile Include="..\WikiViewer.Core\Models\ArticlePreview.cs" Link="Models\ArticlePreview.cs" />
-    <Compile Include="..\WikiViewer.Core\Services\EditorPreviewSession.cs" Link="Services\EditorPreviewSession.cs" />
-    <Compile Include="..\WikiViewer.Core\Services\EditorPreviewPolicy.cs" Link="Services\EditorPreviewPolicy.cs" />
-    <Compile Include="..\WikiViewer.Core\Services\EditorPreviewResponse.cs" Link="Services\EditorPreviewResponse.cs" />
-    <Compile Include="..\WikiViewer.Core\Services\ArticleContentResponse.cs" Link="Services\ArticleContentResponse.cs" />
-    <Compile Include="..\WikiViewer.Core\Managers\ArticleCacheManager.cs" Link="Managers\ArticleCacheManager.cs" />
-    <Compile Include="..\WikiViewer.Core\Interfaces\IStorageProvider.cs" Link="Interfaces\IStorageProvider.cs" />
-    <Compile Include="..\WikiViewer.Core\Services\NativeArticleDocumentService.cs" Link="Services\NativeArticleDocumentService.cs" />
-    <Compile Include="..\WikiViewer.Core\Services\NativeSvgService.cs" Link="Services\NativeSvgService.cs" />
+    <ProjectReference Include="..\WikiViewer.Core\WikiViewer.Core.csproj" AdditionalProperties="WikitextParserVersion=0.2.0"/>
   </ItemGroup>
 </Project>

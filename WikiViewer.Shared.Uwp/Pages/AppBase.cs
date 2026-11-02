@@ -78,6 +78,11 @@ namespace WikiViewer.Shared.Uwp
             var credentialService = new CredentialService();
 
             AppSettings.SettingsProvider = settingsProvider;
+            ArticlePresentation.GetThemeCssAsync = ThemeManager.GetThemeCssAsync;
+            ArticlePresentation.IsDarkMode = () => Application.Current.RequestedTheme == ApplicationTheme.Dark;
+            FavouritesService.StorageProvider = storageProvider;
+            MediaCacheService.DirectWorkerFactory = () => new UwpHttpClientApiWorker();
+            MediaCacheService.LocalUriFactory = path => "ms-appdata:///local" + path;
             ResolverConfigurationService.Current = new ResolverConfigurationService(settingsProvider, credentialService);
             ResolverConfigurationService.Current.Changed += (sender, args) =>
             {

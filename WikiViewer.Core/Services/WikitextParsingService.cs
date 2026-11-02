@@ -9,7 +9,7 @@ using Newtonsoft.Json.Linq;
 using WikitextParser;
 using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
-using Windows.UI.Xaml;
+
 
 namespace WikiViewer.Core.Services
 {
@@ -130,7 +130,7 @@ namespace WikiViewer.Core.Services
             catch (Exception ex)
             {
                 return WrapInHtmlShell(WebUtility.HtmlEncode("Error generating preview: " + ex.Message),
-                    Application.Current.RequestedTheme == ApplicationTheme.Dark, true);
+                    ArticlePresentation.IsDarkMode(), true);
             }
         }
 
@@ -154,7 +154,7 @@ namespace WikiViewer.Core.Services
             string headContent = "<meta name='viewport' content='width=device-width, initial-scale=1.0'>" +
                 "<base href='" + WebUtility.HtmlEncode(wikiContext.GetWikiPageUrl(pageTitle)) + "'>" +
                 (cssUrl.Length == 0 ? "" : "<link rel='stylesheet' href='" + WebUtility.HtmlEncode(cssUrl) + "'>") +
-                "<style>" + await ThemeManager.GetThemeCssAsync() + "</style>";
+                "<style>" + await ArticlePresentation.GetThemeCssAsync() + "</style>";
             string body = "<div class='mw-parser-output'>" + preview.Content.HtmlContent + "</div></body></html>";
             int headEnd = (preview.HeadHtml ?? "").IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
             preview.WebHtml = headEnd >= 0 ? preview.HeadHtml.Insert(headEnd, headContent) + body :

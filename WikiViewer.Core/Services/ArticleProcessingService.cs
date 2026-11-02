@@ -170,7 +170,7 @@ namespace WikiViewer.Core.Services
             WikiInstance wiki
         )
         {
-            string themeCss = await ThemeManager.GetThemeCssAsync();
+            string themeCss = await ArticlePresentation.GetThemeCssAsync();
             string decodedCss = WebUtility.HtmlDecode(themeCss);
             string contentWithAbsoluteUrls = WikitextParsingService.FixRelativeUrls(
                 articleContentHtml,

@@ -8,20 +8,16 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
-#if WINDOWS_UWP
-using Windows.Security.Cryptography;
-using Windows.Security.Cryptography.Core;
-using Windows.Storage.Streams;
-#else
 using System.Security.Cryptography;
 using System.Text;
-#endif
 
 namespace WikiViewer.Core.Services
 {
     public static class MediaCacheService
     {
         public static IApiWorkerFactory ApiWorkerFactory { get; set; }
+        public static Func<IApiWorker> DirectWorkerFactory { get; set; } = () => new HttpClientApiWorker();
+        public static Func<string, string> LocalUriFactory { get; set; } = path => path;
         public static IStorageProvider StorageProvider { get; set; }
         public static Func<Func<Task>, Task> DispatcherInvoker { get; set; }
 
@@ -146,7 +142,7 @@ namespace WikiViewer.Core.Services
                         _urlToLocalPathMap[remoteUrl] = localPath;
                         RequestSave();
                     }
-                    return $"ms-appdata:///local{localPath}";
+                    return LocalUriFactory(localPath);
                 }
                 else
                 {
@@ -173,21 +169,11 @@ namespace WikiViewer.Core.Services
 
         private static string GetHashedString(string input)
         {
-#if WINDOWS_UWP
-            var algProvider = HashAlgorithmProvider.OpenAlgorithm(HashAlgorithmNames.Sha1);
-            IBuffer buffer = CryptographicBuffer.ConvertStringToBinary(
-                input,
-                BinaryStringEncoding.Utf8
-            );
-            var hashedBuffer = algProvider.HashData(buffer);
-            return CryptographicBuffer.EncodeToHexString(hashedBuffer);
-#else
             using (var sha1 = SHA1.Create())
             {
                 var hash = sha1.ComputeHash(Encoding.UTF8.GetBytes(input));
                 return hash.Aggregate("", (s, b) => s + b.ToString("x2"));
             }
-#endif
         }
 
         private static async Task<string> DownloadAndCacheAsync(string remoteUrl, WikiInstance wiki, CancellationToken cancellationToken)
@@ -204,7 +190,7 @@ namespace WikiViewer.Core.Services
                 {
                     try
                     {
-                        using (var direct = new HttpClientApiWorker())
+                        using (var direct = DirectWorkerFactory())
                         {
                             await direct.InitializeAsync(wiki.BaseUrl);
                             bytes = await NetworkOperationTimeout.RunAsync(() => direct.GetRawBytesFromUrlAsync(remoteUrl), TimeSpan.FromSeconds(3), "Direct image download timed out.");
@@ -239,7 +225,7 @@ namespace WikiViewer.Core.Services
                         VerifiedPaths[relativePath] = true;
                         RequestSave();
 
-                        return $"ms-appdata:///local{relativePath}";
+                        return LocalUriFactory(relativePath);
                     }
             }
             catch (Exception ex)

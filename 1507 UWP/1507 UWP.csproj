@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -10,7 +10,7 @@
     <RootNamespace>_1507_UWP</RootNamespace>
     <AssemblyName>1507_UWP</AssemblyName>
     <DefaultLanguage>en-US</DefaultLanguage>
-    <WikitextParserVersion Condition="'$(WikitextParserVersion)' == ''">0.0.1</WikitextParserVersion>
+    <WikitextParserVersion Condition="'$(WikitextParserVersion)' == ''">0.2.0</WikitextParserVersion>
     <TargetPlatformIdentifier>UAP</TargetPlatformIdentifier>
     <TargetPlatformVersion Condition=" '$(TargetPlatformVersion)' == '' ">10.0.10240.0</TargetPlatformVersion>
     <TargetPlatformVersion>10.0.10240.0</TargetPlatformVersion>
@@ -272,7 +272,9 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup />
-  <Import Project="..\WikiViewer.Core\WikiViewer.Core.projitems" Label="Shared" />
+  <ItemGroup>
+    <ProjectReference Include="..\WikiViewer.Core\WikiViewer.Core.csproj"><Project>{17EAF20E-8428-4E29-8369-4B30025EE5DE}</Project><Name>WikiViewer.Core</Name></ProjectReference>
+  </ItemGroup>
   <PropertyGroup Condition="'$(WikitextParserVersion)' != '0.0.1'">
     <DefineConstants>$(DefineConstants);WIKITEXT_EXTENDED</DefineConstants>
   </PropertyGroup>

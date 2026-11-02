@@ -1,10 +1,12 @@
 using System;
 using WikiViewer.Core.Enums;
 using WikiViewer.Core.Interfaces;
-using Windows.UI.Xaml;
+
 
 namespace WikiViewer.Core
 {
+    public enum EditorThemeMode { Default, Light, Dark }
+
     public enum ConcurrencyLevel
     {
         Low,
@@ -60,17 +62,17 @@ namespace WikiViewer.Core
             set => SettingsProvider.SetValue(MaxConcurrentDownloadsKey, (int)value);
         }
 
-        public static ElementTheme EditorTheme
+        public static EditorThemeMode EditorTheme
         {
             get
             {
                 var themeName = SettingsProvider.GetValue(
                     EditorThemeKey,
-                    ElementTheme.Default.ToString()
+                    EditorThemeMode.Default.ToString()
                 );
-                return Enum.TryParse(themeName, out ElementTheme parsedTheme)
+                return Enum.TryParse(themeName, out EditorThemeMode parsedTheme)
                     ? parsedTheme
-                    : ElementTheme.Default;
+                    : EditorThemeMode.Default;
             }
             set => SettingsProvider.SetValue(EditorThemeKey, value.ToString());
         }

@@ -1,13 +1,8 @@
 using System;
 using System.Text.RegularExpressions;
-#if WINDOWS_UWP
-using Windows.Security.Cryptography;
-using Windows.Security.Cryptography.Core;
-#else
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
-#endif
 
 namespace WikiViewer.Core.Services
 {
@@ -22,12 +17,7 @@ namespace WikiViewer.Core.Services
         }
         public static string Hash(string value)
         {
-#if WINDOWS_UWP
-            var provider = HashAlgorithmProvider.OpenAlgorithm(HashAlgorithmNames.Sha1);
-            return CryptographicBuffer.EncodeToHexString(provider.HashData(CryptographicBuffer.ConvertStringToBinary(value, BinaryStringEncoding.Utf8)));
-#else
             using (var sha = SHA1.Create()) return string.Concat(sha.ComputeHash(Encoding.UTF8.GetBytes(value)).Select(b => b.ToString("x2")));
-#endif
         }
     }
 }

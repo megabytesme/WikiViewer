@@ -106,13 +106,13 @@ namespace _1507_UWP.Pages
                 WikitextEditorTextBox.RequestedTheme = ElementTheme.Dark;
             }
 
-            AppSettings.EditorTheme = isLight ? ElementTheme.Light : ElementTheme.Default;
+            AppSettings.EditorTheme = isLight ? WikiViewer.Core.EditorThemeMode.Light : WikiViewer.Core.EditorThemeMode.Default;
         }
 
         private void LoadEditorThemePreference()
         {
             var savedTheme = AppSettings.EditorTheme;
-            bool isLight = (savedTheme == ElementTheme.Light);
+            bool isLight = (savedTheme == WikiViewer.Core.EditorThemeMode.Light);
 
             if (LightModeToggleMenuBarItem != null)
                 LightModeToggleMenuBarItem.IsChecked = isLight;
