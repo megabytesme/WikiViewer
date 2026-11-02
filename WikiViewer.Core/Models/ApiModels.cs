@@ -337,6 +337,11 @@ namespace WikiViewer.Core.Models
         public bool IsTalkAvailable => !string.IsNullOrEmpty(TalkPageTitle);
 
         [JsonIgnore]
+        public string DefaultArticleTitle => IsArticleAvailable ? ArticlePageTitle :
+            TalkPageTitle?.StartsWith("User talk:", StringComparison.OrdinalIgnoreCase) == true ?
+                "User:" + TalkPageTitle.Substring("User talk:".Length) : DisplayTitle;
+
+        [JsonIgnore]
         public Guid WikiId { get; set; }
 
         [JsonIgnore]

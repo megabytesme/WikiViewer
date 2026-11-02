@@ -106,7 +106,7 @@ namespace WikiViewer.Uwp.Pages
             if (e.ClickedItem is FavouriteItem item)
             {
                 var wiki = WikiManager.GetWikiById(item.WikiId);
-                if (wiki != null) NavigateToArticleIfItExists(item.ArticlePageTitle, wiki);
+                if (wiki != null && !string.IsNullOrEmpty(item.DefaultArticleTitle)) NavigateToArticleIfItExists(item.DefaultArticleTitle, wiki);
             }
         }
 
