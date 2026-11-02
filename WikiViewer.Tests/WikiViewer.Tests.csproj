@@ -51,6 +51,7 @@
     <Compile Include="..\WikiViewer.Core\Models\ArticleContent.cs" Link="Models\ArticleContent.cs" />
     <Compile Include="..\WikiViewer.Core\Models\ArticlePreview.cs" Link="Models\ArticlePreview.cs" />
     <Compile Include="..\WikiViewer.Core\Services\EditorPreviewSession.cs" Link="Services\EditorPreviewSession.cs" />
+    <Compile Include="..\WikiViewer.Core\Services\EditorPreviewPolicy.cs" Link="Services\EditorPreviewPolicy.cs" />
     <Compile Include="..\WikiViewer.Core\Services\EditorPreviewResponse.cs" Link="Services\EditorPreviewResponse.cs" />
     <Compile Include="..\WikiViewer.Core\Services\ArticleContentResponse.cs" Link="Services\ArticleContentResponse.cs" />
     <Compile Include="..\WikiViewer.Core\Managers\ArticleCacheManager.cs" Link="Managers\ArticleCacheManager.cs" />

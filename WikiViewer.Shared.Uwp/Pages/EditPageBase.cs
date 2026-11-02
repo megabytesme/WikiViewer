@@ -36,6 +36,7 @@ namespace WikiViewer.Shared.Uwp.Pages
         private bool _previewQueued;
         private bool _previewActive;
         private bool _sourceLoaded;
+        private string _lastPreviewSource;
         private bool isDragging = false;
         private double initialX;
         private GridLength leftColInitialWidth;
@@ -313,7 +314,16 @@ namespace WikiViewer.Shared.Uwp.Pages
             if (version != _previewRenderVersion) return;
             NativePreviewHost.Visibility = Visibility.Collapsed;
             WebPreviewHost.Visibility = Visibility.Visible;
-            try { await ShowWebPreviewAsync(preview.WebHtml, version); }
+            try
+            {
+                if (string.IsNullOrEmpty(preview.WebHtml)) await WikitextParsingService.BuildWebPreviewHtmlAsync(preview, _pageTitle, _pageWikiContext);
+                if (!EditorPreviewPolicy.CanDisplayWeb(preview.WebHtml))
+                {
+                    HidePreview("This page exceeds the Web preview's 2 MB limit. Switch to Native for an unlimited, live preview.");
+                    return;
+                }
+                if (version == _previewRenderVersion) await ShowWebPreviewAsync(preview.WebHtml, version);
+            }
             catch (Exception ex) { if (version == _previewRenderVersion) HidePreview("Failed to display Web preview: " + ex.Message); }
         }
 
@@ -685,7 +695,11 @@ namespace WikiViewer.Shared.Uwp.Pages
             WikitextEditorTextBox.Document.GetText(TextGetOptions.None, out var previewSource);
             _previewSession.SourceChanged(previewSource);
             if (_previewSession.IsStale) PreviewStatusControl.Text = "Preview is out of date. Click Preview to update it.";
-            QueueNativePreview();
+            if (!string.Equals(_lastPreviewSource, previewSource, StringComparison.Ordinal))
+            {
+                _lastPreviewSource = previewSource;
+                QueueNativePreview();
+            }
             if (_isUpdatingText)
             {
                 _isUpdatingText = false;
@@ -1071,7 +1085,7 @@ namespace WikiViewer.Shared.Uwp.Pages
             _previewSession.SourceChanged(source);
             if (_previewSession.Current != null && !_previewSession.IsStale)
             {
-                await RenderPreviewAsync(_previewSession.Current);
+                if (!native) await RenderPreviewAsync(_previewSession.Current);
                 return;
             }
             var request = _previewSession.Begin(source, _pageTitle);
@@ -1097,7 +1111,8 @@ namespace WikiViewer.Shared.Uwp.Pages
                     request.Source,
                     request.Title,
                     _pageWikiContext,
-                    worker
+                    worker,
+                    buildWebHtml: !native
                 );
                 if (_previewActive && PreviewModeControl.IsOn == native && _previewSession.Accept(request, preview)) await RenderPreviewAsync(preview);
                 else if (_previewSession.IsLatest(request) && !native) PreviewStatusControl.Text = "Text changed while the preview was generated. Click Preview again.";

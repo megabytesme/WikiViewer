@@ -7,6 +7,22 @@ namespace WikiViewer.Tests;
 public class EditorPreviewTests
 {
     [Fact]
+    public void NativeKeepsLargeDraftAndExpandedContentBeyondTheWebLimit()
+    {
+        string source = new string('x', EditorPreviewPolicy.WebByteLimit + 1);
+        string html = "<p>" + source + "</p><p>End of large page</p>";
+        var json = Newtonsoft.Json.JsonConvert.SerializeObject(new { parse = new { text = html } });
+        var preview = EditorPreviewResponse.Parse(json, source, "Large page");
+        Assert.Equal(source, preview.Content.RawWikitext);
+        var model = NativeArticleDocumentService.Parse(preview.Content, new Uri("https://example.org/wiki/Large_page"));
+        Assert.Equal(2, model.Nodes.Count);
+        Assert.Equal("End of large page", model.Nodes[1].Children[0].Text);
+        Assert.False(EditorPreviewPolicy.CanDisplayWeb(html));
+        Assert.True(EditorPreviewPolicy.CanDisplayWeb(new string('x', EditorPreviewPolicy.WebByteLimit)));
+        Assert.False(EditorPreviewPolicy.CanDisplayWeb(new string('界', EditorPreviewPolicy.WebByteLimit / 2)));
+    }
+
+    [Fact]
     public void SwitchingModeRejectsPendingExpansionWithoutDiscardingTheDraftSnapshot()
     {
         var session = new EditorPreviewSession();

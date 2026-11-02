@@ -134,7 +134,7 @@ namespace WikiViewer.Core.Services
             }
         }
 
-        public static async Task<ArticlePreview> ParseEditorPreviewAsync(string wikitext, string pageTitle, WikiInstance wikiContext, IApiWorker worker)
+        public static async Task<ArticlePreview> ParseEditorPreviewAsync(string wikitext, string pageTitle, WikiInstance wikiContext, IApiWorker worker, bool buildWebHtml = true)
         {
             if (wikiContext == null) throw new ArgumentNullException(nameof(wikiContext));
             if (worker == null) throw new ArgumentNullException(nameof(worker));
@@ -142,6 +142,12 @@ namespace WikiViewer.Core.Services
             var preview = EditorPreviewResponse.Parse(json, wikitext, pageTitle);
             preview.Content.Syntax = await WikiSyntaxService.GetAsync(wikiContext.ApiEndpoint, worker.GetJsonFromApiAsync);
             await ArticleStyleResourceService.ResolveAsync(preview.Content, new Uri(wikiContext.GetWikiPageUrl(pageTitle)), wikiContext.ScriptPath, worker.GetRawHtmlFromUrlAsync);
+            if (buildWebHtml) await BuildWebPreviewHtmlAsync(preview, pageTitle, wikiContext);
+            return preview;
+        }
+
+        public static async Task BuildWebPreviewHtmlAsync(ArticlePreview preview, string pageTitle, WikiInstance wikiContext)
+        {
             string scriptPath = (wikiContext.ScriptPath ?? "").Trim('/');
             string cssUrl = preview.StyleModules.Count == 0 ? "" : wikiContext.BaseUrl.TrimEnd('/') + "/" +
                 (scriptPath.Length == 0 ? "" : scriptPath + "/") + "load.php?modules=" + Uri.EscapeDataString(string.Join("|", preview.StyleModules)) + "&only=styles";
@@ -153,7 +159,6 @@ namespace WikiViewer.Core.Services
             int headEnd = (preview.HeadHtml ?? "").IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
             preview.WebHtml = headEnd >= 0 ? preview.HeadHtml.Insert(headEnd, headContent) + body :
                 "<!DOCTYPE html><html><head><meta charset='utf-8'>" + headContent + "</head><body>" + body;
-            return preview;
         }
     }
 }
