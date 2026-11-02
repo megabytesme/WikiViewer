@@ -91,6 +91,18 @@ public class NativeResponsiveContentTests
     }
 
     [Fact]
+    public void AudioCardLeavesMostOfTheWidthForItsPlayerAndCaption()
+    {
+        var row = NativeArticleDocumentService.Parse("<div style='display:flex;gap:8px'><div style='flex:none'><img src='/speaker.png' width='50'></div><div style='flex:1'><audio style='width:232px'><source src='/clip.mp3' type='audio/mpeg'></audio><p>Drum cadences performed by the United States Navy Band</p></div></div>", Page).Nodes.Single();
+        var styles = row.Children.Select(node => NativeResponsiveLayout.FlexItemStyle(node, 320)).ToList();
+        var rects = NativeResponsiveLayout.Flex(320, styles, row.Style, (i, w) => 100);
+        Assert.InRange(rects[0].Width, 50, 80);
+        Assert.True(rects[1].Width >= 232);
+        Assert.Equal(320, rects.Last().X + rects.Last().Width, 6);
+        Assert.Null(row.Children[0].Style.FlexBasis);
+    }
+
+    [Fact]
     public void StyledListGridKeepsListItemsAsLayoutChildren()
     {
         var node = NativeArticleDocumentService.Parse("<ul style='display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))'><li><a href='/A'>One</a></li><li>Two</li></ul>", Page).Nodes.Single();

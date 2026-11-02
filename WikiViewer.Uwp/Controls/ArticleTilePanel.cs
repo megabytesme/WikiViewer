@@ -14,6 +14,7 @@ namespace WikiViewer.Uwp.Controls
         public int Columns { get; set; }
         public double Gap { get; set; } = 8;
         public NativeArticleStyle FlowStyle { get; set; }
+        public List<NativeArticleNode> LayoutNodes { get; } = new List<NativeArticleNode>();
         private List<ArticleFlowRect> _rectangles = new List<ArticleFlowRect>();
         protected override Size MeasureOverride(Size availableSize)
         {
@@ -26,7 +27,8 @@ namespace WikiViewer.Uwp.Controls
             };
             if (FlowStyle?.Display == "flex")
             {
-                var styles = Children.Select(c => c.GetValue(ArticleFlowPanel.LayoutStyleProperty) as NativeArticleStyle ?? new NativeArticleStyle()).ToList();
+                var styles = LayoutNodes.Count == Children.Count ? LayoutNodes.Select(node => NativeResponsiveLayout.FlexItemStyle(node, width)).ToList() :
+                    Children.Select(c => c.GetValue(ArticleFlowPanel.LayoutStyleProperty) as NativeArticleStyle ?? new NativeArticleStyle()).ToList();
                 _rectangles = NativeResponsiveLayout.Flex(width, styles, FlowStyle, measure);
             }
             else

@@ -505,7 +505,7 @@ namespace WikiViewer.Uwp.Controls
                     foreach (var child in node.Children.Where(c => !c.Style.Hidden && (c.Kind != NativeArticleNodeKind.Text || !string.IsNullOrWhiteSpace(c.Text))))
                     {
                         var item = IsBlock(child) ? RenderBlock(child) : ArticleVisualStyle.Block(Text(new[] { child }, node), child, _palette);
-                        Register(child.Id, item); tiles.Children.Add(item);
+                        Register(child.Id, item); tiles.LayoutNodes.Add(child); tiles.Children.Add(item);
                     }
                     return tiles;
                 }
@@ -556,7 +556,7 @@ namespace WikiViewer.Uwp.Controls
             }
             if (node.Kind == NativeArticleNodeKind.LineBreak) { inlines.Add(new LineBreak()); return; }
             if (node.Kind == NativeArticleNodeKind.Image) { inlines.Add(new InlineUIContainer { Child = Image(node) }); return; }
-            if (node.Kind == NativeArticleNodeKind.Media) { inlines.Add(new InlineUIContainer { Child = Media(node) }); return; }
+            if (node.Kind == NativeArticleNodeKind.Media) { inlines.Add(new InlineUIContainer { Child = RenderBlock(node) }); return; }
             if (node.Kind == NativeArticleNodeKind.Math) { inlines.Add(new InlineUIContainer { Child = MathView(node) }); return; }
             if (node.Kind == NativeArticleNodeKind.Unsupported)
             {

@@ -8,6 +8,16 @@ namespace WikiViewer.Core.Services
     /// <summary>Finite-width sizing shared by native tables, flex rows and compatibility tests.</summary>
     public static class NativeResponsiveLayout
     {
+        public static NativeArticleStyle FlexItemStyle(NativeArticleNode node, double available)
+        {
+            var style = node.Style.Copy();
+            // An auto basis follows the content. A fixed 200px basis lets a small
+            // icon consume most of an audio card while its player is squeezed.
+            if (style.FlexBasis == null && style.Width == null)
+                style.FlexBasis = new ArticleLength { Value = PreferredCellWidth(node, available), Unit = "px" };
+            return style;
+        }
+
         public static double PreferredCellWidth(NativeArticleNode cell, double available)
         {
             if (cell.Style.Width != null) return Math.Max(40, Math.Min(2000, cell.Style.Width.Resolve(available)));
