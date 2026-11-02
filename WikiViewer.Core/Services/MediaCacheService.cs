@@ -107,6 +107,18 @@ namespace WikiViewer.Core.Services
             }
         }
 
+        /// <summary>Check saved media without starting a connection or download.</summary>
+        public static async Task<string> TryGetCachedUriAsync(string remoteUrl, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string path;
+            if (!_isInitialized || string.IsNullOrEmpty(remoteUrl) || !_urlToLocalPathMap.TryGetValue(remoteUrl, out path)) return null;
+            if (!VerifiedPaths.ContainsKey(path) && !await StorageProvider.FileExistsAsync("cache\\" + System.IO.Path.GetFileName(path))) return null;
+            cancellationToken.ThrowIfCancellationRequested();
+            VerifiedPaths[path] = true;
+            return LocalUriFactory(path);
+        }
+
         public static async Task<string> GetLocalUriAsync(
             string remoteUrl,
             WikiInstance wiki,

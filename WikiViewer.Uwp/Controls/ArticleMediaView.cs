@@ -93,6 +93,13 @@ namespace WikiViewer.Uwp.Controls
                     var candidate = _sources[(first + offset) % _sources.Count];
                     _open.NavigateUri = candidate.Uri;
                     _status.Text = "Preparing media…";
+                    string cached = null;
+                    try { cached = await MediaCacheService.TryGetCachedUriAsync(candidate.Uri.AbsoluteUri, token); }
+                    catch (Exception ex) { System.Diagnostics.Debug.WriteLine("Saved media: " + ex.Message); }
+                    if (!Current(request)) return;
+                    Uri saved;
+                    if (Uri.TryCreate(cached, UriKind.Absolute, out saved) && await OpenAsync(saved, request, token))
+                    { Ready(resume); return; }
                     if (!cachedFirst && await OpenAsync(candidate.Uri, request, token))
                     { Ready(resume); return; }
                     if (!Current(request)) return;
@@ -108,7 +115,7 @@ namespace WikiViewer.Uwp.Controls
                         catch (Exception ex) { System.Diagnostics.Debug.WriteLine("Media recovery: " + ex.Message); }
                         if (!Current(request)) return;
                         Uri uri;
-                        if (Uri.TryCreate(local, UriKind.Absolute, out uri) && uri != candidate.Uri && await OpenAsync(uri, request, token))
+                        if (Uri.TryCreate(local, UriKind.Absolute, out uri) && uri != candidate.Uri && uri.AbsoluteUri != cached && await OpenAsync(uri, request, token))
                         { Ready(resume); return; }
                     }
                     if (cachedFirst && await OpenAsync(candidate.Uri, request, token))
