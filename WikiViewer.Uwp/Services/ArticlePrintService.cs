@@ -21,6 +21,7 @@ namespace WikiViewer.Uwp.Services
     /// <summary>Prints a complete document, independently of the reader's recycled viewport.</summary>
     public sealed class ArticlePrintService : IDisposable
     {
+        private static ArticlePrintService _active;
         private readonly Canvas _host;
         private readonly PrintDocument _document = new PrintDocument();
         private readonly IPrintDocumentSource _source;
@@ -38,6 +39,9 @@ namespace WikiViewer.Uwp.Services
             _host = host ?? throw new ArgumentNullException(nameof(host));
             _source = _document.DocumentSource;
             _manager = PrintManager.GetForCurrentView();
+            // Article and image dialogs share the current window's print contract.
+            _active?.Dispose();
+            _active = this;
             _manager.PrintTaskRequested += TaskRequested;
             _document.Paginate += Paginate;
             _document.GetPreviewPage += GetPreview;
@@ -217,6 +221,7 @@ namespace WikiViewer.Uwp.Services
         {
             if (_disposed) return;
             _disposed = true;
+            if (ReferenceEquals(_active, this)) _active = null;
             _manager.PrintTaskRequested -= TaskRequested;
             _document.Paginate -= Paginate; _document.GetPreviewPage -= GetPreview; _document.AddPages -= AddPages;
             _host.Children.Clear(); _pages.Clear(); _text = null; _image = null;
