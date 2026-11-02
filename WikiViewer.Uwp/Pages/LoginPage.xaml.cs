@@ -32,7 +32,7 @@ namespace WikiViewer.Uwp
         )
         {
             var loginResult = authException.LoginResult;
-            var panel = new StackPanel { Spacing = 12 };
+            var panel = new WikiViewer.Uwp.Controls.SpacedPanel { Spacing = 12 };
             var textBoxes = new Dictionary<string, TextBox>();
 
             foreach (var request in loginResult.Requests)

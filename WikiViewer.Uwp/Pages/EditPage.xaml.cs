@@ -12,6 +12,8 @@ namespace WikiViewer.Uwp.Pages
         public EditPage()
         {
             this.InitializeComponent();
+            if (Windows.Foundation.Metadata.ApiInformation.IsPropertyPresent("Windows.UI.Xaml.Controls.RichEditBox", "SelectionFlyout"))
+                WikitextEditor.SelectionFlyout = (Windows.UI.Xaml.Controls.Primitives.FlyoutBase)Resources["SharedEditorMenu"];
             AttachEditorFunctionality();
             InitializePreviewControls();
         }

@@ -30,7 +30,7 @@ namespace WikiViewer.Uwp.Pages
         private string _captchaToken = null;
 
         protected abstract TextBlock PageTitleTextBlock { get; }
-        protected abstract StackPanel FieldsStackPanel { get; }
+        protected abstract Panel FieldsStackPanel { get; }
         protected abstract Button CreateAccountButton { get; }
         protected abstract Windows.UI.Xaml.Controls.ProgressRing LoadingProgressRing { get; }
         protected abstract void ShowError(string message);

@@ -13,7 +13,7 @@ namespace WikiViewer.Uwp.Pages
         public CreateAccountPage() => this.InitializeComponent();
 
         protected override TextBlock PageTitleTextBlock => PageTitle;
-        protected override StackPanel FieldsStackPanel => FieldsPanel;
+        protected override Panel FieldsStackPanel => FieldsPanel;
         protected override Button CreateAccountButton => CreateButton;
         protected override Windows.UI.Xaml.Controls.ProgressRing LoadingProgressRing => LoadingRing;
         private WikiBrowser ErrorWebViewControl => ErrorWebView;
