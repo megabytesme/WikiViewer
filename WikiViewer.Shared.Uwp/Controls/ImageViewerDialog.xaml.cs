@@ -23,6 +23,7 @@ namespace WikiViewer.Shared.Uwp.Controls
         private readonly WikiInstance _wikiContext;
         private DataTransferManager _dataTransferManager;
         private StorageFile _localImageFile;
+        private WikiViewer.Shared.Uwp.Services.ArticlePrintService _printing;
 
         public ImageViewerDialog(ImageMetadata metadata, WikiInstance wikiContext)
         {
@@ -36,6 +37,7 @@ namespace WikiViewer.Shared.Uwp.Controls
 
             this.Closing += (s, e) =>
             {
+                _printing?.Dispose();
                 if (_dataTransferManager != null)
                 {
                     _dataTransferManager.DataRequested -= OnDataRequested;
@@ -189,6 +191,19 @@ namespace WikiViewer.Shared.Uwp.Controls
         private void Image_LoadComplete(object sender, RoutedEventArgs e)
         {
             LoadingIndicator.IsActive = false;
+            PrintButton.IsEnabled = RasterImageView.Source != null;
+        }
+
+        private async void PrintButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                _printing?.Dispose();
+                _printing = new WikiViewer.Shared.Uwp.Services.ArticlePrintService(PrintCanvas);
+                _printing.Failed += (s, message) => ShowError(message);
+                await _printing.PrintImageAsync(Metadata.PageTitle, RasterImageView.Source);
+            }
+            catch (Exception ex) { _printing?.Dispose(); ShowError("Could not print: " + ex.Message); }
         }
 
         private void Image_LoadFailed(object sender, ExceptionRoutedEventArgs e)

@@ -22,6 +22,26 @@ namespace WikiViewer.Shared.Uwp.Pages
 {
     public abstract class ArticleViewerPageBase : Page
     {
+        private WikiViewer.Shared.Uwp.Services.ArticlePrintService _printing;
+
+        protected async void PrintButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_displayedContent == null || _pageWikiContext == null) return;
+            try
+            {
+                _printing?.Dispose();
+                _printing = new WikiViewer.Shared.Uwp.Services.ArticlePrintService((Canvas)FindName("PrintCanvas"));
+                _printing.Failed += async (s, message) => await new ContentDialog { Title = "Printing", Content = message, CloseButtonText = "Close" }.ShowAsync();
+                var wiki = _pageWikiContext;
+                await _printing.PrintArticleAsync(_pageTitleToFetch.Replace('_', ' '), _displayedContent,
+                    new Uri(wiki.GetWikiPageUrl(_pageTitleToFetch)), url => MediaCacheService.GetLocalUriAsync(url, wiki));
+            }
+            catch (Exception ex)
+            {
+                _printing?.Dispose();
+                await new ContentDialog { Title = "Could not print", Content = ex.Message, PrimaryButtonText = "Close" }.ShowAsync();
+            }
+        }
         protected bool _isVerificationOnlyFlow = false;
         public WikiInstance _pageWikiContext;
         protected string _pageTitleToFetch = "";
@@ -305,6 +325,7 @@ namespace WikiViewer.Shared.Uwp.Pages
 
         private void Page_Unloaded(object sender, RoutedEventArgs e)
         {
+            _printing?.Dispose();
             _articleRequestVersion++;
             DataTransferManager.GetForCurrentView().DataRequested -= OnDataRequested;
             AuthenticationService.AuthenticationStateChanged -= OnAuthenticationStateChanged;

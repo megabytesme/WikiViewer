@@ -11,6 +11,7 @@
     <Import_RootNamespace>WikiViewer.Shared.Uwp</Import_RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)Services\ArticlePrintService.cs" />
     <!-- Controls with XAML -->
     <Compile Include="$(MSBuildThisFileDirectory)Controls\NativeArticleView.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Controls\ArticleFlowPanel.cs" />
