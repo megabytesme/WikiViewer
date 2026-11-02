@@ -72,6 +72,7 @@ namespace WikiViewer.Uwp
             var credentialService = new CredentialService();
 
             AppSettings.SettingsProvider = settingsProvider;
+            AppearanceService.Apply();
             ArticlePresentation.GetThemeCssAsync = ThemeManager.GetThemeCssAsync;
             ArticlePresentation.IsDarkMode = () => Application.Current.RequestedTheme == ApplicationTheme.Dark;
             FavouritesService.StorageProvider = storageProvider;

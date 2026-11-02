@@ -32,6 +32,7 @@ namespace WikiViewer.Uwp.Pages
 
         private void MainPage_Loaded(object sender, RoutedEventArgs e)
         {
+            WikiViewer.Uwp.Services.AppearanceService.Apply();
             SetupTitleBar();
         }
 

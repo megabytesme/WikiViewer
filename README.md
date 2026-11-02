@@ -86,6 +86,8 @@ Use MSBuild from Visual Studio with UWP targets installed. The version property 
 1. In the Solution Explorer, right-click `WikiViewer.Uwp` and select **"Set as Startup Project"**.
 2. Press `F5` or select `Debug > Start Debugging` to build and run.
 
+**Settings > Appearance > App style** offers Automatic, Windows 10 Fluent and Windows 11. The Fluent resources follow [LibreSpotUWP](https://github.com/megabytesme/LibreSpotUWP/tree/master/LibreSpotUWP/Themes), with acrylic on supported Windows versions and solid colours on 15063. Light, dark and high contrast colours follow Windows. Changing the style keeps the current page and unsaved editor text.
+
 ## Architectural Overview
 
 The solution has one Windows app, a portable core library and portable tests.

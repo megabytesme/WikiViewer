@@ -7,6 +7,7 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+                <ResourceDictionary Source="Themes/Default.xaml"/>
                 <ResourceDictionary>
                     <shared:StringToVisibilityConverter x:Key="StringToVisibilityConverter" />
                     <shared:BooleanToVisibilityConverter x:Key="GlobalBoolToVisibility" />
@@ -14,11 +15,10 @@
                     <shared:StringToBitmapImageConverter x:Key="StringToBitmapImageConverter" />
                 </ResourceDictionary>
                 <ResourceDictionary>
-                    <SolidColorBrush x:Key="PageTitleBarAcrylicBrush" Color="{ThemeResource SystemChromeMediumColor}"/>
 
                     <Style x:Key="PageTitleBarGridStyle" TargetType="Grid">
                         <Setter Property="Height" Value="52"/>
-                        <Setter Property="Background" Value="{StaticResource PageTitleBarAcrylicBrush}"/>
+                        <Setter Property="Background" Value="{ThemeResource PageTitleBarAcrylicBrush}"/>
                     </Style>
 
                     <Style x:Key="PageTitleBarTextStyle" TargetType="TextBlock" BasedOn="{StaticResource TitleTextBlockStyle}">
@@ -28,7 +28,7 @@
                     </Style>
 
                     <Style TargetType="ContentDialog">
-                        <Setter Property="Background" Value="{ThemeResource SystemControlBackgroundChromeMediumLowBrush}" />
+                        <Setter Property="Background" Value="{ThemeResource PageTitleBarAcrylicBrush}" />
                         <Setter Property="TitleTemplate">
                             <Setter.Value>
                                 <DataTemplate>

@@ -32,8 +32,8 @@ namespace WikiViewer.Uwp.Controls
         {
 #if UWP_1809
             this.Background = (Brush)
-                Application.Current.Resources["SystemControlAcrylicWindowBrush"];
-            this.CornerRadius = new CornerRadius(8);
+                Application.Current.Resources["PageTitleBarAcrylicBrush"];
+            this.CornerRadius = new CornerRadius(WikiViewer.Uwp.Services.AppearanceService.UseFluent ? 2 : 8);
 #endif
         }
 

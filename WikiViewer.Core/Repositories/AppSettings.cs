@@ -6,6 +6,7 @@ using WikiViewer.Core.Interfaces;
 namespace WikiViewer.Core
 {
     public enum EditorThemeMode { Default, Light, Dark }
+    public enum AppAppearance { Automatic, Windows10Fluent, Windows11 }
 
     public enum ConcurrencyLevel
     {
@@ -19,6 +20,11 @@ namespace WikiViewer.Core
 
     public static class AppSettings
     {
+        public static AppAppearance Appearance
+        {
+            get => (AppAppearance)SettingsProvider.GetValue("AppAppearance", (int)AppAppearance.Automatic);
+            set => SettingsProvider.SetValue("AppAppearance", (int)value);
+        }
         public static ISettingsProvider SettingsProvider { get; set; }
 
         private const string CachingEnabledKey = "IsCachingEnabled";

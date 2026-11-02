@@ -4,7 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
     xmlns:local="using:WikiViewer.Uwp.Pages"
-    muxc:BackdropMaterial.ApplyToRootOrPageBackground="True">
+    Background="{ThemeResource AppBackgroundBrush}">
     <Grid>
         <VisualStateManager.VisualStateGroups>
             <VisualStateGroup x:Name="WindowStates">

@@ -20,7 +20,7 @@
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel MaxWidth="800" Spacing="24" HorizontalAlignment="Center" Margin="24">
 
-                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
+                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="{ThemeResource CardCornerRadius}" Padding="16">
                     <StackPanel Spacing="12">
                         <TextBlock Text="Manage Wikis" Style="{ThemeResource SubtitleTextBlockStyle}"/>
                         <TextBlock Text="Add, remove, or edit the MediaWiki sites this app connects to." Opacity="0.7" TextWrapping="WrapWholeWords"/>
@@ -39,7 +39,19 @@
                     </StackPanel>
                 </Border>
 
-                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
+                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="{ThemeResource CardCornerRadius}" Padding="16">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="Appearance" Style="{ThemeResource SubtitleTextBlockStyle}"/>
+                        <ComboBox x:Name="AppAppearanceComboBox" Header="App style" SelectionChanged="AppAppearance_SelectionChanged">
+                            <ComboBoxItem Content="Automatic"/>
+                            <ComboBoxItem Content="Windows 10 Fluent"/>
+                            <ComboBoxItem Content="Windows 11"/>
+                        </ComboBox>
+                        <TextBlock Text="Automatic matches your Windows version. The app follows your light, dark and high contrast settings." TextWrapping="Wrap" Opacity="0.7"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="{ThemeResource CardCornerRadius}" Padding="16">
                     <StackPanel Spacing="12">
                         <TextBlock Text="Reading" Style="{ThemeResource SubtitleTextBlockStyle}"/>
                         <ToggleSwitch x:Name="NativeReaderDefaultToggle"
@@ -50,7 +62,7 @@
                     </StackPanel>
                 </Border>
 
-                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
+                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="{ThemeResource CardCornerRadius}" Padding="16">
                     <StackPanel Spacing="12">
                         <TextBlock Text="Connection" Style="{ThemeResource SubtitleTextBlockStyle}"/>
                         <TextBox x:Name="ResolverUrl" Header="Resolver URL" PlaceholderText="https://your-resolver.example"/>
@@ -78,7 +90,7 @@
                     </StackPanel>
                 </Border>
 
-                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
+                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="{ThemeResource CardCornerRadius}" Padding="16">
                     <StackPanel Spacing="12">
                         <TextBlock Text="Storage" Style="{ThemeResource SubtitleTextBlockStyle}"/>
                         <Grid VerticalAlignment="Center">
@@ -105,7 +117,7 @@
                 <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                         BorderThickness="1"
-                        CornerRadius="8"
+                        CornerRadius="{ThemeResource CardCornerRadius}"
                         Padding="16">
                     <StackPanel Spacing="12">
                         <TextBlock Text="Appearance" Style="{ThemeResource SubtitleTextBlockStyle}"/>
@@ -166,7 +178,7 @@
                     </StackPanel>
                 </Border>
 
-                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
+                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="{ThemeResource CardCornerRadius}" Padding="16">
                     <StackPanel Spacing="12">
                         <TextBlock Text="About" Style="{ThemeResource SubtitleTextBlockStyle}"/>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Spacing="12">

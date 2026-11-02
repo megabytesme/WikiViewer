@@ -21,7 +21,7 @@
 
                     <!-- Wiki Info Card -->
                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                            CornerRadius="8"
+                            CornerRadius="{ThemeResource CardCornerRadius}"
                             Padding="16"
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                             BorderThickness="1">
@@ -53,7 +53,7 @@
 
                     <!-- Paths Card -->
                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                            CornerRadius="8"
+                            CornerRadius="{ThemeResource CardCornerRadius}"
                             Padding="16"
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                             BorderThickness="1">
@@ -89,7 +89,7 @@
 
                     <!-- Connection Method Card -->
                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                            CornerRadius="8"
+                            CornerRadius="{ThemeResource CardCornerRadius}"
                             Padding="16"
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                             BorderThickness="1">

@@ -16,7 +16,7 @@
     <RootNamespace>WikiViewer.Uwp</RootNamespace>
     <AssemblyName>WikiViewer</AssemblyName>
     <DefaultLanguage>en-US</DefaultLanguage>
-    <RuntimeIdentifiers>win10-x86;win10-x64;win10-arm;win10-arm64</RuntimeIdentifiers>
+    <RuntimeIdentifiers>win10-x86;win10-x64;win10-arm;win10-arm64;win10-x86-aot;win10-x64-aot;win10-arm-aot;win10-arm64-aot</RuntimeIdentifiers>
     <WikitextParserVersion Condition="'$(WikitextParserVersion)' == ''">0.2.0</WikitextParserVersion>
     <TargetPlatformIdentifier>UAP</TargetPlatformIdentifier>
     <TargetPlatformVersion Condition=" '$(TargetPlatformVersion)' == '' ">10.0.22621.0</TargetPlatformVersion>
@@ -148,7 +148,7 @@
     <Page Include="**\*.xaml" Exclude="App.xaml;obj\**;bin\**;artifacts\**"/>
     <ApplicationDefinition Include="App.xaml"/>
     <Content Include="Assets\**\*"/>
-    <None Include="Properties\Default.rd.xml"/>
+    <Content Include="Properties\Default.rd.xml"/>
     <AppxManifest Include="Package.appxmanifest" Condition="'$(UseWebView2)' == 'true'"/>
     <AppxManifest Include="$(IntermediateOutputPath)Package.Compatibility.appxmanifest" Condition="'$(UseWebView2)' != 'true'"/>
     <ProjectReference Include="..\WikiViewer.Core\WikiViewer.Core.csproj"><Project>{17EAF20E-8428-4E29-8369-4B30025EE5DE}</Project><Name>WikiViewer.Core</Name></ProjectReference>

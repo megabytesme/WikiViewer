@@ -38,6 +38,15 @@ namespace WikiViewer.Uwp.Pages
         protected abstract PasswordBox ResolverPasswordControl { get; }
         protected abstract TextBlock ResolverStatusControl { get; }
         private bool _isLoaded;
+        private bool _appearanceReady;
+        private ComboBox AppearanceComboBox => (ComboBox)FindName("AppAppearanceComboBox");
+
+        protected void AppAppearance_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (!_appearanceReady || AppearanceComboBox.SelectedIndex < 0) return;
+            AppSettings.Appearance = (AppAppearance)AppearanceComboBox.SelectedIndex;
+            AppearanceService.Apply();
+        }
 
         public SettingsPageBase()
         {
@@ -49,6 +58,9 @@ namespace WikiViewer.Uwp.Pages
         {
             if (_isLoaded) return;
             _isLoaded = true;
+            _appearanceReady = false;
+            AppearanceComboBox.SelectedIndex = Math.Max(0, Math.Min(2, (int)AppSettings.Appearance));
+            _appearanceReady = true;
             PopulateConcurrencyComboBox();
             PopulateDefaultConnectionMethodComboBox();
             LoadResolverControls();
