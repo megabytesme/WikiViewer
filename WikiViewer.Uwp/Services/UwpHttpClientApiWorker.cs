@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using WikiViewer.Core.Interfaces;
 using WikiViewer.Core.Models;
 using System.Linq;
+using System.Threading;
 
 using Windows.Web.Http;
 using System.Runtime.InteropServices.WindowsRuntime;
@@ -18,6 +19,8 @@ namespace WikiViewer.Uwp.Services
         private readonly HttpClient _client;
 
         private readonly bool _isSharedClient;
+        private readonly CancellationTokenSource _lifetime = new CancellationTokenSource();
+        private bool _disposed;
         public bool IsInitialized { get; private set; }
         public WikiInstance WikiContext { get; set; }
 
@@ -70,7 +73,7 @@ namespace WikiViewer.Uwp.Services
             Debug.WriteLine($"[UwpHttpClientApiWorker] Attempting to GET URL: {url}");
             try
             {
-                return await _client.GetStringAsync(new Uri(url));
+                return await _client.GetStringAsync(new Uri(url)).AsTask(_lifetime.Token);
             }
             catch (Exception ex)
             {
@@ -87,7 +90,7 @@ namespace WikiViewer.Uwp.Services
             Debug.WriteLine($"[UwpHttpClientApiWorker] Attempting to GET BYTES for URL: {url}");
             try
             {
-                var buffer = await _client.GetBufferAsync(new Uri(url));
+                var buffer = await _client.GetBufferAsync(new Uri(url)).AsTask(_lifetime.Token);
                 return buffer.ToArray();
             }
             catch (Exception ex)
@@ -130,9 +133,11 @@ namespace WikiViewer.Uwp.Services
             using (var content = new Windows.Web.Http.HttpStringContent(encodedContent))
             {
                 content.Headers.ContentType = new Windows.Web.Http.Headers.HttpMediaTypeHeaderValue("application/x-www-form-urlencoded");
-                var response = await _client.PostAsync(new Uri(url), content);
-                response.EnsureSuccessStatusCode();
-                return await response.Content.ReadAsStringAsync();
+                using (var response = await _client.PostAsync(new Uri(url), content).AsTask(_lifetime.Token))
+                {
+                    response.EnsureSuccessStatusCode();
+                    return await response.Content.ReadAsStringAsync().AsTask(_lifetime.Token);
+                }
             }
         }
 
@@ -143,6 +148,10 @@ namespace WikiViewer.Uwp.Services
 
         public void Dispose()
         {
+            if (_disposed) return;
+            _disposed = true;
+            _lifetime.Cancel();
+            _lifetime.Dispose();
             if (!_isSharedClient)
             {
                 _client?.Dispose();

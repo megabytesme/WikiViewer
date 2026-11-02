@@ -184,31 +184,40 @@ namespace WikiViewer.Uwp.Services
                         navTcs.TrySetResult(e.IsSuccess);
                     };
                     this.WebView.NavigationCompleted += navHandler;
-                    this.WebView.NavigateWithHttpRequestMessage(httpRequest);
-                    await NetworkOperationTimeout.RunAsync(() => navTcs.Task, TimeSpan.FromSeconds(30), "WebView navigation timed out. Configure a resolver in Settings > Connection or try another method.");
-
-                    await Task.Delay(250);
-                    string fullHtml = await ExecuteScriptAsync(this.WebView, "document.documentElement.outerHTML");
-
-                    if (string.IsNullOrEmpty(fullHtml))
-                        throw new Exception("POST operation resulted in a blank page.");
-
-                    if (CloudflareDetector.IsCloudflareChallenge(fullHtml))
-                        throw new NeedsUserVerificationException("Cloudflare challenge detected.", url);
-
-                    var doc = new HtmlAgilityPack.HtmlDocument();
-                    doc.LoadHtml(fullHtml);
-                    string json = doc.DocumentNode.SelectSingleNode("//body/pre")?.InnerText;
-                    if (string.IsNullOrWhiteSpace(json))
-                        json = doc.DocumentNode.SelectSingleNode("//body")?.InnerText;
-
-                    if (!string.IsNullOrWhiteSpace(json))
+                    try
                     {
-                        string decodedJson = System.Net.WebUtility.HtmlDecode(json);
-                        if (decodedJson.Trim().StartsWith("{") || decodedJson.Trim().StartsWith("["))
-                            return decodedJson.Trim();
+                        this.WebView.NavigateWithHttpRequestMessage(httpRequest);
+                        await NetworkOperationTimeout.RunAsync(() => navTcs.Task, TimeSpan.FromSeconds(30), "WebView navigation timed out. Configure a resolver in Settings > Connection or try another method.");
+
+                        await Task.Delay(250);
+                        string fullHtml = await ExecuteScriptAsync(this.WebView, "document.documentElement.outerHTML");
+
+                        if (string.IsNullOrEmpty(fullHtml))
+                            throw new Exception("POST operation resulted in a blank page.");
+
+                        if (CloudflareDetector.IsCloudflareChallenge(fullHtml))
+                            throw new NeedsUserVerificationException("Cloudflare challenge detected.", url);
+
+                        var doc = new HtmlAgilityPack.HtmlDocument();
+                        doc.LoadHtml(fullHtml);
+                        string json = doc.DocumentNode.SelectSingleNode("//body/pre")?.InnerText;
+                        if (string.IsNullOrWhiteSpace(json))
+                            json = doc.DocumentNode.SelectSingleNode("//body")?.InnerText;
+
+                        if (!string.IsNullOrWhiteSpace(json))
+                        {
+                            string decodedJson = System.Net.WebUtility.HtmlDecode(json);
+                            if (decodedJson.Trim().StartsWith("{") || decodedJson.Trim().StartsWith("["))
+                                return decodedJson.Trim();
+                        }
+                        throw new Exception("Could not extract valid JSON from the POST response page.");
                     }
-                    throw new Exception("Could not extract valid JSON from the POST response page.");
+                    finally
+                    {
+                        this.WebView.NavigationCompleted -= navHandler;
+                        httpRequest.Dispose();
+                        if (!navTcs.Task.IsCompleted) this.WebView.Stop();
+                    }
                 }
             );
         }

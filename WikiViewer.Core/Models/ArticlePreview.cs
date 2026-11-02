@@ -7,6 +7,7 @@ namespace WikiViewer.Core.Models
         public ArticleContent Content { get; set; }
         public string HeadHtml { get; set; }
         public string WebHtml { get; set; }
+        public bool NeedsServerExpansion { get; set; }
         public List<string> StyleModules { get; } = new List<string>();
     }
 

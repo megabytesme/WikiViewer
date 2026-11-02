@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using WikiViewer.Core;
 using WikiViewer.Core.Interfaces;
+using WikiViewer.Core.Managers;
 using WikiViewer.Core.Models;
 using WikiViewer.Core.Services;
 using WikiViewer.Uwp.Controls;
@@ -41,6 +42,9 @@ namespace WikiViewer.Uwp.Pages
         private bool _previewActive;
         private bool _sourceLoaded;
         private string _lastPreviewSource;
+        private Task<IApiWorker> _editorWorkerTask;
+        private IApiWorker _ownedEditorWorker;
+        private int _editorWorkerGeneration;
         private bool isDragging = false;
         private double initialX;
         private GridLength leftColInitialWidth;
@@ -325,7 +329,8 @@ namespace WikiViewer.Uwp.Pages
         {
             int version = ++_previewRenderVersion;
             PreviewPlaceholderControl.Visibility = Visibility.Collapsed;
-            PreviewStatusControl.Text = _previewSession.IsStale ? (PreviewModeControl.IsOn ? "Updating live preview..." : "Preview is out of date. Click Preview to update it.") : "Preview of your unsaved text";
+            PreviewStatusControl.Text = _previewSession.IsStale ? (PreviewModeControl.IsOn ? "Updating live preview..." : "Preview is out of date. Click Preview to update it.") :
+                preview.NeedsServerExpansion ? "Preview ready · Checking server expansion…" : "Preview of your unsaved text";
             if (PreviewModeControl.IsOn)
             {
                 NativePreviewHost.Visibility = Visibility.Visible;
@@ -414,19 +419,33 @@ namespace WikiViewer.Uwp.Pages
         {
             try
             {
-                var worker = SessionManager.GetAnonymousWorkerForWiki(_pageWikiContext);
-                await worker.InitializeAsync(_pageWikiContext.BaseUrl);
+                var published = EditorPreviewBootstrap.Take(_pageWikiContext.Id, _pageTitle);
+                if (published == null && AppSettings.IsCachingEnabled)
+                    published = await ArticleCacheManager.GetCachedArticleContentAsync(_pageTitle, _pageWikiContext.Id);
                 string url =
                     $"{_pageWikiContext.ApiEndpoint}?action=query&prop=revisions&titles={Uri.EscapeDataString(_pageTitle)}&rvprop=content&format=json";
-                string json = await worker.GetJsonFromApiAsync(url);
+                string json = await NetworkOperationTimeout.RunAsync(async () =>
+                    await (await GetEditorWorkerAsync()).GetJsonFromApiAsync(url), TimeSpan.FromSeconds(45), "The latest source could not be retrieved in time.");
+                if (!_previewActive) return;
                 var root = JObject.Parse(json);
                 var page = root["query"]["pages"].First.First;
                 var content = page["revisions"][0]["*"].ToString();
                 _originalWikitext = content;
                 WikitextEditorTextBox.Document.SetText(TextSetOptions.None, _originalWikitext);
+                WikitextEditorTextBox.Document.GetText(TextGetOptions.None, out var editorSource);
+                _lastPreviewSource = editorSource;
+                _previewSession.SourceChanged(editorSource);
+                var seed = EditorPreviewBootstrap.Create(published, content, editorSource);
+                if (seed != null)
+                {
+                    var request = _previewSession.Begin(editorSource, _pageTitle);
+                    if (_previewSession.Accept(request, seed) && PreviewModeControl.IsOn) await RenderPreviewAsync(seed);
+                }
             }
             catch (Exception ex)
             {
+                if (!_previewActive) return;
+                ResetEditorWorker();
                 LoadingTextBlock.Text = $"Error: {ex.Message}";
                 WikitextEditorTextBox.Document.SetText(
                     TextSetOptions.None,
@@ -438,12 +457,40 @@ namespace WikiViewer.Uwp.Pages
             }
             finally
             {
-                LoadingOverlayGrid.Visibility = Visibility.Collapsed;
-                AttachEditorFunctionality();
-                UpdateBracketHighlighting();
-                _sourceLoaded = !WikitextEditorTextBox.IsReadOnly;
-                QueueNativePreview();
+                if (_previewActive)
+                {
+                    LoadingOverlayGrid.Visibility = Visibility.Collapsed;
+                    AttachEditorFunctionality();
+                    UpdateBracketHighlighting();
+                    _sourceLoaded = !WikitextEditorTextBox.IsReadOnly;
+                    QueueNativePreview();
+                }
             }
+        }
+
+        private Task<IApiWorker> GetEditorWorkerAsync() => _editorWorkerTask ?? (_editorWorkerTask = CreateEditorWorkerAsync());
+
+        private async Task<IApiWorker> CreateEditorWorkerAsync()
+        {
+            int generation = _editorWorkerGeneration;
+            var authenticated = AccountManager.GetAccountsForWiki(_pageWikiContext.Id).FirstOrDefault(account => account.IsLoggedIn)?.AuthenticatedApiWorker;
+            if (authenticated != null)
+            {
+                await authenticated.InitializeAsync(_pageWikiContext.BaseUrl);
+                if (!_previewActive || generation != _editorWorkerGeneration) throw new OperationCanceledException();
+                return authenticated;
+            }
+            var worker = await KnownWikiApiWorker.CreateAsync(_pageWikiContext, App.ApiWorkerFactory);
+            if (!_previewActive || generation != _editorWorkerGeneration) { worker.Dispose(); throw new OperationCanceledException(); }
+            _ownedEditorWorker = worker;
+            return worker;
+        }
+
+        private void ResetEditorWorker()
+        {
+            _editorWorkerGeneration++;
+            _ownedEditorWorker?.Dispose();
+            _ownedEditorWorker = null; _editorWorkerTask = null;
         }
 
         protected void AttachEditorFunctionality()
@@ -467,6 +514,7 @@ namespace WikiViewer.Uwp.Pages
             base.OnNavigatingFrom(e);
             if (e.Cancel) return;
             _previewActive = false;
+            ResetEditorWorker();
             _previewQueued = false;
             _previewTimer.Stop();
             _previewSession.Clear();
@@ -1123,7 +1171,7 @@ namespace WikiViewer.Uwp.Pages
             _previewQueued = false;
             WikitextEditorTextBox.Document.GetText(TextGetOptions.None, out var source);
             _previewSession.SourceChanged(source);
-            if (_previewSession.Current != null && !_previewSession.IsStale)
+            if (_previewSession.Current != null && !_previewSession.IsStale && !_previewSession.Current.NeedsServerExpansion)
             {
                 if (!native) await RenderPreviewAsync(_previewSession.Current);
                 return;
@@ -1135,26 +1183,23 @@ namespace WikiViewer.Uwp.Pages
 
             try
             {
-                var account = AccountManager
-                    .GetAccountsForWiki(_pageWikiContext.Id)
-                    .FirstOrDefault(a => a.IsLoggedIn);
-                IApiWorker worker =
-                    account?.AuthenticatedApiWorker
-                    ?? SessionManager.GetAnonymousWorkerForWiki(_pageWikiContext);
+                IApiWorker worker = await GetEditorWorkerAsync();
                 if (worker == null)
                 {
                     throw new InvalidOperationException(
                         "Could not obtain an API worker for the preview."
                     );
                 }
-                var preview = await WikitextParsingService.ParseEditorPreviewAsync(
+                var expansion = Stopwatch.StartNew();
+                var preview = await NetworkOperationTimeout.RunAsync(() => WikitextParsingService.ParseEditorPreviewAsync(
                     request.Source,
                     request.Title,
                     _pageWikiContext,
                     worker,
                     buildWebHtml: !native,
                     resolveRemoteResources: !native
-                );
+                ), TimeSpan.FromSeconds(45), "Server expansion timed out.");
+                ArticleLoadMetrics.Record("editor-api-expansion", expansion.ElapsedMilliseconds);
                 if (_previewActive && PreviewModeControl.IsOn == native && _previewSession.Accept(request, preview))
                 {
                     await RenderPreviewAsync(preview);
@@ -1166,8 +1211,11 @@ namespace WikiViewer.Uwp.Pages
             {
                 if (_previewSession.IsLatest(request))
                 {
-                    PreviewStatusControl.Text = $"Preview could not update: {ex.Message}";
+                    PreviewStatusControl.Text = _previewSession.Current != null ?
+                        "Server preview could not update. Your local preview is still available; keep editing or select Preview to retry." :
+                        $"Preview could not update: {ex.Message}";
                 }
+                ResetEditorWorker();
             }
             finally
             {

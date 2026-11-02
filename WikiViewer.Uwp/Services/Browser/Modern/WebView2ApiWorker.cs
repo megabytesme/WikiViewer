@@ -473,94 +473,61 @@ namespace WikiViewer.Uwp.Services
             );
         }
 
-        public async Task<string> PostAndGetJsonFromApiAsync(
-            string url,
-            Dictionary<string, string> postData
-        )
+        public async Task<string> PostAndGetJsonFromApiAsync(string url, Dictionary<string, string> postData)
         {
             await EnsureInitializedAsync();
-
-            return await DispatcherTaskExtensions.RunTaskAsync(
-                CoreApplication.MainView.CoreWindow.Dispatcher,
-                async () =>
+            return await DispatcherTaskExtensions.RunTaskAsync(CoreApplication.MainView.CoreWindow.Dispatcher, async () =>
+            {
+                var view = WebView?.CoreWebView2 ?? throw new InvalidOperationException("CoreWebView2 is not initialized.");
+                string body = string.Join("&", postData.Select(item => System.Net.WebUtility.UrlEncode(item.Key) + "=" + System.Net.WebUtility.UrlEncode(item.Value)));
+                var received = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+                TypedEventHandler<CoreWebView2, CoreWebView2WebResourceResponseReceivedEventArgs> handler = async (sender, args) =>
                 {
-                    if (WebView?.CoreWebView2 == null)
-                        throw new InvalidOperationException("CoreWebView2 could not be initialized for POST.");
-
-                    var encodedItems = postData.Select(kvp =>
-                        System.Net.WebUtility.UrlEncode(kvp.Key) + "=" + System.Net.WebUtility.UrlEncode(kvp.Value)
-                    );
-                    var postBody = string.Join("&", encodedItems);
-                    var postBytes = System.Text.Encoding.UTF8.GetBytes(postBody);
-
-                    var tcs = new TaskCompletionSource<string>();
-
-                    WebView.CoreWebView2.WebResourceResponseReceived += async (s, e) =>
+                    if (!string.Equals(args.Request.Method, "POST", StringComparison.OrdinalIgnoreCase) ||
+                        !string.Equals(args.Request.Uri, url, StringComparison.OrdinalIgnoreCase) || received.Task.IsCompleted) return;
+                    try
                     {
-                        try
+                        using (var content = await args.Response.GetContentAsync())
                         {
-                            if (e.Request.Uri.StartsWith(url, StringComparison.OrdinalIgnoreCase))
+                            if (content == null) throw new InvalidOperationException("The wiki API response had no readable content.");
+                            // Content may be chunked; read to EOF rather than trusting its initial Size.
+                            using (var reader = new StreamReader(content.AsStreamForRead(), Encoding.UTF8))
                             {
-                                var contentStream = await e.Response.GetContentAsync();
-                                uint size = (uint)contentStream.Size;
-
-                                if (size == 0)
-                                {
-                                    System.Diagnostics.Debug.WriteLine("[WebView2ApiWorker] Response stream size is 0.");
-                                    return;
-                                }
-
-                                using (var reader = new Windows.Storage.Streams.DataReader(contentStream))
-                                {
-                                    await reader.LoadAsync(size);
-                                    byte[] bytes = new byte[size];
-                                    reader.ReadBytes(bytes);
-                                    string raw = Encoding.UTF8.GetString(bytes);
-
-                                    System.Diagnostics.Debug.WriteLine($"[WebView2ApiWorker] Received {bytes.Length} bytes from {e.Request.Uri}");
-
-                                    if (!string.IsNullOrWhiteSpace(raw) &&
-                                        (raw.Trim().StartsWith("{") || raw.Trim().StartsWith("[")))
-                                    {
-                                        tcs.TrySetResult(raw.Trim());
-                                    }
-                                    else
-                                    {
-                                        System.Diagnostics.Debug.WriteLine("[WebView2ApiWorker] Response did not look like JSON.");
-                                    }
-                                }
+                                string text = (await reader.ReadToEndAsync()).Trim();
+                                if (CloudflareDetector.IsCloudflareChallenge(text))
+                                    throw new NeedsUserVerificationException("The wiki requires a security check.", url);
+                                if (args.Response.StatusCode >= 400)
+                                    throw new InvalidOperationException("The wiki API returned HTTP " + args.Response.StatusCode + ".");
+                                if (!text.StartsWith("{") && !text.StartsWith("["))
+                                    throw new InvalidOperationException("The wiki API did not return JSON.");
+                                received.TrySetResult(text);
                             }
                         }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"[WebView2ApiWorker] Exception reading response: {ex}");
-                            tcs.TrySetException(ex);
-                        }
-                    };
-
+                    }
+                    catch (Exception error) { received.TrySetException(error); }
+                };
+                view.WebResourceResponseReceived += handler;
+                try
+                {
+                    // Chromium consumes the request asynchronously, so keep its stream alive
+                    // until the response has been read (including large draft POST bodies).
                     using (var stream = new InMemoryRandomAccessStream())
                     {
-                        await stream.WriteAsync(postBytes.AsBuffer());
+                        await stream.WriteAsync(Encoding.UTF8.GetBytes(body).AsBuffer());
                         stream.Seek(0);
-
-                        var request = WebView.CoreWebView2.Environment.CreateWebResourceRequest(
-                            url,
-                            "POST",
-                            stream,
-                            "Content-Type: application/x-www-form-urlencoded"
-                        );
-
-                        System.Diagnostics.Debug.WriteLine($"[WebView2ApiWorker] Sending POST to {url} with body length {postBytes.Length}");
-                        WebView.CoreWebView2.NavigateWithWebResourceRequest(request);
+                        var request = view.Environment.CreateWebResourceRequest(url, "POST", stream,
+                            "Content-Type: application/x-www-form-urlencoded\r\n");
+                        view.NavigateWithWebResourceRequest(request);
+                        return await NetworkOperationTimeout.RunAsync(() => received.Task, TimeSpan.FromSeconds(45),
+                            "The wiki API did not finish the POST request in time.");
                     }
-
-                    var completedTask = await Task.WhenAny(tcs.Task, Task.Delay(15000));
-                    if (completedTask != tcs.Task)
-                        throw new TimeoutException($"Timed out waiting for POST response from {url}");
-
-                    return await tcs.Task;
                 }
-            );
+                finally
+                {
+                    view.WebResourceResponseReceived -= handler;
+                    if (received.Task.Status != TaskStatus.RanToCompletion) view.Stop();
+                }
+            });
         }
 
         public void Dispose()

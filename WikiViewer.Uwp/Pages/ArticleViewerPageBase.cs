@@ -592,6 +592,7 @@ namespace WikiViewer.Uwp.Pages
         {
             if (!string.IsNullOrEmpty(_pageTitleToFetch))
             {
+                EditorPreviewBootstrap.Store(_pageWikiContext.Id, _pageTitleToFetch, _displayedContent);
                 App.Navigate(
                     GetEditPageType(),
                     new ArticleNavigationParameter
