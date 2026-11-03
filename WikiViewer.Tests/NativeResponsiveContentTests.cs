@@ -74,6 +74,30 @@ public class NativeResponsiveContentTests
     }
 
     [Fact]
+    public void WikimediaFormulaRetainsTextRelativeDimensionsAndThemeablePaths()
+    {
+        var formula = NativeArticleDocumentService.Parse("<img class='mwe-math-fallback-image-inline' src='/math/render/svg/root' style='width:3.198ex;height:3.009ex' alt='square root of gamma'>", Page).Nodes.Single();
+        Assert.InRange(formula.Style.Width.Resolve(800), 28, 30);
+        Assert.InRange(formula.Style.Height.Resolve(800), 27, 28);
+        var svg = NativeSvgService.PrepareFormula("<svg><g fill='currentColor' stroke='currentColor'><path fill='none' d='M0 0'/></g><script>bad()</script></svg>", "#EEEEEE");
+        Assert.DoesNotContain("currentColor", svg);
+        Assert.DoesNotContain("script", svg);
+        Assert.Contains("fill=\"#EEEEEE\"", svg);
+        Assert.Contains("fill=\"none\"", svg);
+        Assert.Null(NativeSvgService.PrepareFormula("<svg/>", "url(untrusted)"));
+    }
+
+    [Fact]
+    public void HiddenAccessibleMathDoesNotTurnAnInlineFormulaIntoABlock()
+    {
+        var paragraph = NativeArticleDocumentService.Parse("<p>multiply by <span class='mwe-math-element'><span style='display:none;position:absolute'><math><mi>x</mi></math></span><img src='/math/render/svg/x' style='width:1.3ex;height:1.5ex'></span> next</p>", Page).Nodes.Single();
+        var formula = paragraph.Children.Single(child => child.Classes?.Contains("mwe-math-element") == true);
+        Assert.False(formula.IsBlock);
+        Assert.True(formula.Children.First().Style.Hidden);
+        Assert.Equal(NativeArticleNodeKind.Paragraph, paragraph.Kind);
+    }
+
+    [Fact]
     public void UnequalHomepageColumnsKeepTheirFlexWeights()
     {
         var node = NativeArticleDocumentService.Parse("<style>.banner{display:flex;flex-flow:row wrap;gap:20px}.wide{flex:3}.narrow{flex:1}</style><div class='banner'><div class='wide'>Welcome</div><div class='narrow'>Navigation</div></div>", Page).Nodes.Single();

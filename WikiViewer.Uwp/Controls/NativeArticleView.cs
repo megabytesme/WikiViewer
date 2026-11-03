@@ -32,6 +32,7 @@ namespace WikiViewer.Uwp.Controls
         private bool _themeSubscribed;
         private readonly Dictionary<string, FrameworkElement> _anchors = new Dictionary<string, FrameworkElement>(StringComparer.Ordinal);
         private readonly List<Image> _images = new List<Image>();
+        private readonly Dictionary<Image, Tuple<string, NativeArticleStyle>> _formulaSvg = new Dictionary<Image, Tuple<string, NativeArticleStyle>>();
         private NativeArticleDocument _document;
         private readonly Dictionary<NativeArticleNode, List<WeakReference<Run>>> _draftRuns = new Dictionary<NativeArticleNode, List<WeakReference<Run>>>();
         private readonly Dictionary<NativeArticleNode, WeakReference<FrameworkElement>> _draftTextOwners = new Dictionary<NativeArticleNode, WeakReference<FrameworkElement>>();
@@ -97,6 +98,7 @@ namespace WikiViewer.Uwp.Controls
         private void UpdatePalette()
         {
             _palette.Update(this, _accessibility.HighContrast, _uiSettings);
+            foreach (var formula in _formulaSvg.ToArray()) _ = ApplyFormulaColorAsync(formula.Key, formula.Value.Item1, formula.Value.Item2);
             if (_document == null) return;
             _scroll.Background = _palette.Canvas(_document.Background);
             if (_sections != null) _sections.Background = _palette.Canvas(_document.Background);
@@ -363,7 +365,7 @@ namespace WikiViewer.Uwp.Controls
             if (!scope.Active) return;
             scope.Active = false;
             scope.Cancellation.Cancel(); scope.Cancellation.Dispose();
-            foreach (var image in scope.Images) { _images.Remove(image); image.Source = null; }
+            foreach (var image in scope.Images) { _images.Remove(image); _formulaSvg.Remove(image); image.Source = null; }
             foreach (var media in scope.Media) { _media.Remove(media); media.Dispose(); }
             foreach (var anchor in scope.Anchors) { FrameworkElement current; if (_anchors.TryGetValue(anchor.Key, out current) && current == anchor.Value) _anchors.Remove(anchor.Key); }
             _scopes.Remove(scope);
@@ -393,6 +395,7 @@ namespace WikiViewer.Uwp.Controls
             _root.Children.Clear();
             _anchors.Clear();
             _images.Clear();
+            _formulaSvg.Clear();
             _palette.Clear();
         }
 
@@ -604,7 +607,11 @@ namespace WikiViewer.Uwp.Controls
         private FrameworkElement Image(NativeArticleNode node)
         {
             if (node.Uri == null && node.SvgContent == null) return new TextBlock { Text = node.Text ?? "[Image]", TextWrapping = TextWrapping.Wrap };
-            var image = new Image { Width = node.ImageWidth > 0 ? node.ImageWidth : double.NaN, MaxWidth = Math.Max(80, _root.ActualWidth > 0 ? _root.ActualWidth - 40 : 320), MaxHeight = 600, Stretch = Stretch.Uniform, Margin = new Thickness(0, 8, 0, 8) };
+            bool formula = node.Classes?.Contains("mwe-math-fallback") == true || node.Uri?.AbsolutePath.IndexOf("/math/render/", StringComparison.OrdinalIgnoreCase) >= 0;
+            double font = node.Style.FontSize?.Resolve(18) ?? 18;
+            double width = node.Style.Width != null && node.Style.Width.Unit != "%" ? node.Style.Width.Resolve(800, font) : node.ImageWidth > 0 ? node.ImageWidth : double.NaN;
+            double height = node.Style.Height != null && node.Style.Height.Unit != "%" ? node.Style.Height.Resolve(800, font) : double.NaN;
+            var image = new Image { Width = width, Height = height, MaxWidth = Math.Max(80, _root.ActualWidth > 0 ? _root.ActualWidth - 40 : 320), MaxHeight = 600, Stretch = Stretch.Uniform, Margin = formula ? new Thickness(0) : new Thickness(0, 8, 0, 8) };
             if (node.SvgContent == null && (node.Uri == null || node.Uri.AbsolutePath.IndexOf("/math/render/", StringComparison.OrdinalIgnoreCase) < 0)) _palette.Decorate(image);
             var host = new Grid { MinHeight = Math.Min(32, node.ImageWidth > 0 ? node.ImageWidth : 32) }; host.Children.Add(image);
             double indicatorSize = Math.Min(32, node.ImageWidth > 0 ? node.ImageWidth : 32);
@@ -653,11 +660,12 @@ namespace WikiViewer.Uwp.Controls
                         catch (Exception ex) { System.Diagnostics.Debug.WriteLine("Native reader image cache: " + ex.Message); }
                         if (version != _version || scope?.Active == false) return;
                         Uri local;
-                        if (Uri.TryCreate(resolved, UriKind.Absolute, out local) && await LoadImageSourceAsync(image, local, IsSvg(remote))) { finished(); return; }
+                        if (Uri.TryCreate(resolved, UriKind.Absolute, out local) &&
+                            (formula && await LoadFormulaAsync(image, local, node.Style, cancellationToken, version) || !formula && await LoadImageSourceAsync(image, local, IsSvg(remote)))) { finished(); return; }
                         if (version != _version || scope?.Active == false) return;
                         if (!System.Net.NetworkInformation.NetworkInterface.GetIsNetworkAvailable())
                         { fallback.Text = (node.Text ?? "Image") + " — unavailable offline"; failed(); return; }
-                        if (await LoadImageSourceAsync(image, remote, IsSvg(remote))) { finished(); return; }
+                        if (formula ? await LoadFormulaAsync(image, remote, node.Style, cancellationToken, version) : await LoadImageSourceAsync(image, remote, IsSvg(remote))) { finished(); return; }
                         if (version != _version || scope?.Active == false) return;
                     }
                     failed();
@@ -665,6 +673,52 @@ namespace WikiViewer.Uwp.Controls
                 catch (Exception ex) { if (version == _version) failed(); System.Diagnostics.Debug.WriteLine("Native reader image: " + ex.Message); }
             };
             return host;
+        }
+
+        private async Task<bool> LoadFormulaAsync(Image image, Uri uri, NativeArticleStyle style, CancellationToken token, int version)
+        {
+            try
+            {
+                string markup;
+                if (uri.Scheme == "ms-appdata" || uri.Scheme == "ms-appx")
+                    markup = await FileIO.ReadTextAsync(await StorageFile.GetFileFromApplicationUriAsync(uri)).AsTask(token);
+                else
+                {
+                    using (var worker = new WikiViewer.Uwp.Services.UwpHttpClientApiWorker())
+                    {
+                        await worker.InitializeAsync(uri.GetLeftPart(UriPartial.Authority));
+                        markup = await NetworkOperationTimeout.RunAsync(() => worker.GetRawHtmlFromUrlAsync(uri.AbsoluteUri), TimeSpan.FromSeconds(15), "Formula download timed out.");
+                    }
+                }
+                if (token.IsCancellationRequested || version != _version) return false;
+                string safe = NativeSvgService.Prepare(markup);
+                if (safe == null) return false;
+                _formulaSvg[image] = Tuple.Create(safe, style);
+                return await ApplyFormulaColorAsync(image, safe, style);
+            }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine("Native formula: " + ex.Message); return false; }
+        }
+
+        private async Task<bool> ApplyFormulaColorAsync(Image image, string markup, NativeArticleStyle style)
+        {
+            try
+            {
+                int version = _version;
+                var color = _palette.Get(style.Foreground, ArticleColorRole.Text, style.ColorContext).Color;
+                string themed = NativeSvgService.PrepareFormula(markup, "#" + color.R.ToString("X2") + color.G.ToString("X2") + color.B.ToString("X2"));
+                if (themed == null) return false;
+                var svg = new SvgImageSource();
+                using (var stream = new InMemoryRandomAccessStream())
+                {
+                    using (var writer = new DataWriter(stream.GetOutputStreamAt(0))) { writer.WriteBytes(System.Text.Encoding.UTF8.GetBytes(themed)); await writer.StoreAsync(); }
+                    stream.Seek(0);
+                    if (await svg.SetSourceAsync(stream) != SvgImageSourceLoadStatus.Success || version != _version || !_formulaSvg.ContainsKey(image) ||
+                        !color.Equals(_palette.Get(style.Foreground, ArticleColorRole.Text, style.ColorContext).Color)) return false;
+                    image.Source = svg;
+                    return true;
+                }
+            }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine("Native formula colour: " + ex.Message); return false; }
         }
 
         private static async Task ShowImageProgressAsync(ProgressRing progress, Func<bool> pending)

@@ -41,10 +41,10 @@ namespace WikiViewer.Core.Models
         public double Value { get; set; }
         public string Unit { get; set; }
         public double Resolve(double available, double fontSize = 18) => Unit == "%" ? available * Value / 100 :
-            Unit == "em" ? fontSize * Value : Unit == "rem" ? 18 * Value : Unit == "pt" ? Value * 4 / 3 : Value;
+            Unit == "em" ? fontSize * Value : Unit == "ex" ? fontSize * Value * 0.5 : Unit == "rem" ? 18 * Value : Unit == "pt" ? Value * 4 / 3 : Value;
         public static ArticleLength Parse(string source, bool allowNegative = false)
         {
-            var match = Regex.Match((source ?? "").Trim(), @"^(-?\d+(?:\.\d+)?)(px|em|rem|pt|%)?$", RegexOptions.IgnoreCase);
+            var match = Regex.Match((source ?? "").Trim(), @"^(-?\d+(?:\.\d+)?)(px|em|ex|rem|pt|%)?$", RegexOptions.IgnoreCase);
             double number;
             if (!match.Success || !double.TryParse(match.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out number) ||
                 (!allowNegative && number < 0) || Math.Abs(number) > 10000) return null;

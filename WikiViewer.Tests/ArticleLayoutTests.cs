@@ -97,7 +97,7 @@ public class ArticleLayoutTests
     }
 
     [Theory]
-    [InlineData("25%", 200)] [InlineData("2em", 36)] [InlineData("12pt", 16)] [InlineData("120px", 120)]
+    [InlineData("25%", 200)] [InlineData("2em", 36)] [InlineData("12pt", 16)] [InlineData("120px", 120)] [InlineData("3.198ex", 28.782)]
     public void ResolvesLayoutLengths(string value, double expected) => Assert.Equal(expected, ArticleLength.Parse(value).Resolve(800));
 
     [Theory]

@@ -6,6 +6,19 @@ namespace WikiViewer.Core.Services
 {
     public static class NativeSvgService
     {
+        public static string PrepareFormula(string source, string color)
+        {
+            string safe = Prepare(source);
+            if (safe == null || !System.Text.RegularExpressions.Regex.IsMatch(color ?? "", "^#[0-9a-fA-F]{6}$")) return null;
+            var root = XElement.Parse(safe);
+            root.SetAttributeValue("fill", color);
+            root.SetAttributeValue("color", color);
+            foreach (var attribute in root.DescendantsAndSelf().Attributes().Where(a =>
+                (a.Name.LocalName == "fill" || a.Name.LocalName == "stroke") && a.Value.Equals("currentColor", StringComparison.OrdinalIgnoreCase)).ToList())
+                attribute.Value = color;
+            return root.ToString(SaveOptions.DisableFormatting);
+        }
+
         /// <summary>Retain static vector markup; native SVG rendering does not run page code.</summary>
         public static string Prepare(string source)
         {
