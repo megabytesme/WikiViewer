@@ -186,6 +186,10 @@ namespace WikiViewer.Core.Services
                 var converted = Convert(child, pageUri, document, node.PreserveWhitespace, node.RightToLeft, insideLink || node.Kind == NativeArticleNodeKind.Link, style, depth + 1);
                 if (converted != null) node.Children.Add(converted);
             }
+            // MediaWiki wraps players in inline file spans. Keep those wrappers
+            // in block layout so the player receives the card's finite width.
+            if (tag == "span" && ContainsMedia(node))
+                node.IsBlock = true;
             if (node.Kind == NativeArticleNodeKind.List && (style.Display == "grid" || style.Display == "flex"))
             {
                 node.Kind = NativeArticleNodeKind.Container; node.IsBlock = true;
@@ -264,6 +268,9 @@ namespace WikiViewer.Core.Services
             }
             return node;
         }
+
+        private static bool ContainsMedia(NativeArticleNode node) => !node.Style.Hidden &&
+            (node.Kind == NativeArticleNodeKind.Media || node.Children.Any(ContainsMedia));
 
         private static void Inherit(NativeArticleStyle style, NativeArticleStyle parent)
         {

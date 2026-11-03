@@ -22,7 +22,7 @@ namespace WikiViewer.Uwp.Controls
             Func<int, double, double> measure = (index, cell) =>
             {
                 var element = Children[index] as Windows.UI.Xaml.FrameworkElement;
-                if (element != null) element.MaxWidth = Math.Max(1, cell);
+                if (element != null) element.MaxWidth = Math.Max(1, cell - element.Margin.Left - element.Margin.Right);
                 Children[index].Measure(new Size(cell, double.PositiveInfinity)); return Children[index].DesiredSize.Height;
             };
             if (FlowStyle?.Display == "flex")

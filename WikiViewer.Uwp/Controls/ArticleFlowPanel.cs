@@ -34,7 +34,8 @@ namespace WikiViewer.Uwp.Controls
                 if (element != null)
                 {
                     var style = element.GetValue(LayoutStyleProperty) as NativeArticleStyle;
-                    element.MaxWidth = Math.Min(style?.MaxWidth?.Resolve(width) ?? 960, Math.Max(1, constraint));
+                    double contentWidth = Math.Max(1, constraint - element.Margin.Left - element.Margin.Right);
+                    element.MaxWidth = Math.Min(style?.MaxWidth?.Resolve(width) ?? 960, contentWidth);
                     if (style?.Width != null) element.Width = Math.Min(element.MaxWidth, Math.Max(1, style.Width.Resolve(width)));
                 }
                 Children[index].Measure(new Size(Math.Max(1, constraint), double.PositiveInfinity));

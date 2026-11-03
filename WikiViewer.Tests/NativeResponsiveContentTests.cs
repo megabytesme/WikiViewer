@@ -60,6 +60,19 @@ public class NativeResponsiveContentTests
         Assert.Single(media.MediaSources);
     }
 
+    [Theory]
+    [InlineData("audio")]
+    [InlineData("video")]
+    public void NestedFileSpansKeepMediaInFiniteWidthBlockLayout(string tag)
+    {
+        var wrapper = NativeArticleDocumentService.Parse("<span typeof='mw:File'><span><" + tag + " width='350'><source src='/clip.mp4' type='video/mp4'></" + tag + "></span></span>", Page).Nodes.Single();
+        Assert.True(wrapper.IsBlock);
+        Assert.True(wrapper.Children.Single().IsBlock);
+        var media = wrapper.Children.Single().Children.Single();
+        Assert.Equal(NativeArticleNodeKind.Media, media.Kind);
+        Assert.Equal(350, media.Style.Width.Value);
+    }
+
     [Fact]
     public void UnequalHomepageColumnsKeepTheirFlexWeights()
     {
